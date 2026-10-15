@@ -1,0 +1,28 @@
+--- a/gpu-port/xkpi/override/src/linux_pci.c
++++ b/gpu-port/xkpi/override/src/linux_pci.c
+@@ -296,13 +296,25 @@
+ 	uint16_t subvendor;
+ 	uint16_t subdevice;
+ 
++	driver_t *probing;
++
+ 	vendor = pci_get_vendor(dev);
+ 	device = pci_get_device(dev);
+ 	subvendor = pci_get_subvendor(dev);
+ 	subdevice = pci_get_subdevice(dev);
++	/*
++	 * macOS port: amdgpu, i915 and xe are linked into one kext, so a device id can be in more than one driver's
++	 * table (xe lists Tiger Lake through Arrow Lake too). FreeBSD never loads two of them together and took the
++	 * first table that matched; here that was xe (registered last, so first in the list), and i915's probe then
++	 * declined with ENXIO because the match was not its own: "vgapci0: no driver attached" for every Intel iGPU.
++	 * While a driver probes or attaches, only that driver's table counts.
++	 */
++	probing = device_get_driver(dev);
+ 
+ 	spin_lock(&pci_lock);
+ 	list_for_each_entry(pdrv, &pci_drivers, node) {
++		if (probing != NULL && probing != &pdrv->bsddriver)
++			continue;
+ 		for (id = pdrv->id_table; id->vendor != 0; id++) {
+ 			if (vendor == id->vendor &&
+ 			    (PCI_ANY_ID == id->device || device == id->device) &&

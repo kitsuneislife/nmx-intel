@@ -1,0 +1,19 @@
+--- a/drivers/gpu/drm/i915/soc/intel_pch.c
++++ b/drivers/gpu/drm/i915/soc/intel_pch.c
+@@ -277,7 +277,15 @@
+ 		dev_priv->pch_type = PCH_NOP;
+ 		dev_priv->pch_id = 0;
+ 	} else if (!pch) {
+-		if (i915_run_as_guest() && HAS_DISPLAY(dev_priv)) {
++		/*
++		 * macOS port (NMXGPU): only the GPU's own PCI function is visible to the
++		 * port, so the ISA bridge scan above never finds the PCH. Without a PCH
++		 * type the display code takes the PPS registers at 0x61200 instead of
++		 * the PCH ones at 0xc7200 and reads them as zero ("PPS 0 powered off
++		 * while attempting AUX CH communication", "PPS state mismatch"). Make
++		 * the same educated guess a virtual machine gets.
++		 */
++		if (HAS_DISPLAY(dev_priv)) {
+ 			intel_virt_detect_pch(dev_priv, &id, &pch_type);
+ 			dev_priv->pch_type = pch_type;
+ 			dev_priv->pch_id = id;

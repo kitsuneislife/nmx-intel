@@ -1,0 +1,29 @@
+--- a/drivers/gpu/drm/i915/display/intel_dp_tunnel.c
++++ b/drivers/gpu/drm/i915/display/intel_dp_tunnel.c
+@@ -662,6 +662,9 @@
+ 
+ 	err = drm_dp_tunnel_atomic_check_stream_bws(&state->base,
+ 						    &failed_stream_mask);
++	/* macOS port (NMXGPU): no DP tunnel helpers, so no tunnel BW to check */
++	if (err == -EOPNOTSUPP)
++		return 0;
+ 	if (err != -ENOSPC)
+ 		return err;
+ 
+@@ -792,6 +795,16 @@
+ 	drm_connector_list_iter_end(&connector_list_iter);
+ 
+ 	tunnel_mgr = drm_dp_tunnel_mgr_create(display->drm, dp_connectors);
++	/*
++	 * macOS port (NMXGPU): i915 is built with CONFIG_DRM_I915_DP_TUNNEL but the
++	 * DRM DP tunnel helpers are not, so the stub above always answers
++	 * -EOPNOTSUPP and the whole display probe failed with it ("Device
++	 * initialization failed (-102)"). No tunnel manager only means no DP
++	 * tunnelling: drm_dp_tunnel_detect() answers -EOPNOTSUPP too, which
++	 * intel_dp_detect() already ignores.
++	 */
++	if (PTR_ERR_OR_ZERO(tunnel_mgr) == -EOPNOTSUPP)
++		return 0;
+ 	if (IS_ERR(tunnel_mgr))
+ 		return PTR_ERR(tunnel_mgr);
+ 
