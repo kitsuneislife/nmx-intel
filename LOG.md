@@ -189,3 +189,24 @@ Saídas possíveis, as duas exigindo código novo e build do NMXGPU:
 2. Criar o buffer de scan-out na stolen memory (`i915_gem_object_create_stolen`).
 
 Falta saber se o i915 herdou o fb do GOP (procurar `initial plane`/`BIOS fb` no log do boot).
+
+## 2026-10-15: análise do teste 5, o fb do GOP não foi herdado
+
+No log do teste 5 (`~/n6.txt`, linhas a partir de 3440), a leitura do estado do hardware pelo i915 mostra
+tudo desligado:
+```
+[drm] Got Intel graphics stolen memory base 0x3e800000, size 0x4000000
+[CRTC:82:pipe A] hw state readout: disabled
+[PLANE:32:plane 1A] hw state readout: disabled, pipe A
+BIOS left unused DDI_IO_A power well enabled, disabling it
+```
+- Não aparece `initial plane`, `BIOS fb` nem `takeover`. Quando o i915 assume, o pipe A já está desligado,
+  então não sobra framebuffer do GOP para herdar.
+- **O caminho 1 está descartado.** Fica o caminho 2: criar o buffer de scan-out na stolen memory
+  (`i915_gem_object_create_stolen`), fixar no GGTT e publicar o endereço físico (`0x3e800000 + offset`).
+- A stolen foi detectada certa (64 MiB), então há espaço: 1920x1080x4 dá uns 8 MiB.
+
+## Próximo: build do NMXGPU
+
+Montar a árvore de fontes, compilar sem mudanças e comparar com o binário da release 2.0.2. Só depois
+escrever a ponte nova para o i915.
