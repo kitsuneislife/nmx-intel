@@ -22,6 +22,8 @@ O NVIDIA (RTX 3050) já funciona com o driver original e não é afetado por nad
 | `-102` no primeiro modeset (`intel_dp_tunnel_atomic_check_link`, mesma falha de build) | ✅ patch 5 |
 | **i915 inicializa por completo: `NullMoth GPU: driving 8086:a7a8`** | ✅ |
 | NMXAccel atende clientes Metal (user clients, GPU tasks) | ✅ começou |
+| fb do GOP herdado pelo i915 | ❌ não: o pipe A já está desligado quando o i915 assume. Fica o buffer na stolen |
+| **Compilar o NMXGPU no Mac** (`build/`) | ✅ o build sem mudanças bate com a release |
 | Ponte de tela: `the scan-out buffer would not map (102)` (GEM do i915 sem `.vmap`, buffer não contínuo) | ❌ precisa de código novo, ver LOG |
 | Tela preta com o Mac vivo (sem framebuffer, o i915 desliga o pipe, DC6) | ❌ consequência da ponte |
 | Tela acelerada / Metal na Intel | ❌ ainda não |
