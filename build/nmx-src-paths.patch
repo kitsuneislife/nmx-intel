@@ -1,0 +1,395 @@
+diff --git a/gpu-port/xkpi/all-i915.sh b/gpu-port/xkpi/all-i915.sh
+index e4ee72c..141a2d9 100755
+--- a/gpu-port/xkpi/all-i915.sh
++++ b/gpu-port/xkpi/all-i915.sh
+@@ -1,14 +1,14 @@
+ #!/bin/bash
+ # all-i915.sh [N]: compiles every source drm-kmod's i915 Makefile builds (evaluated against amd.flags, the shared CONFIG
+ # set) into obj-i915/, and ranks the remaining errors. The DRM core, TTM and dma-buf come from all.sh (obj/).
+-X=/Volumes/MiniData/build/gpu-src/xkpi
+-K=/Volumes/MiniData/build/gpu-src/kpi
++X=${NMX_SRC:-$HOME/nmx-build/gpu-src}/xkpi
++K=${NMX_SRC:-$HOME/nmx-build/gpu-src}/kpi
+ cd "$X" || exit 1
+ mkdir -p obj-i915 logs-i915 && rm -f logs-i915/*.log logs-i915/*.failed
+ # intel_ggtt_gmch.c: pre-Gen6 GTT through FreeBSD agp(4); override/i915/nmx_i915_gmch.c answers for it
+ # i915_gem_mman.c: forked by fork_i915_gem_mman.py into override/i915
+ EXCLUDE="intel_ggtt_gmch.c i915_gem_mman.c"
+-/opt/homebrew/bin/python3 srclist.py "$K/drm-kmod" amd.flags i915 2>/dev/null > srcs-i915.all
++python3 srclist.py "$K/drm-kmod" amd.flags i915 2>/dev/null > srcs-i915.all
+ : > srcs-i915.txt
+ while read -r f; do
+     case " $EXCLUDE " in
+@@ -16,7 +16,7 @@ while read -r f; do
+         *) echo "$f" >> srcs-i915.txt ;;
+     esac
+ done < srcs-i915.all
+-/opt/homebrew/bin/python3 fork_i915_gem_mman.py "$K/drm-kmod" override/i915/i915_gem_mman.c >/dev/null
++python3 fork_i915_gem_mman.py "$K/drm-kmod" override/i915/i915_gem_mman.c >/dev/null
+ for f in "$X"/override/i915/*.c; do echo "$f" >> srcs-i915.txt; done
+ n=$(wc -l < srcs-i915.txt | tr -d ' ')
+ one() { b=$(basename "$1" .c); rm -f logs-i915/$b.failed; ./cc-i915.sh "$1" > logs-i915/$b.log 2>&1 || touch logs-i915/$b.failed; }
+diff --git a/gpu-port/xkpi/all-npu.sh b/gpu-port/xkpi/all-npu.sh
+index d55e762..5bc9fe6 100755
+--- a/gpu-port/xkpi/all-npu.sh
++++ b/gpu-port/xkpi/all-npu.sh
+@@ -1,11 +1,11 @@
+ #!/bin/bash
+ # all-npu.sh [N]: compiles Intel's NPU driver (ivpu) and the DRM accel core from Linux 6.14 into obj-npu/ (GPL-2.0:
+ # they link into NMXNPU.kext only) and ranks the remaining errors.
+-X=/Volumes/MiniData/build/gpu-src/xkpi
+-V=/Volumes/MiniData/build/gpu-src/linux-6.14
++X=${NMX_SRC:-$HOME/nmx-build/gpu-src}/xkpi
++V=${NMX_SRC:-$HOME/nmx-build/gpu-src}/linux-6.14
+ cd "$X" || exit 1
+ mkdir -p obj-npu logs-npu override/npu && rm -f logs-npu/*.log logs-npu/*.failed
+-/opt/homebrew/bin/python3 fork_npu.py "$V" npu-src /Volumes/MiniData/build/gpu-src/linux || exit 1
++python3 fork_npu.py "$V" npu-src ${NMX_SRC:-$HOME/nmx-build/gpu-src}/linux || exit 1
+ # ivpu_debugfs.c and ivpu_coredump.c: debugfs and devcoredump do not exist on macOS (their headers stub them)
+ ls npu-src/ivpu/*.c npu-src/drm_accel.c npu-src/drm_gem_shmem_helper.c | grep -v "ivpu_debugfs.c\|ivpu_coredump.c" > srcs-npu.txt
+ # AMD XDNA: built separately per file with NMX_XDNA (its own include paths); listed after ivpu
+diff --git a/gpu-port/xkpi/all-npucore.sh b/gpu-port/xkpi/all-npucore.sh
+index a58ca5c..e12a7e4 100755
+--- a/gpu-port/xkpi/all-npucore.sh
++++ b/gpu-port/xkpi/all-npucore.sh
+@@ -1,12 +1,12 @@
+ #!/bin/bash
+ # all-npucore.sh [N]: NMXNPU's DRM core - drm-kmod's drm and dmabuf modules, as all.sh selects them, plus the DRM
+ # helpers the NPU drivers use - compiled with CONFIG_DRM_ACCEL into obj-npucore/.
+-X=/Volumes/MiniData/build/gpu-src/xkpi
+-K=/Volumes/MiniData/build/gpu-src/kpi
++X=${NMX_SRC:-$HOME/nmx-build/gpu-src}/xkpi
++K=${NMX_SRC:-$HOME/nmx-build/gpu-src}/kpi
+ cd "$X" || exit 1
+ mkdir -p obj-npucore logs-npucore && rm -f logs-npucore/*.log logs-npucore/*.failed
+ EXCLUDE="drm_gem_ttm_helper.c drm_writeback.c drm_hdcp_helper.c sync_file.c dma-fence-unwrap.c dma-buf.c dma-buf-kmod.c linux_fb.c vt_drmfb.c drm_os_freebsd.c"
+-/opt/homebrew/bin/python3 srclist.py "$K/drm-kmod" amd.flags drm dmabuf 2>/dev/null > srcs-npucore.all
++python3 srclist.py "$K/drm-kmod" amd.flags drm dmabuf 2>/dev/null > srcs-npucore.all
+ : > srcs-npucore.txt
+ while read -r f; do
+     case " $EXCLUDE " in *" $(basename "$f") "*) ;; *) echo "$f" >> srcs-npucore.txt ;; esac
+diff --git a/gpu-port/xkpi/all-xe.sh b/gpu-port/xkpi/all-xe.sh
+index 7da54f3..57fd5d8 100755
+--- a/gpu-port/xkpi/all-xe.sh
++++ b/gpu-port/xkpi/all-xe.sh
+@@ -1,11 +1,11 @@
+ #!/bin/bash
+ # all-xe.sh [N]: compiles every source Linux 6.14's xe Makefile builds (display included) into obj-xe/ and ranks the
+ # remaining errors. The DRM core, TTM, scheduler and dma-buf come from all.sh (obj/), as for i915.
+-X=/Volumes/MiniData/build/gpu-src/xkpi
+-V=/Volumes/MiniData/build/gpu-src/linux-6.14
++X=${NMX_SRC:-$HOME/nmx-build/gpu-src}/xkpi
++V=${NMX_SRC:-$HOME/nmx-build/gpu-src}/linux-6.14
+ XE=$X/xe-src
+ # the i915 display and soc code xe shares: drm-kmod's 6.14 copy, the one the i915 build already compiles
+-I915=/Volumes/MiniData/build/gpu-src/kpi/drm-kmod/drivers/gpu/drm/i915
++I915=${NMX_SRC:-$HOME/nmx-build/gpu-src}/kpi/drm-kmod/drivers/gpu/drm/i915
+ # compat-i915-headers reach it as ../../../i915 from inside xe-src
+ ln -sfn "$I915" i915
+ cd "$X" || exit 1
+@@ -13,7 +13,7 @@ cd "$X" || exit 1
+ # picked up by an #include "..." from its own directory; the replacements live in override/xe.
+ rsync -a --delete --exclude tests/ --exclude xe_pt_walk.c --exclude xe_pt_walk.h --exclude xe_res_cursor.h \
+     --exclude 'xe_trace*' --exclude 'xe_vsec.*' --exclude xe_module.c "$V/drivers/gpu/drm/xe/" xe-src/ || exit 1
+-/opt/homebrew/bin/python3 fork_xe.py xe-src || exit 1
++python3 fork_xe.py xe-src || exit 1
+ # (Makefile/Kconfig are kbuild files, never built; only source and headers must be free of GPL)
+ if grep -rl --include='*.c' --include='*.h' 'SPDX-License-Identifier: GPL' xe-src; then echo 'a GPL file is left in xe-src' >&2; exit 1; fi
+ mkdir -p obj-xe/gen logs-xe && rm -f logs-xe/*.log logs-xe/*.failed
+@@ -31,7 +31,7 @@ if [ ! -f obj-xe/gen/generated/xe_wa_oob.h ]; then
+     xcrun clang -O2 '-Dprogram_invocation_short_name=getprogname()' -include stdlib.h -o obj-xe/gen/xe_gen_wa_oob "$XE/xe_gen_wa_oob.c" || exit 1
+     obj-xe/gen/xe_gen_wa_oob "$XE/xe_wa_oob.rules" obj-xe/gen/generated/xe_wa_oob.c obj-xe/gen/generated/xe_wa_oob.h || exit 1
+ fi
+-/opt/homebrew/bin/python3 xesrc.py "$V" amd.flags --i915 "$I915" DRM_XE DRM_XE_DISPLAY | sed "s|^$V/drivers/gpu/drm/xe/|$XE/|" > srcs-xe.all
++python3 xesrc.py "$V" amd.flags --i915 "$I915" DRM_XE DRM_XE_DISPLAY | sed "s|^$V/drivers/gpu/drm/xe/|$XE/|" > srcs-xe.all
+ : > srcs-xe.txt
+ while read -r f; do
+     case " $EXCLUDE " in
+diff --git a/gpu-port/xkpi/all.sh b/gpu-port/xkpi/all.sh
+index bd1ce4a..fc224ba 100755
+--- a/gpu-port/xkpi/all.sh
++++ b/gpu-port/xkpi/all.sh
+@@ -3,14 +3,14 @@
+ # Sources are exactly what drm-kmod's Makefiles build for amdgpu (minus the display core), drm, ttm and dmabuf,
+ # evaluated against amd.flags, minus files that are GPL-only or built on FreeBSD file descriptors or its console;
+ # the port supplies its own code for those.
+-X=/Volumes/MiniData/build/gpu-src/xkpi
+-K=/Volumes/MiniData/build/gpu-src/kpi
++X=${NMX_SRC:-$HOME/nmx-build/gpu-src}/xkpi
++K=${NMX_SRC:-$HOME/nmx-build/gpu-src}/kpi
+ cd "$X" || exit 1
+ mkdir -p logs && rm -f logs/*.log logs/*.failed
+ 
+ # amdgpu_dm_crc.c: CRC capture is a debugfs feature (no debugfs on macOS; its header stubs the hooks to NULL)
+ EXCLUDE="amdgpu_dm_crc.c drm_gem_ttm_helper.c drm_writeback.c drm_hdcp_helper.c sync_file.c dma-fence-unwrap.c dma-buf.c dma-buf-kmod.c linux_fb.c vt_drmfb.c drm_os_freebsd.c"
+-/opt/homebrew/bin/python3 srclist.py "$K/drm-kmod" amd.flags amd/amdgpu drm ttm dmabuf 2>/dev/null > srcs.all
++python3 srclist.py "$K/drm-kmod" amd.flags amd/amdgpu drm ttm dmabuf 2>/dev/null > srcs.all
+ : > srcs.txt
+ while read -r f; do
+     case " $EXCLUDE " in
+diff --git a/gpu-port/xkpi/cc-i915.sh b/gpu-port/xkpi/cc-i915.sh
+index c1e88cf..bb1d647 100755
+--- a/gpu-port/xkpi/cc-i915.sh
++++ b/gpu-port/xkpi/cc-i915.sh
+@@ -1,15 +1,15 @@
+ #!/bin/bash
+ # cc-i915.sh <source.c> [extra flags]: compiles one drm-kmod i915 source for the macOS kernel (x86_64) through the
+ # FreeBSD-on-xnu layer (bsdcompat) and FreeBSD LinuxKPI. drm-kmod's GPL-only linuxkpi/gplv2 headers are NOT on the path.
+-X=/Volumes/MiniData/build/gpu-src/xkpi
+-K=/Volumes/MiniData/build/gpu-src/kpi
++X=${NMX_SRC:-$HOME/nmx-build/gpu-src}/xkpi
++K=${NMX_SRC:-$HOME/nmx-build/gpu-src}/kpi
+ L=$K/freebsd-src/sys/compat/linuxkpi
+ D=$K/drm-kmod
+ A=$D/drivers/gpu/drm/amd
+ SDK=$(xcrun --sdk macosx --show-sdk-path)
+ KF=$SDK/System/Library/Frameworks/Kernel.framework/Headers
+ src=$1; shift
+-exec xcrun clang -arch x86_64 -mmacosx-version-min=15.0 -ffile-prefix-map=/Volumes/MiniData/build/gpu-src=/src -mkernel -fapple-kext -nostdinc -std=gnu11 \
++exec xcrun clang -arch x86_64 -mmacosx-version-min=15.0 -ffile-prefix-map=${NMX_SRC:-$HOME/nmx-build/gpu-src}=/src -mkernel -fapple-kext -nostdinc -std=gnu11 \
+   -fno-builtin -fno-common -fno-strict-aliasing -fms-extensions -O2 -g0 \
+   -Wno-pointer-sign -Wno-unused-parameter -Wno-microsoft-anon-tag -ferror-limit=80 \
+   -D_KERNEL -DKERNEL -DKERNEL_PRIVATE -DLINUXKPI_VERSION=61400 -DNMXKPI=1 \
+diff --git a/gpu-port/xkpi/cc-npu.sh b/gpu-port/xkpi/cc-npu.sh
+index 9791b8d..888c569 100755
+--- a/gpu-port/xkpi/cc-npu.sh
++++ b/gpu-port/xkpi/cc-npu.sh
+@@ -2,11 +2,11 @@
+ # cc-npu.sh <source.c> [extra flags]: compiles one Linux 6.14 NPU (accel) source - Intel's ivpu, the DRM accel core -
+ # for the macOS kernel through the port's layer, like cc-xe.sh. The NPU drivers are GPL-2.0, so they are built into
+ # their own kext (NMXNPU), never into NMXGPU.
+-X=/Volumes/MiniData/build/gpu-src/xkpi
+-K=/Volumes/MiniData/build/gpu-src/kpi
++X=${NMX_SRC:-$HOME/nmx-build/gpu-src}/xkpi
++K=${NMX_SRC:-$HOME/nmx-build/gpu-src}/kpi
+ L=$K/freebsd-src/sys/compat/linuxkpi
+ D=$K/drm-kmod
+-V=/Volumes/MiniData/build/gpu-src/linux-6.14
++V=${NMX_SRC:-$HOME/nmx-build/gpu-src}/linux-6.14
+ A=$X/npu-src
+ SDK=$(xcrun --sdk macosx --show-sdk-path)
+ KF=$SDK/System/Library/Frameworks/Kernel.framework/Headers
+@@ -14,7 +14,7 @@ src=$1; shift
+ # each driver keeps its own module name (PCI driver name and sysctl parameter prefix)
+ case "$src" in *amdxdna*|*nmx_xdna*) MOD=amdxdna;; *) MOD=intel_vpu;; esac
+ mkdir -p $X/obj-npu
+-exec xcrun clang -arch x86_64 -mmacosx-version-min=15.0 -ffile-prefix-map=/Volumes/MiniData/build/gpu-src=/src -mkernel -fapple-kext -nostdinc -std=gnu11 \
++exec xcrun clang -arch x86_64 -mmacosx-version-min=15.0 -ffile-prefix-map=${NMX_SRC:-$HOME/nmx-build/gpu-src}=/src -mkernel -fapple-kext -nostdinc -std=gnu11 \
+   -fno-builtin -fno-common -fno-strict-aliasing -fms-extensions -O2 -g0 \
+   -Wno-pointer-sign -Wno-unused-parameter -Wno-microsoft-anon-tag -ferror-limit=80 \
+   -D_KERNEL -DKERNEL -DKERNEL_PRIVATE -DLINUXKPI_VERSION=61400 -DNMXKPI=1 \
+diff --git a/gpu-port/xkpi/cc-npucore.sh b/gpu-port/xkpi/cc-npucore.sh
+index ab287dc..7b38cae 100755
+--- a/gpu-port/xkpi/cc-npucore.sh
++++ b/gpu-port/xkpi/cc-npucore.sh
+@@ -3,15 +3,15 @@
+ # (accel minors, /dev/accel/accelN), into obj-npucore/.
+ # cc.sh <source.c> [extra flags]: compiles one drm-kmod source for the macOS kernel (x86_64) through the
+ # FreeBSD-on-xnu layer (bsdcompat) and FreeBSD LinuxKPI. drm-kmod's GPL-only linuxkpi/gplv2 headers are NOT on the path.
+-X=/Volumes/MiniData/build/gpu-src/xkpi
+-K=/Volumes/MiniData/build/gpu-src/kpi
++X=${NMX_SRC:-$HOME/nmx-build/gpu-src}/xkpi
++K=${NMX_SRC:-$HOME/nmx-build/gpu-src}/kpi
+ L=$K/freebsd-src/sys/compat/linuxkpi
+ D=$K/drm-kmod
+ A=$D/drivers/gpu/drm/amd
+ SDK=$(xcrun --sdk macosx --show-sdk-path)
+ KF=$SDK/System/Library/Frameworks/Kernel.framework/Headers
+ src=$1; shift
+-exec xcrun clang -arch x86_64 -mmacosx-version-min=15.0 -ffile-prefix-map=/Volumes/MiniData/build/gpu-src=/src -mkernel -fapple-kext -nostdinc -std=gnu11 \
++exec xcrun clang -arch x86_64 -mmacosx-version-min=15.0 -ffile-prefix-map=${NMX_SRC:-$HOME/nmx-build/gpu-src}=/src -mkernel -fapple-kext -nostdinc -std=gnu11 \
+   -fno-builtin -fno-common -fno-strict-aliasing -fms-extensions -O2 -g0 \
+   -Wno-pointer-sign -Wno-unused-parameter -Wno-microsoft-anon-tag -ferror-limit=80 \
+   -D_KERNEL -DKERNEL -DKERNEL_PRIVATE -DLINUXKPI_VERSION=61400 -DNMXKPI=1 \
+diff --git a/gpu-port/xkpi/cc-xe.sh b/gpu-port/xkpi/cc-xe.sh
+index 9064a7a..f288570 100755
+--- a/gpu-port/xkpi/cc-xe.sh
++++ b/gpu-port/xkpi/cc-xe.sh
+@@ -4,17 +4,17 @@
+ # FreeBSD LinuxKPI and drm-kmod's 6.14 DRM core. xe is not in drm-kmod, so it comes from the pristine 6.14 tree
+ # (linux-6.14, MIT except the files listed in all-xe.sh, which are replaced, never compiled). Its display code is the
+ # 6.14 i915 display built with xe's compat headers and -Ddrm_i915_private=xe_device, as Linux's Makefile does.
+-X=/Volumes/MiniData/build/gpu-src/xkpi
+-K=/Volumes/MiniData/build/gpu-src/kpi
++X=${NMX_SRC:-$HOME/nmx-build/gpu-src}/xkpi
++K=${NMX_SRC:-$HOME/nmx-build/gpu-src}/kpi
+ L=$K/freebsd-src/sys/compat/linuxkpi
+ D=$K/drm-kmod
+-V=/Volumes/MiniData/build/gpu-src/linux-6.14
++V=${NMX_SRC:-$HOME/nmx-build/gpu-src}/linux-6.14
+ XE=$X/xe-src
+ SDK=$(xcrun --sdk macosx --show-sdk-path)
+ KF=$SDK/System/Library/Frameworks/Kernel.framework/Headers
+ src=$1; shift
+ mkdir -p $X/obj-xe
+-exec xcrun clang -arch x86_64 -mmacosx-version-min=15.0 -ffile-prefix-map=/Volumes/MiniData/build/gpu-src=/src -mkernel -fapple-kext -nostdinc -std=gnu11 \
++exec xcrun clang -arch x86_64 -mmacosx-version-min=15.0 -ffile-prefix-map=${NMX_SRC:-$HOME/nmx-build/gpu-src}=/src -mkernel -fapple-kext -nostdinc -std=gnu11 \
+   -fno-builtin -fno-common -fno-strict-aliasing -fms-extensions -O2 -g0 \
+   -Wno-pointer-sign -Wno-unused-parameter -Wno-microsoft-anon-tag -ferror-limit=80 \
+   -D_KERNEL -DKERNEL -DKERNEL_PRIVATE -DLINUXKPI_VERSION=61400 -DNMXKPI=1 \
+diff --git a/gpu-port/xkpi/cc.sh b/gpu-port/xkpi/cc.sh
+index 57a5296..30a8bf9 100755
+--- a/gpu-port/xkpi/cc.sh
++++ b/gpu-port/xkpi/cc.sh
+@@ -1,15 +1,15 @@
+ #!/bin/bash
+ # cc.sh <source.c> [extra flags]: compiles one drm-kmod source for the macOS kernel (x86_64) through the
+ # FreeBSD-on-xnu layer (bsdcompat) and FreeBSD LinuxKPI. drm-kmod's GPL-only linuxkpi/gplv2 headers are NOT on the path.
+-X=/Volumes/MiniData/build/gpu-src/xkpi
+-K=/Volumes/MiniData/build/gpu-src/kpi
++X=${NMX_SRC:-$HOME/nmx-build/gpu-src}/xkpi
++K=${NMX_SRC:-$HOME/nmx-build/gpu-src}/kpi
+ L=$K/freebsd-src/sys/compat/linuxkpi
+ D=$K/drm-kmod
+ A=$D/drivers/gpu/drm/amd
+ SDK=$(xcrun --sdk macosx --show-sdk-path)
+ KF=$SDK/System/Library/Frameworks/Kernel.framework/Headers
+ src=$1; shift
+-exec xcrun clang -arch x86_64 -mmacosx-version-min=15.0 -ffile-prefix-map=/Volumes/MiniData/build/gpu-src=/src -mkernel -fapple-kext -nostdinc -std=gnu11 \
++exec xcrun clang -arch x86_64 -mmacosx-version-min=15.0 -ffile-prefix-map=${NMX_SRC:-$HOME/nmx-build/gpu-src}=/src -mkernel -fapple-kext -nostdinc -std=gnu11 \
+   -fno-builtin -fno-common -fno-strict-aliasing -fms-extensions -O2 -g0 \
+   -Wno-pointer-sign -Wno-unused-parameter -Wno-microsoft-anon-tag -ferror-limit=80 \
+   -D_KERNEL -DKERNEL -DKERNEL_PRIVATE -DLINUXKPI_VERSION=61400 -DNMXKPI=1 \
+diff --git a/gpu-port/xkpi/cclk.sh b/gpu-port/xkpi/cclk.sh
+index 6bbae66..0f5e4f2 100755
+--- a/gpu-port/xkpi/cclk.sh
++++ b/gpu-port/xkpi/cclk.sh
+@@ -1,15 +1,15 @@
+ #!/bin/bash
+ # cc.sh <source.c> [extra flags]: compiles one drm-kmod source for the macOS kernel (x86_64) through the
+ # FreeBSD-on-xnu layer (bsdcompat) and FreeBSD LinuxKPI. drm-kmod's GPL-only linuxkpi/gplv2 headers are NOT on the path.
+-X=/Volumes/MiniData/build/gpu-src/xkpi
+-K=/Volumes/MiniData/build/gpu-src/kpi
++X=${NMX_SRC:-$HOME/nmx-build/gpu-src}/xkpi
++K=${NMX_SRC:-$HOME/nmx-build/gpu-src}/kpi
+ L=$K/freebsd-src/sys/compat/linuxkpi
+ D=$K/drm-kmod
+ A=$D/drivers/gpu/drm/amd
+ SDK=$(xcrun --sdk macosx --show-sdk-path)
+ KF=$SDK/System/Library/Frameworks/Kernel.framework/Headers
+ src=$1; shift
+-exec xcrun clang -arch x86_64 -mmacosx-version-min=15.0 -ffile-prefix-map=/Volumes/MiniData/build/gpu-src=/src -mkernel -fapple-kext -nostdinc -std=gnu11 \
++exec xcrun clang -arch x86_64 -mmacosx-version-min=15.0 -ffile-prefix-map=${NMX_SRC:-$HOME/nmx-build/gpu-src}=/src -mkernel -fapple-kext -nostdinc -std=gnu11 \
+   -fno-builtin -fno-common -fno-strict-aliasing -fms-extensions -O2 -g0 \
+   -Wno-pointer-sign -Wno-unused-parameter -Wno-microsoft-anon-tag -ferror-limit=80 \
+   -D_KERNEL -DKERNEL -DKERNEL_PRIVATE -DLINUXKPI_VERSION=61400 -DNMXKPI=1 \
+diff --git a/gpu-port/xkpi/ccsrc.sh b/gpu-port/xkpi/ccsrc.sh
+index 08f8587..d3a228d 100755
+--- a/gpu-port/xkpi/ccsrc.sh
++++ b/gpu-port/xkpi/ccsrc.sh
+@@ -1,15 +1,15 @@
+ #!/bin/bash
+ # cc.sh <source.c> [extra flags]: compiles one drm-kmod source for the macOS kernel (x86_64) through the
+ # FreeBSD-on-xnu layer (bsdcompat) and FreeBSD LinuxKPI. drm-kmod's GPL-only linuxkpi/gplv2 headers are NOT on the path.
+-X=/Volumes/MiniData/build/gpu-src/xkpi
+-K=/Volumes/MiniData/build/gpu-src/kpi
++X=${NMX_SRC:-$HOME/nmx-build/gpu-src}/xkpi
++K=${NMX_SRC:-$HOME/nmx-build/gpu-src}/kpi
+ L=$K/freebsd-src/sys/compat/linuxkpi
+ D=$K/drm-kmod
+ A=$D/drivers/gpu/drm/amd
+ SDK=$(xcrun --sdk macosx --show-sdk-path)
+ KF=$SDK/System/Library/Frameworks/Kernel.framework/Headers
+ src=$1; shift
+-exec xcrun clang -arch x86_64 -mmacosx-version-min=15.0 -ffile-prefix-map=/Volumes/MiniData/build/gpu-src=/src -mkernel -fapple-kext -nostdinc -std=gnu11 \
++exec xcrun clang -arch x86_64 -mmacosx-version-min=15.0 -ffile-prefix-map=${NMX_SRC:-$HOME/nmx-build/gpu-src}=/src -mkernel -fapple-kext -nostdinc -std=gnu11 \
+   -fno-builtin -fno-common -fno-strict-aliasing -fms-extensions -O2 -g0 \
+   -Wno-pointer-sign -Wno-unused-parameter -Wno-microsoft-anon-tag -ferror-limit=80 \
+   -D_KERNEL -DKERNEL -DKERNEL_PRIVATE -DLINUXKPI_VERSION=61400 -DNMXKPI=1 \
+diff --git a/gpu-port/xkpi/ccxx.sh b/gpu-port/xkpi/ccxx.sh
+index d290e77..8a2ab68 100755
+--- a/gpu-port/xkpi/ccxx.sh
++++ b/gpu-port/xkpi/ccxx.sh
+@@ -1,13 +1,13 @@
+ #!/bin/bash
+ # ccxx.sh <source.cpp>: compiles one IOKit-side file of the port with Apple's Kernel.framework headers only
+-X=/Volumes/MiniData/build/gpu-src/xkpi
++X=${NMX_SRC:-$HOME/nmx-build/gpu-src}/xkpi
+ SDK=$(xcrun --sdk macosx --show-sdk-path)
+ KF=$SDK/System/Library/Frameworks/Kernel.framework/Headers
+ mkdir -p $X/xnuobj
+ # nmxxnu/ holds the two boundary headers for the IOKit side (which must not see the FreeBSD include tree); they are
+ # copies of bsdcompat/include's, refreshed here so a declaration added there always reaches the C++ side
+ cp -p $X/bsdcompat/include/nmx_port.h $X/bsdcompat/include/nmx_xnu.h $X/bsdcompat/include/nmxxnu/
+-exec xcrun clang++ -arch x86_64 -mmacosx-version-min=15.0 -ffile-prefix-map=/Volumes/MiniData/build/gpu-src=/src -mkernel -fapple-kext -nostdinc -isysroot "$SDK" -I"$KF" \
++exec xcrun clang++ -arch x86_64 -mmacosx-version-min=15.0 -ffile-prefix-map=${NMX_SRC:-$HOME/nmx-build/gpu-src}=/src -mkernel -fapple-kext -nostdinc -isysroot "$SDK" -I"$KF" \
+   -I$X/bsdcompat/include/nmxxnu -DKERNEL -DKERNEL_PRIVATE -DDRIVER_PRIVATE -DAPPLE -DNeXT \
+   -std=c++17 -fno-rtti -fno-exceptions -fno-builtin -fno-common -O2 -g0 -Wall -Wno-unused-parameter \
+   -Wno-deprecated-declarations -Wno-inconsistent-missing-override -c "$1" -o ${NMX_OBJ:-$X/xnuobj/$(basename "${1%.cpp}").o}
+diff --git a/gpu-port/xkpi/kext-npu/build.sh b/gpu-port/xkpi/kext-npu/build.sh
+index e25f2b8..4e7a13a 100755
+--- a/gpu-port/xkpi/kext-npu/build.sh
++++ b/gpu-port/xkpi/kext-npu/build.sh
+@@ -3,7 +3,7 @@
+ # helper) on its own DRM core built with accel minors (obj-npucore) and its own copy of the port layer (lkobj, srcobj,
+ # xnuobj without NMXGPU's kext and display glue).
+ set -euo pipefail
+-X=/Volumes/MiniData/build/gpu-src/xkpi
++X=${NMX_SRC:-$HOME/nmx-build/gpu-src}/xkpi
+ OUT=$1
+ cd "$X"
+ mkdir -p obj-npu-glue
+diff --git a/gpu-port/xkpi/kext-npu/mksource.sh b/gpu-port/xkpi/kext-npu/mksource.sh
+index 4fdb05d..960db14 100755
+--- a/gpu-port/xkpi/kext-npu/mksource.sh
++++ b/gpu-port/xkpi/kext-npu/mksource.sh
+@@ -5,7 +5,7 @@
+ # the NullMoth layer and scripts, upstream/ for the Linux, drm-kmod, LinuxKPI and ACPICA files. Plus the build scripts
+ # and NOTICE-GPL.txt. Run after all-npucore.sh, all-npu.sh and kext-npu/build.sh.
+ set -euo pipefail
+-G=/Volumes/MiniData/build/gpu-src
++G=${NMX_SRC:-$HOME/nmx-build/gpu-src}
+ X=$G/xkpi
+ K=$G/kpi
+ L=$K/freebsd-src/sys/compat/linuxkpi/common/src
+diff --git a/gpu-port/xkpi/kext/build.sh b/gpu-port/xkpi/kext/build.sh
+index 3b13d2b..ab89fdb 100755
+--- a/gpu-port/xkpi/kext/build.sh
++++ b/gpu-port/xkpi/kext/build.sh
+@@ -2,7 +2,7 @@
+ # kext/build.sh <out dir>: links NMXGPU.kext from the compiled port (obj = AMD/DRM/TTM, obj-i915 = Intel i915, obj-xe = Intel xe, lkobj = LinuxKPI runtime and
+ # the port's LinuxKPI-side files, srcobj = FreeBSD-on-xnu layer, xnuobj = IOKit glue and the kext itself).
+ set -euo pipefail
+-X=/Volumes/MiniData/build/gpu-src/xkpi
++X=${NMX_SRC:-$HOME/nmx-build/gpu-src}/xkpi
+ OUT=$1
+ cd "$X"
+ ./ccxx.sh xnu/nmx_kext.cpp > xlog_nmx_kext.txt 2>&1 || { grep -A3 error: xlog_nmx_kext.txt | head -20; exit 1; }
+diff --git a/gpu-port/xkpi/rt.sh b/gpu-port/xkpi/rt.sh
+index 92a2a22..324b868 100755
+--- a/gpu-port/xkpi/rt.sh
++++ b/gpu-port/xkpi/rt.sh
+@@ -2,8 +2,8 @@
+ # rt.sh: rebuilds the port's runtime against the current headers: LinuxKPI's runtime sources (forks from
+ # override/src replace the originals of the same name; sources the port replaces or does not use are left out),
+ # the port's own LinuxKPI-side files, bsdcompat/src and the xnu glue. Prints failures only, then counts.
+-X=/Volumes/MiniData/build/gpu-src/xkpi
+-L=/Volumes/MiniData/build/gpu-src/kpi/freebsd-src/sys/compat/linuxkpi/common/src
++X=${NMX_SRC:-$HOME/nmx-build/gpu-src}/xkpi
++L=${NMX_SRC:-$HOME/nmx-build/gpu-src}/kpi/freebsd-src/sys/compat/linuxkpi/common/src
+ cd "$X" || exit 1
+ # networking, USB and wireless are not part of the GPU driver; i2c/i2cbb are replaced by nmx_linux_i2c.c;
+ # cmdline and eventfd are unused (drm-kmod's own headers answer them)
+@@ -18,7 +18,7 @@ for f in $L/*.c override/src/*.c; do
+     ./cclk.sh "$f" > "lklogs/$b.log" 2>&1 || { echo "LK FAIL $b"; fail=$((fail + 1)); }
+ done
+ # Concurrency Kit's epoch reclamation (BSD-2-Clause), under LinuxKPI's RCU
+-CK=/Volumes/MiniData/build/gpu-src/kpi/freebsd-src/sys/contrib/ck/src
++CK=${NMX_SRC:-$HOME/nmx-build/gpu-src}/kpi/freebsd-src/sys/contrib/ck/src
+ n=$((n + 1))
+ ./cclk.sh "$CK/ck_epoch.c" > lklogs/ck_epoch.log 2>&1 || { echo "LK FAIL ck_epoch"; fail=$((fail + 1)); }
+ for f in bsdcompat/src/*.c; do
+diff --git a/gpu-port/xkpi/try.sh b/gpu-port/xkpi/try.sh
+index 0fe0942..fb01948 100755
+--- a/gpu-port/xkpi/try.sh
++++ b/gpu-port/xkpi/try.sh
+@@ -1,7 +1,7 @@
+ #!/bin/bash
+ # try.sh <src>: compile, then show the first distinct errors (paths shortened)
+-cd /Volumes/MiniData/build/gpu-src/xkpi
++cd ${NMX_SRC:-$HOME/nmx-build/gpu-src}/xkpi
+ ./cc.sh "$1" > last.log 2>&1
+ n=$(grep -c "error:" last.log)
+ echo "errors: $n"
+-grep -E "error:" last.log | sed -E "s|/Volumes/MiniData/build/gpu-src/||; s|kpi/freebsd-src/sys/compat/linuxkpi/|LKPI/|; s|kpi/drm-kmod/|DK/|" | awk "!seen[\$0]++" | head -${2:-25}
++grep -E "error:" last.log | sed -E "s|${NMX_SRC:-$HOME/nmx-build/gpu-src}/||; s|kpi/freebsd-src/sys/compat/linuxkpi/|LKPI/|; s|kpi/drm-kmod/|DK/|" | awk "!seen[\$0]++" | head -${2:-25}

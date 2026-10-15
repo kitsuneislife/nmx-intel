@@ -110,14 +110,15 @@ Nos dois casos, o acesso da CPU pode ser pela aperture do GGTT (BAR2, write-comb
 
 ### Para compilar o NMXGPU no Mac
 
-1. Xcode Command Line Tools (`xcode-select --install`). O Xcode 16.4 completo está no cache do repo
-   `hackintosh`, se for preciso.
-2. Montar a árvore: clonar o nullmoth no commit da versão em uso, e baixar `freebsd-src`, `drm-kmod` e
-   `linux-6.14` nas revisões que o `gpu-port` espera. Conferir os scripts `fork_*.py` e `gen_flags.py`.
-3. Trocar `/Volumes/MiniData/build/gpu-src` por uma variável (por exemplo `NMX_SRC`).
-4. Primeiro, compilar **sem mudanças** e comparar com o binário da release (tamanho e símbolos), para provar
-   que o build bate. Só então aplicar `source-fixes/0001..0003` e a correção da ponte.
-5. Instalar como os patches: substituir o binário em `/Library/NullMoth/kexts/15/NMXGPU.kext/Contents/MacOS/`,
+**Já funciona** (2026-10-15): o build sem mudanças bate com a release. Ver o fim do `LOG.md`.
+1. `bash build/setup.sh` monta a árvore em `~/nmx-build` (nullmoth, drm-kmod, freebsd-src e linux-6.14 nas
+   revisões certas, com `$NMX_SRC` no lugar de `/Volumes/MiniData/build/gpu-src`).
+2. `bash build/build-all.sh` compila tudo (~6 min). Para refazer só uma parte: `build-all.sh i915 kext`. Os
+   nomes das etapas são `amd rt i915 xe kext`. A saída fica em `~/nmx-build/out/NMXGPU.kext`, e o log é o do
+   próprio comando.
+3. As mudanças nossas no fonte vão no branch `nmx-intel-build` do clone `~/nmx-build/nvidia-macos-driver` e
+   são guardadas aqui como patch.
+4. Instalar como os patches: substituir o binário em `/Library/NullMoth/kexts/15/NMXGPU.kext/Contents/MacOS/`,
    depois desligar e ligar o driver no app. Guardar o original antes.
 
 ## Como trabalhar

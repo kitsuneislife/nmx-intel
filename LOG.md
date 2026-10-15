@@ -210,3 +210,46 @@ BIOS left unused DDI_IO_A power well enabled, disabling it
 
 Montar a árvore de fontes, compilar sem mudanças e comparar com o binário da release 2.0.2. Só depois
 escrever a ponte nova para o i915.
+
+## 2026-10-15: primeiro build do NMXGPU no Mac, sem mudanças
+
+Árvore montada em `~/nmx-build` por `build/setup.sh`, e build por `build/build-all.sh`. Revisões:
+- nullmoth 2.0.2 (`d96eaca`, ainda o `main` do upstream), branch local `nmx-intel-build` com
+  `build/nmx-src-paths.patch`: troca `/Volumes/MiniData/build/gpu-src` por `$NMX_SRC` e `/opt/homebrew/bin/python3`
+  por `python3` (o 3.9 das CLT serve).
+- drm-kmod `master` `c16de0f9fa` (2026-10-08, o último commit antes de o xkpi aparecer no nullmoth).
+- freebsd-src `bbfd52d`. O nullmoth não diz a revisão. Os forks em `override/src` batem com qualquer commit
+  entre `d7e7397` (10-05) e `bbfd52d` (10-10). O `9d82546` (10-11) já muda o `linux_pci.c`.
+- Linux `v6.14`, só `drivers/gpu/drm/xe` e `include/uapi`.
+- Apple clang 17.0.0 (clang-1700.0.13.5), das Command Line Tools, SDK 15.5.
+
+O que faltava e não está no repo do nullmoth:
+- `fbroot/`: links para `freebsd-src/sys/compat` e `sys/contrib` (o ACPICA é necessário).
+- `amd.flags`: gerado por `gen_flags.py`.
+- `xe_drm.h`: o xe inclui `<uapi/drm/xe_drm.h>`, que o drm-kmod não tem. Pus um link para o do Linux 6.14 em
+  `drm-kmod/include/uapi/drm/`.
+- O `rt.sh` compila também `xnu/nmx_npu_kext.cpp`, e isso duplica o `kmod_info` no link. O `build-all.sh`
+  tira esse objeto, como o `kext-npu/build.sh` faz.
+
+Resultado: **compila e linka sem erro**. amd 900/900, runtime 76/76, i915 274/274, xe 193/193.
+`NMXGPU 16b0a4d6`, 15.236.184 B.
+
+Comparação com o binário da release (`~/NMXGPU.original`, 15.368.736 B):
+
+| | release | nosso |
+| --- | --- | --- |
+| `__text` | 10.526.990 | 10.523.694 (−0,03%) |
+| `__DATA,__data` | 199.928 | 199.944 |
+| `nmx_sysinit`, `__bss`, `__common`, `__got` | iguais | iguais |
+| símbolos com nome | 28.296 | 28.296 |
+
+Só 11 símbolos de cada lado diferem. São funções e tabelas `static` que um compilador embutiu e o outro não, por
+exemplo `subplatform_rpl_ids`, que está no fonte mas o nosso clang dobrou para dentro do código. A diferença vem do
+compilador: o nullmoth compila cruzado num Apple Silicon. **O build bate com a release.**
+
+## Próximo: aplicar as correções no fonte e escrever a ponte para o i915
+
+1. Aplicar `source-fixes/0001..0003` (os equivalentes dos patches 1 a 3) e corrigir o stub do dp_tunnel
+   (patches 4 e 5) no fonte.
+2. Ponte de tela: para o i915, criar o buffer na stolen memory e publicar o endereço físico.
+3. Antes de instalar: guardar o binário original e explicar o teste para o Lukas.
