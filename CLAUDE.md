@@ -1,75 +1,80 @@
-# Contexto para o Claude
+# Instructions for Claude
 
-Leia isto, depois o `README.md` e o fim de `docs/LOG.md` (o mais novo fica no fim).
+## Start of a session (token budget)
 
-## Quem e como
+1. Read `docs/status.md` (short, always current). Then open **only** what the task needs, via `docs/index.md`.
+2. Never read `docs/archive/LOG-pt.md` routinely (verbatim history, ~1,450 lines). Look things up in
+   `docs/tests/index.md` → one phase file, or `grep` the archive for a specific term.
+3. Prefer `grep -n` and targeted `Read` ranges over whole files. Each doc starts with a `> **Summary.**` block.
 
-- O usuário é o Lukas. Escreve em português e quer respostas **curtas e simples**: o que fazer, um comando
-  por vez, o que esperar.
-- Ele **não consegue digitar `|`**. Quando for ele que digita, nada de pipe: grave num arquivo e use
-  `grep`/`tail`/`sed -n` no arquivo.
-- Nunca mande o e-mail dele para lugar nenhum.
-- Commits: mensagem clara, sem identificador de modelo, terminando com
-  `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`. Commit e push depois de cada teste.
-- Não abrir PR sem ele pedir.
-- Antes de qualquer coisa que reinicie o Mac, mexa no EFI ou em `/Library/Extensions`: explicar e confirmar.
+## Working with Lukas
 
-## A máquina
+- Lukas writes in Portuguese and wants **short, simple answers**: what to do, one command per block, what to expect.
+  Reply in Portuguese; the repository (docs, commits, code comments) is in **English**.
+- He **cannot type `|`**. Commands he types must not use pipes: write to a file, then `grep`/`tail`/`sed -n` it.
+- Never send his e-mail anywhere.
+- Commits: clear message, no model identifier, ending with
+  `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`. Commit and push after every test.
+- No pull requests unless he asks.
+- Before anything that reboots the Mac, touches the EFI or `/Library/Extensions`: explain and get his OK.
+- After analysing a test, build the next one and give install steps directly (no need to ask).
 
-- Acer Nitro V15 ANV15-51, i5-13420H. macOS Sequoia 15.8.1, bare metal, dual boot com o Windows.
-- iGPU Intel `8086:a7a8` (Raptor Lake-P, display 13.00 E0). **O painel interno está nela**, sem MUX. Stolen de
-  64 MiB em `0x3e800000`; fb do GOP na aperture em `0x4000000000`.
-- dGPU RTX 3050 Laptop `10de:25ac` com o driver do nullmoth (app 1401). Funciona.
-- OpenCore na ESP do Windows (`sudo diskutil mount disk0s1`); config gerada por `tools/make_config.py` no repo
-  `kitsuneislife/Acer-Nitro-V15-ANV15-51-Hackintosh`. Boot-args com `-v` para os testes; backup sem `-v` em
+## Quality and integrity rules
+
+- **Evidence first.** Read the trail/beat/io, the panic reports and the logs before theorising; quote the lines that
+  matter. Tag claims **[measured]**, **[inferred]** or **[unverified]** in the docs; never present an inference as a
+  fact, and update the tag when evidence changes.
+- **Check `docs/knowledge/pitfalls.md`** against every new symptom before proposing a fix.
+- **Read the source you depend on** (IOGraphics `IOFramebuffer.cpp`, nullmoth, i915) instead of guessing API
+  behaviour; record what you learned as a pitfall.
+- **One variable per test** where possible; add a knob (`nmx_xnu_knob`) so a change can be undone without a rebuild.
+- **Verify builds**: the binary hash changes, new symbols/strings are present (`nm`, `strings`), scripts pass
+  `bash -n`. Report the SHA-256 (first 8 hex in docs).
+- **Do not lose information.** History is append-only: new tests go at the end of the current phase file; corrections
+  are added as notes, not by rewriting old results.
+- Keep `docs/status.md` under ~40 lines; move detail into tests/ or knowledge/.
+
+## After each test (checklist)
+
+1. Read `nvram nullmoth-gpu-trail`, `nullmoth-gpu-beat`, `nullmoth-gpu-io`, `/Library/Logs/DiagnosticReports`,
+   and the relevant `log show` (see `docs/knowledge/diagnostics.md`).
+2. Fix in the clone → commit → `git tag -f fix-00NN` → `git format-patch -1 --stdout > source-fixes/00NN-<slug>.patch`
+   → add it to `build/apply-fixes.sh` → `bash build/build-all.sh rt kext` (add `i915` for drm-kmod changes).
+3. Docs: a row in `docs/tests/index.md`; the entry in the current phase file under `docs/tests/`; a row in
+   `docs/knowledge/patches.md`; new lessons in `pitfalls.md`; new tokens/knobs in `diagnostics.md`; rewrite
+   `docs/status.md`.
+4. Commit and push; give Lukas the install steps (install → toggle the AMD/Intel driver in the app → libdrm → reboot).
+
+## The machine
+
+- Acer Nitro V15 ANV15-51, i5-13420H. macOS Sequoia 15.8.1, bare metal, dual boot with Windows.
+- iGPU `8086:a7a8` (Raptor Lake-P, display 13.00 E0) drives the internal panel; no MUX. Stolen 64 MiB at
+  `0x3e800000`; GOP framebuffer in the aperture at `0x4000000000`.
+- dGPU RTX 3050 Laptop `10de:25ac` on nullmoth's driver (1401 app): works.
+- OpenCore on the Windows ESP (`sudo diskutil mount disk0s1`); config generated by `tools/make_config.py` in
+  `kitsuneislife/Acer-Nitro-V15-ANV15-51-Hackintosh`. Boot-args include `-v` for testing; backup without `-v` in
   `~/config-antes-v.plist`.
-- Outros repos: `kitsuneislife/Acer-Nitro-V15-ANV15-51-Hackintosh` (EFI público) e `kitsuneislife/hackintosh`
-  (privado: `CONTEXT.md`, guias).
+- Other repos: `kitsuneislife/Acer-Nitro-V15-ANV15-51-Hackintosh` (public EFI), `kitsuneislife/hackintosh` (private:
+  `CONTEXT.md`, guides).
 
-## NMXGPU
+## NMXGPU in one paragraph
 
-- Porte do amdgpu/i915/xe (drm-kmod, Linux 6.14) para o xnu pelo LinuxKPI do FreeBSD. Fonte:
-  `nullmoth/nvidia-macos-driver`, `gpu-port/xkpi`, versão 2.0.2 (`d96eaca`). PolyForm Noncommercial: sem
-  redistribuir binários.
-- Liga com `nmxintel=1` (o app 1401 põe e tira). O app guarda o kext em `/Library/NullMoth/kexts/15/NMXGPU.kext`
-  e o copia para `/Library/Extensions` ao ligar o driver de teste "AMD / Intel", sem conferir hash.
-- Árvore de build em `~/nmx-build` (`build/setup.sh`). As nossas mudanças ficam no branch `nmx-intel-build` do
-  clone `~/nmx-build/nvidia-macos-driver` (e `nmx-intel` no drm-kmod), com tag `fix-00NN`, e são guardadas aqui
-  em `source-fixes/` (`git format-patch -1`) e listadas em `build/apply-fixes.sh`.
-- Arquivos que importam: `xnu/nmx_kext.cpp` (attach, trilha, batimento, chaves), `xnu/nmx_fb.cpp` (`NMXGPUFB`),
-  `override/src/nmx_fb_bridge.c` e `override/i915/nmx_i915_fb.c` (ponte de tela), `override/src/linux_rcu.c`.
-- Acelerador: `kexts/NVRM/accel/nvrm-accel.cpp` com `NMX_ACCEL` = NMXAccel. Nesse modo o `fFB` nunca é
-  preenchido, e o Metal do AMD/Intel é só para apps: o WindowServer não é acelerado.
+nullmoth's port of amdgpu/i915/xe (drm-kmod, Linux 6.14) to xnu over FreeBSD's LinuxKPI (`gpu-port/xkpi`, release
+2.0.2 `d96eaca`, PolyForm Noncommercial: never commit binaries). Enabled by `nmxintel=1` (the 1401 app adds/removes
+it); the app copies `/Library/NullMoth/kexts/15/NMXGPU.kext` to `/Library/Extensions` when the AMD/Intel test driver
+is turned on, without a hash check. Build tree `~/nmx-build` (`build/setup.sh`); our changes live on branch
+`nmx-intel-build` of `~/nmx-build/nvidia-macos-driver` and `nmx-intel` of drm-kmod, exported to `source-fixes/`.
+Architecture: `docs/knowledge/architecture.md`.
 
-## Diagnóstico
+## Safety and recovery
 
-- NVRAM: `nullmoth-gpu-trail` (etapas), `nullmoth-gpu-beat` (batimento), `nullmoth-gpu-io` (pedidos e energia).
-- Chaves (`sudo nvram <chave>=N`, `-d` apaga): `nullmoth-gpu-fb` (1 = nosso fb, 2 = só o painel),
-  `nullmoth-gpu-accel`, `nullmoth-gpu-fbdep`, `nullmoth-gpu-ndrv`, `nullmoth-gpu-vbl`, `nullmoth-gpu-shadow`.
-- Panics salvos: `/Library/Logs/DiagnosticReports/Kernel-*.panic`. Log do WindowServer: `/usr/bin/log show`.
-- `tools/vram`: `dump.c`/`watch.c` leem a VRAM como o WindowServer; `displays.c` lista as telas do CoreGraphics.
-- Vídeos no Google Drive dele (`VIDEO_BOOT_HACKINTOSH_N.mp4`, `HACKINTOSH_GLITCHES_N.mp4`).
+- A frozen attach makes NMXGPU park the GPU next boot; toggle the driver in the app to retry.
+- OpenCore: Space → "Start once without NVIDIA driver" (`-nvoff`, disables NMXGPU too).
+- `sudo bash tools/binpatch/apply.sh restore` restores the release binary (backup `~/NMXGPU.original`).
+- From Recovery: delete `/Library/Extensions/NMXGPU.kext`.
 
-## Segurança e como voltar
+## Outside the Intel work
 
-- Attach que nunca volta: o NMXGPU desiste da placa no boot seguinte; desligar e ligar no app libera.
-- OpenCore: Espaço → "Start once without NVIDIA driver" (`-nvoff`, desliga também o NMXGPU).
-- `sudo bash tools/binpatch/apply.sh restore` volta ao binário original (backup em `~/NMXGPU.original`).
-- Pelo Recovery: apagar `/Library/Extensions/NMXGPU.kext`.
-
-## Onde paramos (2026-10-16, teste 32)
-
-- Desktop pelo i915 no `NMXGPUFB`, 1920x1080 a 144 Hz, estável. Patches até `0032`, binário `9823079e…`.
-- Os glitches vinham da tela do firmware (`.Display_boot`), que o WindowServer mantém como segunda tela mesmo
-  depois de removida do IOKit. `tools/mirror` (LaunchAgent) a espelha na nossa, e os glitches somem.
-- Sem aceleração: o WindowServer compõe por software (~225 % de CPU).
-- Faltam, para acelerar: um acelerador que o WindowServer use (NMXAccel ligado ao `NMXGPUFB`), a ponte de
-  memória/GPU VA do NMXAccel para o i915, e o Metal via ANV de ponta a ponta. Alternativa: a RTX compor o desktop
-  e copiar para o painel (NMIntelFB, `tools/intelfb`, parado; os panics `CR2 0x170` dele eram o mesmo NULL de
-  controlador corrigido em 0026).
-
-## Pendências fora da Intel
-
-- Remover o `-v` no fim dos testes (restaurar `~/config-antes-v.plist` na ESP).
-- Wi-Fi MT7921 (`14c3:7961`): seção 14 do `CONTEXT.md` no repo `hackintosh`.
-- Bateria, sleep, benchmark da RTX.
+- Remove `-v` when testing ends (restore `~/config-antes-v.plist` on the ESP).
+- Wi-Fi MT7921 (`14c3:7961`): section 14 of `CONTEXT.md` in the `hackintosh` repo.
+- Battery, sleep, RTX benchmark.
