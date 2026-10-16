@@ -1426,3 +1426,19 @@ bater na borda direita, aparece do lado esquerdo e deixa um quadrado branco**; a
   nesta sessão).
 - Pesquisa: o nullmoth diz nas notas da release que, nos notebooks com o painel na Intel, a tela interna não é
   acelerada; as issues #119/#219 confirmam. Ninguém publicou um caminho para isso.
+- **Com o espelhamento, os glitches sumiram** (o Lukas, olhando a tela). Confirmado: a causa era a segunda tela.
+
+### `tools/mirror`: espelhamento automático
+
+`nmx-mirror` (LaunchAgent `com.nmxintel.mirror`, na tela de login e na sessão): se o `NMXGPUFB` existe, espelha na
+tela principal toda tela com o mesmo painel (fabricante, modelo e série iguais; um monitor externo fica de fora). Fica
+rodando e reaplica depois de cada mudança de telas, e procura de novo a cada 5 s no primeiro minuto. Testado ao vivo:
+desfeito o espelho, o agente refez em < 1 s. `sudo bash tools/mirror/install.sh` (ou `remove`). Log em `/tmp/nmx-mirror.log`.
+
+Ainda falta: a tela do firmware continua existindo para o WindowServer (gasta CPU compondo duas telas). A correção no
+kernel seria tirá-la de um jeito que o WindowServer perceba.
+
+## Estado (2026-10-16, depois do teste 32)
+
+Desktop pelo i915 no nosso framebuffer, 1920x1080 a 144 Hz, sem travar, sem glitches com o espelhamento. **Sem
+aceleração**: o WindowServer compõe por software (~225 % de CPU).
