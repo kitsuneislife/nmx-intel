@@ -1256,3 +1256,25 @@ Build `rt kext`: `NMXGPU 838aa8d3b9438482ac7af9a612485a99a957f05b494b93ae8ac269b
 
 Mesmo procedimento do 25. Esperado: a trilha passar de `fb-started` para `fb-pm fb-reg published`, e o WindowServer
 desenhar no nosso framebuffer (sem aceleração). Depois: `nvram nullmoth-gpu-trail`, `nvram nullmoth-gpu-beat` e o probe.
+
+## 2026-10-16: teste 26 (0026) — **DESKTOP PELO NOSSO FRAMEBUFFER (`NMXGPUFB`), SEM TRAVAR**
+
+Binário `838aa8d3…`. Trilha completa, marca de attach apagada:
+```
+… registered fb-new fb-dep fb-start fb-started fb-pm fb-reg fb-ps1 published fb-con fb-en fb-irq fb-ga fb-gac fb-cur
+fb-modes fb-inf fb-cf fb-tim fb-pix fb-sa fb-setmode fb-ap fb-vram fb-sac fb-gam @199443
+```
+Batimento `ms=207585 open=30 ioctl=130 in=0 rcu=0`: vivo depois de 3,5 min, e o ANV conversando com o i915.
+- **O WindowServer abriu o nosso framebuffer, fez `setDisplayMode` e desenha na nossa VRAM.** `system_profiler`: tela
+  principal 1920x1080 a **144 Hz** no `NMXGPUFB` (`IOFBDependentID` `0x4E4D5849…`, índice 0).
+- O Lukas: chegou no desktop, o mouse ficou rápido (antes lento), animações sem travar, mas com muito glitch: piscadas na
+  tela de login, coisas que só aparecem quando o mouse passa por cima.
+- **Duas telas no macOS:** a nossa (principal) e o `IONDRVFramebuffer` do firmware (`.Display_boot`) na mesma GPU,
+  as duas "online". Suspeito número 1 dos glitches: o WindowServer compõe duas telas sobre o mesmo painel.
+- Nenhum `fb-vbl-on`: o WindowServer registrou a interrupção (`fb-irq`), mas nunca ligou o VBL. Suspeito número 2
+  (partes que só redesenham com o mouse).
+- A causa do travamento era mesmo o controlador do IOFramebuffer (0026).
+
+## Próximo
+
+Tirar a tela duplicada do firmware quando o `NMXGPUFB` publica, e ver o VBL.

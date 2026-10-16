@@ -75,6 +75,8 @@ Até 2026-10-15 o trabalho estava no branch `ccr-918d231a-luzxg0` dos dois outro
 
 ## Onde paramos (2026-10-15, depois do teste 5)
 
+**Resultado do teste 26: DESKTOP PELO `NMXGPUFB` (144 Hz), sem travar.** Glitches: duas telas online (a nossa + o
+`IONDRVFramebuffer` `.Display_boot`) e o VBL nunca ligado. Próximo: tirar a tela do firmware e ver o VBL.
 **Mais novo (teste 26, `838aa8d3…`):** o teste 25 parou logo depois de `fb-started`. Causa (IOGraphics da Apple): sem
 `IOFBDependentID`, o `IOFBController` só nasce no `open()`, e o `setPowerState`/`extGetAttribute` caem no NULL (os panics
 `CR2 0x170` do NMIntelFB são isso). 0026 = dependent ID próprio antes do `start` + NMXAccel com padrão 0 (com `NMX_ACCEL`
