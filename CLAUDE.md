@@ -75,13 +75,17 @@ Até 2026-10-15 o trabalho estava no branch `ccr-918d231a-luzxg0` dos dois outro
 
 ## Onde paramos (2026-10-15, depois do teste 5)
 
-**Mais novo (teste 7):** o NMXGPU é compilado no Mac (`build/`), com `source-fixes/0001..0008`. No teste 6 o
-painel mostrou o nosso buffer, mas deslocado (ele caiu sobre o fb do GOP, onde o console do `-v` ainda escreve).
-No teste 7 (0006, tomar o fb do GOP) a tomada falhou porque o error capture do i915 ocupa o GGTT 0: tela preta e Mac
-congelado. O 0007 + 0008 seguram a faixa do console no `init_ggtt` e tomam o fb ali. Já está compilado (`8e8a8f8e…`),
-mas **ainda não foi instalado**: é o teste 8 (ver o fim do `LOG.md`). Quando o Mac congela, o log persistido sai
-truncado, então as fotos ou vídeos do console são o log. No zsh, use `/usr/bin/log`. Os vídeos ficam no Google Drive
-dele (`VIDEO_BOOT_HACKINTOSH_N.mp4`).
+**Mais novo (teste 8):** o NMXGPU é compilado no Mac (`build/`), com `source-fixes/0001..0009`. Os testes 6, 7 e 8
+congelam alguns segundos depois de o WindowServer começar a desenhar no nosso framebuffer. O teste 5, sem
+framebuffer, ficava vivo. Hipótese: escrita na aperture com a GPU em runtime suspend. O 0009 segura a GPU acordada
+enquanto o fb existe e corrige o bit de flag do endereço do fb de boot. Já está compilado **sem** o debug do DRM
+(`775e893a…`), mas **ainda não foi instalado**: é o teste 9 (ver o fim do `LOG.md`).
+- Com o debug ligado, o macOS descarta mensagens do kext, então use `build-all.sh … nodebug kext` quando as linhas
+  `NullMoth display:` importarem.
+- O log de um boot que congelou ainda pode ser lido pelo horário. Os vídeos ficam no Google Drive dele
+  (`VIDEO_BOOT_HACKINTOSH_N.mp4`). No zsh, use `/usr/bin/log`.
+- Já conferido (2026-10-16): WhateverGreen, NootedBlue e NootedGreen (ver o LOG). Nenhum tem algo que dê para
+  usar direto.
 O resto desta seção é o estado do teste 5, com os patches binários.
 
 

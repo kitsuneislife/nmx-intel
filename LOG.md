@@ -429,3 +429,64 @@ Build: `NMXGPU 8e8a8f8e7cd7d4ef238c9d87db6d6ae069b916f18c0fda1f71028d15d08ab860`
 
 O mesmo procedimento do teste 7. Se a tomada funcionar, o texto do `-v` continua legível depois que o i915
 assume, e a foto mostra as linhas `NullMoth display: …`.
+
+## 2026-10-16: teste 8, 0007 + 0008 (segurar a faixa do console no GGTT)
+
+Binário `8e8a8f8e…`. Resultado: tela preta. O Caps Lock funcionou por um tempo e depois parou. Sem vídeo.
+
+O log mostra (boot das 22:18):
+- `NullMoth display: the boot framebuffer 0x4000000001 is not in the GGTT aperture 0x4000000000-0x400fffffff`.
+  **O `v_baseAddr` do console vem com flag no bit 0.** O endereço "não alinhado" foi recusado, então nem a
+  reserva no `init_ggtt` nem a tomada aconteceram, e a ponte caiu de novo no buffer reserva (shmem, zerado).
+- `NMXAccel: NMXGPU drives 8086:a7a8 - starting` às 25,226: o attach **retornou** e a ponte rodou. Mesmo assim,
+  as linhas da ponte e `NullMoth GPU: driving` não estão no log. Com o debug do DRM ligado, o macOS descarta parte
+  das mensagens do kext, então a falta de uma linha não prova nada.
+- 22:18:55: o WindowServer sobe e acha o framebuffer em `GFX0`:
+  - CoreDisplay: `Setting offline display 0x00000000 main`, depois
+    `IOFBSetDisplayModeAndDepth: Setting mode 0x0 … Failed to obtain mode info from IOFBGetDisplayModeInformation()`.
+  - NMXAccel: `serviceMatching(NVRMFramebuffer) returned NULL -- cannot watch for the framebuffer`,
+    `initFramebufferResource(index 0): scanout gate CLOSED`, e o NVMTL diz `headless GPU: no device for WindowServer`.
+- 22:19:03: o Mac estava **na tela de login** (`loginwindow`, `SecurityAgent`, LED do Caps Lock mudando). O kernel
+  repete `IOAccelLegacySurface::set_shape_backing_length_ext … Bad frame buffer index`, mas isso também aparece no
+  teste 5, que ficou vivo (683 vezes), e no boot normal. É ruído.
+- O log acaba às 22:19:04.374, uns 9 s depois de o WindowServer começar a usar o framebuffer.
+
+### Hipótese do congelamento (testes 6, 7 e 8)
+
+O IOFramebuffer (`nmx_fb.cpp`) publica como VRAM o endereço **da aperture** (BAR2 + offset no GGTT), e o
+WindowServer desenha ali com escritas da CPU. No Linux, o i915 não deixa ninguém tocar a aperture com a GPU em
+runtime suspend: ele revoga os mapeamentos do GGTT antes de suspender. Aqui nada segura a GPU. O log mostra
+power wells ligando e desligando a cada ~10 s, e a ponte só segurava um wakeref durante a criação do buffer. Uma
+escrita na aperture com a GPU suspensa pode travar a máquina sem log.
+- O teste 5 (sem framebuffer) ficou vivo, e os testes 6, 7 e 8 (com framebuffer) congelaram.
+- O README do nullmoth diz que esse caminho de tela "has not been loaded on hardware". Somos os primeiros a rodá-lo.
+
+### Correção: 0009 (nullmoth)
+
+- `nmx_xnu_boot_fb`: o endereço é `(v_baseAddr & ~0xfff) + v_offset`.
+- `nmx_i915_fb_create` **mantém o wakeref de runtime PM** enquanto o framebuffer existe e só solta em
+  `nmx_i915_fb_destroy`. A mensagem agora termina em `GPU kept awake while it is shown`.
+- Build **sem** o debug do DRM (`build-all.sh … nodebug kext`), para as mensagens `NullMoth display: …` não
+  serem descartadas.
+- Binário: `NMXGPU 775e893affde58277c320dc6933e9525eee61f7b1214264bf40009cc98d34e99`, 15.240.856 B, com 0001 a 0004 e
+  0006 a 0009 (o 0005 está aplicado, mas sem efeito sem a flag). **Não instalado.**
+
+### Pesquisa: outros projetos para Intel Xe no macOS
+
+- **WhateverGreen**: só faz patch dos drivers Intel da Apple, que vão até Ice Lake. Ele reconhece Alder/Raptor
+  Lake (1.6.9), mas não há framebuffer da Apple para Xe. O Dortania lista os iGPUs de Alder/Raptor Lake como
+  não suportados.
+- **NootedBlue** (KennNek): drivers da Apple para iGPUs sem suporte, só até Gen9.5/Gen11. Não serve.
+- **NootedGreen** (sgiammori e forks): carrega os drivers de **Tiger Lake** da Apple
+  (`AppleIntelTGLGraphicsFramebuffer`) fingindo ser TGL. É desenvolvido justamente em Raptor Lake-P, no macOS 14.7.1.
+  Ainda é trabalho em andamento:
+  - a imagem sai fragmentada (DBUF zerado) e às vezes fica preta ou duplicada;
+  - ele trava o WindowServer uns 200 ms depois de o WindowServer ficar ativo;
+  - há "reset storms" no acelerador.
+  - Caminho diferente do nosso (drivers da Apple em vez do i915). Não dá para combinar, mas confirma que a parte
+    difícil é a ligação entre o display e o WindowServer. Vale acompanhar.
+
+## Próximo: teste 9 (0009, sem debug)
+
+O mesmo procedimento. Agora o log deve guardar as linhas `NullMoth display: …`, com `holding GGTT 0x0+0x7e9000`,
+`took over the boot framebuffer` e `GPU kept awake`.
