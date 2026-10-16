@@ -1,0 +1,13 @@
+--- a/intelfb.cpp
++++ b/intelfb.cpp
+@@ -246,6 +246,10 @@
+     IOPCIDevice *pci = OSDynamicCast(IOPCIDevice, provider);
+     if (!pci) return nullptr;
+     if (PE_parse_boot_argn("-nmintelfboff", nullptr, 0)) { IFBLOG("off by boot-arg"); return nullptr; }
++    // nmx-intel: "Start once without NVIDIA driver" (-nvoff) also leaves the panel to the firmware framebuffer, so a
++    // hang never needs the Recovery; and with the AMD/Intel test driver on (nmxintel=1) i915 owns this GPU's display
++    if (PE_parse_boot_argn("-nvoff", nullptr, 0)) { IFBLOG("off: -nvoff"); return nullptr; }
++    { uint32_t nmx = 0; if (PE_parse_boot_argn("nmxintel", &nmx, sizeof nmx) && nmx) { IFBLOG("off: nmxintel=1 (NMXGPU drives this GPU)"); return nullptr; } }
+     uint16_t dev = pci->configRead16(kIOPCIConfigDeviceID);
+     fVer = displayVersion(dev);
+     if (!fVer) return nullptr;   // an Intel GPU this driver does not know (older ones have Apple's own driver)

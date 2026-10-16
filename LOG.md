@@ -1013,3 +1013,34 @@ nós agora** (Sequoia, `a7a8`, painel interno). É outro caminho (driver da Appl
 
 Fazer o `NMXGPUFB` (fb=1) funcionar sem congelar (testes 10–14). Com ele, o NMXAccel volta a ter framebuffer e o
 WindowServer ganha o Metal da Intel.
+
+## 2026-10-16: caminho novo — **a RTX desenha o desktop no painel da Intel (NMIntelFB)**
+
+O Lukas quer acelerar o desktop do dia a dia. O Metal da Intel pelo i915 ainda está longe (falta o `NMXGPUFB`), mas
+o nullmoth já tem um caminho feito para notebooks com o painel na Intel e sem MUX, como este:
+- `kexts/NMIntelFB` (desde 2026-10-10, **não vem no pacote**): um IOFramebuffer para o painel interno das Intel
+  com display version 12–20 (inclui Raptor Lake). Ele não programa nada no display: lê o plano que o firmware acendeu
+  (linear XRGB8888), publica essa superfície pela aperture (BAR2 + offset no GGTT) e mede o refresh pelo contador
+  de quadros. Se algo não bate, `start()` desiste e o IONDRVFramebuffer fica com a tela, como hoje.
+- Ele se publica como **cabeça 4 do NVAccel** (`IOFBDependentID` do NVRM, `IOFBDependentIndex` 4): o WindowServer
+  compõe essa tela **na RTX (Metal 3)**, e o caminho de cópia do NVAccel escreve cada quadro na superfície da Intel.
+- O NVAccel instalado já tem isso (`debug.nvaccel_igpu`, contador `debug.nvaccel_iop_ok_h4`). Fica desligado por
+  padrão e é ligado em tempo de execução: `debug.nvaccel_igpu=1`, `debug.nvaccelfb=3` e reiniciar o WindowServer.
+  Um reboot desfaz.
+
+### Ferramentas (`tools/intelfb/`)
+
+- `build.sh`: compila o NMIntelFB da tag `v2.1.0` do clone do nullmoth, com os nossos patches. Saída em
+  `~/nmx-build/intelfb/out/NMIntelFB.kext` (`3b86a1e1…`, 63.456 B). O binário não é versionado (licença).
+- `source-fixes/intelfb-0001-off-with-nvoff-or-nmxintel.patch`: o NMIntelFB não sobe com `-nvoff` ("Start once
+  without NVIDIA driver" vira a saída de emergência) nem com `nmxintel=1` (aí o i915 cuida da tela).
+- `install.sh` [`remove`]: copia para `/Library/Extensions` e refaz a coleção auxiliar com `kmutil create`, como o
+  instalador do nullmoth. Confere que NVRM, NVRMFB e NVAccel continuam nela. Backup em
+  `~/AuxiliaryKernelExtensions.kc.antes-intelfb`.
+- `enable.sh` [`status`]: liga a cópia da RTX para o painel neste boot e mostra o estado.
+
+## Próximo: teste RTX-1
+
+1. App 1401: desligar o driver de teste AMD / Intel (sem `nmxintel=1`).
+2. `sudo bash tools/intelfb/install.sh`, reiniciar. Esperado: desktop pelo NMIntelFB (ainda sem aceleração).
+3. `sudo bash tools/intelfb/enable.sh` e `sudo killall WindowServer`. Esperado: o desktop composto na RTX.
