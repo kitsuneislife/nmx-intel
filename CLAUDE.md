@@ -75,11 +75,13 @@ Até 2026-10-15 o trabalho estava no branch `ccr-918d231a-luzxg0` dos dois outro
 
 ## Onde paramos (2026-10-15, depois do teste 5)
 
-**Mais novo (teste 13):** a tomada falha com `-ENOSPC` em stolen 0+0x7e9000: o i915 aloca objetos dele nas páginas do
+**Mais novo (teste 14):** a tomada funciona (`shold took`): o i915 mostra o console do macOS no painel. Ainda congela
+depois do attach. 0015 = chaves na NVRAM (`sudo nvram nullmoth-gpu-fb=2` etc.); teste 15 com `fb=2`.
+**Teste 13:** a tomada falha com `-ENOSPC` em stolen 0+0x7e9000: o i915 aloca objetos dele nas páginas do
 fb do GOP, que o macOS (console e IONDRVFramebuffer) ainda desenha pela aperture. 0014 reserva essas páginas (teste 14).
 **Teste 12:** congela < 2 s depois do registro do nosso IOFramebuffer; o `IONDRVFramebuffer` do firmware
 continua na Intel (dois fbs "console" na mesma GPU). 0013 = teste 13, com chaves `nmxcon=0`/`nmxfb=2`/`nmxfb=0` (ver LOG).
-**Teste 11:** o NMXGPU é compilado no Mac (`build/`), com `source-fixes/0001..0014`. A trilha na NVRAM
+**Teste 11:** o NMXGPU é compilado no Mac (`build/`), com `source-fixes/0001..0015`. A trilha na NVRAM
 (`nvram nullmoth-gpu-trail`) mostrou que **o attach inteiro termina** (`published`, a marca de attach é apagada) e que o
 Mac congela depois, antes do macOS usar o nosso framebuffer (sem `fb-vram`/`fb-setmode`). A tomada do fb do GOP cai em
 `tk-obj` (a faixa da stolen já tem dono). Próximo: teste 12, com batimento e trilha depois do attach (ver o fim do `LOG.md`).

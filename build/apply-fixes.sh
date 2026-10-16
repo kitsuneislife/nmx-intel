@@ -1,6 +1,6 @@
 #!/bin/bash
 # apply-fixes.sh: aplica source-fixes/ na árvore de ~/nmx-build (depois de setup.sh) e faz commit em cada clone.
-#   0001, 0004, 0006, 0008 a 0014 no nullmoth (branch nmx-intel-build), 0002, 0003, 0005 e 0007 no drm-kmod (branch nmx-intel).
+#   0001, 0004, 0006, 0008 a 0015 no nullmoth (branch nmx-intel-build), 0002, 0003, 0005 e 0007 no drm-kmod (branch nmx-intel).
 # Pode rodar de novo: um patch que já está aplicado (tag fix-NNNN no clone) é pulado.
 set -euo pipefail
 F=$(cd "$(dirname "$0")/../source-fixes" && pwd)
@@ -40,3 +40,4 @@ apply "$B/nvidia-macos-driver" 0011-finer-trail-publish-steps-and-takeover-failu
 apply "$B/nvidia-macos-driver" 0012-heartbeat-after-attach-and-reap-freed-objects-before-takeover.patch
 apply "$B/nvidia-macos-driver" 0013-trail-each-framebuffer-call-earlier-heartbeat-bisect-switches.patch
 apply "$B/nvidia-macos-driver" 0014-hold-the-boot-framebuffer-stolen-pages-and-stamp-the-beat-in-the-trail.patch
+apply "$B/nvidia-macos-driver" 0015-test-switches-in-nvram-and-the-beat-in-the-trail-first.patch

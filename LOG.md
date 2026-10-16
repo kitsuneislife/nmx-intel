@@ -679,3 +679,32 @@ Build sem debug: `NMXGPU 959844160a2b2645211daa8398766c9e24d3a5e23a14a70f307cf08
 
 O mesmo procedimento. Se a tomada der certo (`took` na trilha), o painel deve mostrar o mesmo conteúdo do console do
 macOS, porque o nosso fb passa a ser o próprio fb do GOP.
+
+## 2026-10-16: teste 14, as páginas da stolen seguras (0014) — **a tomada funcionou**
+
+Binário `95984416…`. Trilha:
+```
+attach hold shold attached publish probe i915-fb take-pin took fb-pin iomap commit lit client-reg hotplug registered
+fb-new fb-start fb-started fb-pm fb-reg published
+```
+- **`shold` e `took`: a ponte pegou o próprio fb do GOP.** O i915 acende o painel com ele, e **a tela mostra o console
+  do macOS** (foto do Lukas: texto do boot, `AppleKeyStore`, `apfs_keybag_init`…). Antes era tela preta.
+- O attach termina (`published`, marca apagada). O Mac congela depois, no meio das mensagens do boot.
+- O batimento nunca aparece, nem o `@ms` no fim da trilha. Então a thread do batimento nunca passou da primeira
+  gravação, apesar de o attach durar segundos. Na 0015 ela grava `beat` na trilha logo ao começar, e o `@ms` vai
+  antes da variável separada.
+
+### 0015: chaves de teste na NVRAM
+
+`nmx_xnu_knob`: o boot-arg, senão a variável da NVRAM, senão o padrão. Assim o Lukas liga uma chave com um comando
+só, sem mexer nos boot-args:
+- `sudo nvram nullmoth-gpu-fb=2`: acende o painel com o fb do GOP, mas **não publica** o nosso IOFramebuffer (o
+  macOS fica no `IONDRVFramebuffer`, que agora aparece no painel porque é a mesma memória);
+- `nullmoth-gpu-fb=0`: sem ponte; `nullmoth-gpu-con=0`: o nosso fb não é console;
+- apagar: `sudo nvram -d nullmoth-gpu-fb`.
+
+Build sem debug: `NMXGPU ff044b86b58ef59b4028edd50d015795952e20ec417ded095049cae6a05bf331`, 15.250.296 B.
+
+## Próximo: teste 15 (0015, com `nullmoth-gpu-fb=2`)
+
+Se o Mac chegar ao desktop, quem trava é o nosso IOFramebuffer. Se congelar igual, é o i915 (ou o NMXAccel/Metal).
