@@ -1289,3 +1289,24 @@ Build `rt kext`: `NMXGPU 3fc8feaf144b0420ab3b1bce13fad2ed313ef5601143b26da5c97a8
 
 Mesmo procedimento. Esperado: uma tela só, `fb-vbl` e `ndrv-term` na trilha, menos glitches. Se a tela do firmware
 saindo der problema: `sudo nvram nullmoth-gpu-ndrv=0`.
+
+## 2026-10-16: teste 27 (0027) — VBL ok, mas a tela do firmware ficou (`ndrv-none`)
+
+Binário `3fc8feaf…`. Trilha: `… fb-reg fb-ps1 ndrv-none published … fb-tim fb-vbl … fb-vbl-off fb-gam fb-vbl-on @148749`.
+- **O VBL agora corre** (`fb-vbl`; o IOFramebuffer estrangula e religa: `fb-vbl-off`/`fb-vbl-on`).
+- **`ndrv-none`:** `getMatchingServices("IONDRVFramebuffer")` não achou o `.Display_boot`, mas ele continua em
+  `GFX0@2/.Display_boot`, ao lado do `NMXGPU`. Log do WindowServer: `Creating FB 1 of 2` / `FB 2 of 2`,
+  `IOFBSetDisplayModeAndDepth` nos dois (`NMXGPUFB` e `.Display_boot`). As duas telas desenham nas **mesmas páginas**
+  (o fb do GOP que o i915 assumiu): é isso que pisca e só redesenha onde o mouse passa.
+- O Lukas: os mesmos glitches do teste 26.
+
+### 0028: achar a tela do firmware pelos filhos do GFX0
+
+Percorre os filhos do PCI no plano de serviço e dá `terminate()` em todo IOFramebuffer que não seja o nosso. Trilha
+`ndrv-c<filhos vistos>` e `ndrv-term`/`ndrv-none`.
+
+Build `rt kext`: `NMXGPU d002eae8f18c119a2a7c7806d6b73dc87b7d2e3e7d721e20cfead5102d484ed5`, 15.251.040 B.
+
+## Próximo: teste 28 (0028)
+
+Mesmo procedimento. Esperado: `ndrv-term`, uma tela só no `system_profiler` e no log do WindowServer (`FB 1 of 1`).

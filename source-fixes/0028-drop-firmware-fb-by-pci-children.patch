@@ -1,0 +1,56 @@
+From 313dfbbbed5a84e7c1b4e9ba751cceea9846a670 Mon Sep 17 00:00:00 2001
+From: kitsuneislife <kitsuneislif3@gmail.com>
+Date: Fri, 16 Oct 2026 16:47:23 -0300
+Subject: [PATCH] nmx-intel 0028: find the firmware framebuffer among GFX0's
+ children
+
+---
+ gpu-port/xkpi/xnu/nmx_fb.cpp | 25 ++++++++++++++++++-------
+ 1 file changed, 18 insertions(+), 7 deletions(-)
+
+diff --git a/gpu-port/xkpi/xnu/nmx_fb.cpp b/gpu-port/xkpi/xnu/nmx_fb.cpp
+index 4c86998..df55dd2 100644
+--- a/gpu-port/xkpi/xnu/nmx_fb.cpp
++++ b/gpu-port/xkpi/xnu/nmx_fb.cpp
+@@ -333,20 +333,31 @@ IOService *nmx_fb_publish(IOService *gpu, void *dev)
+      * nmxndrv=0 / nullmoth-gpu-ndrv=0 keeps it.
+      */
+     if (nmx_xnu_knob("nmxndrv", "nullmoth-gpu-ndrv", 1)) {
++        /* nmx-intel 0028: the IOFramebuffer children of our PCI device other than ours, walked in the service plane
++           (getMatchingServices("IONDRVFramebuffer") found none in test 27, though .Display_boot sat under GFX0) */
+         IOService *pci = gpu->getProvider();
+-        int n = 0;
+-        if (OSDictionary *m = IOService::serviceMatching("IONDRVFramebuffer")) {
+-            if (OSIterator *it = IOService::getMatchingServices(m)) {
++        int n = 0, seen = 0;
++        if (pci != nullptr) {
++            if (OSIterator *it = pci->getChildIterator(gIOServicePlane)) {
++                OSArray *drop = OSArray::withCapacity(2);
+                 while (IOService *s = OSDynamicCast(IOService, it->getNextObject())) {
+-                    if (pci != nullptr && s->getProvider() == pci) {
+-                        s->terminate();
++                    seen++;
++                    if (s != gpu && s->metaCast("IOFramebuffer") != nullptr && s->metaCast("NMXGPUFB") == nullptr && drop)
++                        drop->setObject(s);
++                }
++                it->release();
++                if (drop != nullptr) {
++                    for (unsigned i = 0; i < drop->getCount(); i++) {
++                        ((IOService *)drop->getObject(i))->terminate();
+                         n++;
+                     }
++                    drop->release();
+                 }
+-                it->release();
+             }
+-            m->release();
+         }
++        char tok[24];
++        snprintf(tok, sizeof(tok), "ndrv-c%d", seen);
++        nmx_xnu_trail(tok);
+         nmx_xnu_trail(n ? "ndrv-term" : "ndrv-none");
+     }
+     return fb;
+-- 
+2.39.5 (Apple Git-154)
+

@@ -54,6 +54,7 @@ O NVIDIA (RTX 3050) já funciona com o driver original e não é afetado por nad
 | RTX-7: mesmo esperando a NVIDIA, trava igual; caminho RTX parado | 🔧 `0025`: o VBL do `NMXGPUFB` em thread própria (o mesmo erro do NMIntelFB); teste 25 com `fb=1` |
 | Teste 25: trava logo depois de `fb-started`. O IOFramebuffer não tinha controlador até o `open` (NULL no `setPowerState` e no `extGetAttribute`, os panics do NMIntelFB) | 🔧 `0026`: `IOFBDependentID` próprio antes do `start`; NMXAccel desligado por padrão (teste 26) |
 | **Teste 26: desktop pelo nosso framebuffer (144 Hz), sem travar**; muito glitch, com duas telas (a nossa e a do firmware) | 🔧 `0027`: VBL ligado desde o registro; a tela do firmware sai (teste 27) |
+| Teste 27: VBL ok; a tela do firmware não foi achada (`ndrv-none`) e as duas telas desenham nas mesmas páginas | 🔧 `0028`: achar a tela do firmware pelos filhos do GFX0 (teste 28) |
 | Patches 1 a 5 viram correções no fonte (`source-fixes/0001..0003`) | 🔧 compilado, falta testar |
 | Tela preta com o Mac vivo (sem framebuffer, o i915 desliga o pipe, DC6) | ❌ consequência da ponte |
 | Tela acelerada / Metal na Intel | ❌ ainda não |
