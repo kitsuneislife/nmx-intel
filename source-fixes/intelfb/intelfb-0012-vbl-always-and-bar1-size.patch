@@ -1,0 +1,66 @@
+diff -ruN a/intelfb.cpp src/intelfb.cpp
+--- a/intelfb.cpp	2026-10-16 19:50:16
++++ b/intelfb.cpp	2026-10-16 19:50:16
+@@ -206,7 +206,11 @@
+     // it (RTX-5: vbl=2, the heartbeat stopped at 21 s, then the Mac froze)
+     uint64_t fVblNext = 0, fVblCalls = 0;
+     volatile bool fStopping = false, fVblOn = false, fVblRunning = false;
+-    bool fOwnGroup = false;
++    bool fOwnGroup = false;   // intelfb-0009: own IOFBDependentID, index 4 for NVAccel until open(), 0 for IOGraphics after
++    // intelfb-0012: the VBL fires whenever it is registered, as NVRMFB's does (its setInterruptState is a no-op).
++    // IOGraphics treats a registered VBL as enabled and never switched it on, and NVAccel's registration switched it
++    // off (RTX-10 trail "is vbl-off"): vbl=0 in every test, and the accelerated display pipe got no vsync.
++    bool fVblAlways = true;
+     // intelfb-0011: as head 0 this panel is NVAccel's primary framebuffer, which NVAccel asks for RM handles and VRAM
+     // (NVRMFB answers on a machine with an NVIDIA display; here no NVRMFB starts). An NVKMS device of our own answers.
+     struct NvKmsKapiFunctionsTable *fKms = nullptr;
+@@ -218,7 +222,7 @@
+     void kapiInit();
+     void kapiFree();
+     IOReturn vramGrant(NVRMVramRequest *r);
+-    IOReturn vramRelease(NVRMVramRequest *r);   // intelfb-0009: own IOFBDependentID, index 4 for NVAccel until open(), 0 for IOGraphics after
++    IOReturn vramRelease(NVRMVramRequest *r);
+     static void vblThread(void *p0, wait_result_t) {
+         NMIntelFB *me = (NMIntelFB *)p0;
+         uint64_t period; nanoseconds_to_absolutetime(me->fFrameNs, &period);
+@@ -324,14 +328,14 @@
+     IOReturn callPlatformFunction(const OSSymbol *fn, bool wait, void *p1, void *p2, void *p3, void *p4) override;
+     IOReturn registerForInterruptType(IOSelect type, IOFBInterruptProc proc, OSObject *target, void *ref, void **iref) override {
+         ifb_attr("ri", (uint32_t)type);
+-        if (type == kIOFBVBLInterruptType) { fVbl = { proc, target, ref }; if (iref) *iref = &fVbl; return kIOReturnSuccess; }
++        if (type == kIOFBVBLInterruptType) { fVbl = { proc, target, ref }; __atomic_thread_fence(__ATOMIC_RELEASE); fVblOn = fVblOn || fVblAlways; if (iref) *iref = &fVbl; return kIOReturnSuccess; }
+         if (type == kIOFBConnectInterruptType) { fConnect = { proc, target, ref }; if (iref) *iref = &fConnect; return kIOReturnSuccess; }
+         return kIOReturnUnsupported;
+     }
+     IOReturn unregisterInterrupt(void *) override { return kIOReturnSuccess; }
+     IOReturn setInterruptState(void *ref, UInt32 state) override {
+         IFB_ONCE("is");
+-        if (ref == &fVbl) { fVblOn = state != 0; static int n; if (n++ < 4) ifb_trail(state ? "vbl-on" : "vbl-off"); }
++        if (ref == &fVbl) { fVblOn = fVblAlways || state != 0; static int n; if (n++ < 4) ifb_trail(state ? "vbl-on" : "vbl-off"); }
+         return kIOReturnSuccess;
+     }
+     IOReturn setGammaTable(UInt32, UInt32, UInt32, void *) override { IFB_ONCE("gam"); return kIOReturnSuccess; }
+@@ -563,8 +567,9 @@
+     setProperty("NMIntelFBPipe", fPipe, 32);
+     setProperty("NMIntelFBDisplayVersion", fVer, 32);
+     setProperty("built-in", kOSBooleanTrue);   // the panel is the laptop's own (kConnectionFlags says so too)
++    fVblAlways = ifb_knob("nullmoth-intelfb-vbl", 1) != 0;
+     armVbl();
+-    ifb_trail("vbl");
++    ifb_trail(fVblAlways ? "vbl-always" : "vbl");
+     if (fOwnGroup && ifb_knob("nullmoth-intelfb-head", 0) != 4) kapiInit();
+     // nmx-intel: nullmoth-intelfb-pm=0 leaves power management out (RTX-2 hung inside this call)
+     if (ifb_knob("nullmoth-intelfb-pm", 1)) {
+@@ -614,8 +619,11 @@
+     fPhysForVa = pv ? (NvU64 (*)(const void *))(uintptr_t)pv->unsigned64BitValue() : nullptr;
+     uint64_t bar = 0;
+     IOService *rm = nub->getProvider();
++    // intelfb-0012: the first range of at least 256 MB, as NVRMFB's surveyBar1 finds BAR1 (NVRM replaces the device
++    // memory list when it places BAR1; the register lookup gave 64 MB of an 8 GB BAR1 in RTX-10)
+     if (IOPCIDevice *pci = rm ? OSDynamicCast(IOPCIDevice, rm->getProvider()) : nullptr)
+-        if (IODeviceMemory *b1 = pci->getDeviceMemoryWithRegister(kIOPCIConfigBaseAddress1)) bar = b1->getLength();
++        for (IOItemCount i = 0; i < pci->getDeviceMemoryCount() && !bar; i++)
++            if (IODeviceMemory *d = pci->getDeviceMemoryWithIndex(i)) if (d->getLength() >= (256ull << 20)) bar = d->getLength();
+     // NVRMFB's budget (nvrmVramBudget): half of a resizable BAR1, three quarters of a smaller one
+     fVramBudget = bar >= (4ull << 30) ? bar / 2 : bar / 4 * 3;
+     if (!fKms || !g || !fPhysForVa || !fKms->allocateDevice || !fVramBudget) {

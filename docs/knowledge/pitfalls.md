@@ -59,6 +59,13 @@
 ### VBL
 - IOGraphics treats a registered VBL interrupt as enabled and calls `setInterruptState` only to throttle; registering
   and never firing breaks frame pacing (test 26). A timer is not a real vblank; currently VBL is not offered (0031).
+- [measured, RTX-10] NMIntelFB waited for `setInterruptState(on)`, which never came (NVAccel's registration sent
+  `off`): `vbl=0` always, and WindowServer on the RTX sent no display-pipe transaction. NVRMFB ignores
+  `setInterruptState` and always fires (intelfb-0012 does the same).
+
+### `getDeviceMemoryWithRegister` is stale for the NVIDIA BAR1
+- [measured, RTX-10] NVRM replaces the device memory list when it places BAR1; the register lookup returned 64 MB of
+  8 GB. Take the first range ≥ 256 MB (NVRMFB's `surveyBar1`).
 
 ### `thread_call_allocate` lands in the kernel HIGH group (one thread)
 - A callback that blocks (e.g. into IOFramebuffer) stalls every HIGH thread_call → slow full freeze (RTX-5). Use a

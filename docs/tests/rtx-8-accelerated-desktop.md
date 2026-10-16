@@ -76,4 +76,27 @@ open-gpu-kernel-modules `610.57.04` (NVRM's tag), fetched by `build.sh`. [measur
 `{version, kapiDevice, hClient, hDevice, hSubDevice}` (checked against `nvrm_gpuva_abi.h`). `NMIntelFB 29893f31…`.
 [unverified] the copy path speed: WindowServer's frames would be read through BAR1 by the CPU.
 
-## RTX-10 — intelfb-0011 (pending)
+## RTX-10 — intelfb-0011 — WindowServer runs on the RTX; nothing reaches the panel
+Boot 19:38; `enable.sh` 19:41:35 (`heads_piped 1`); `killall -9` → screen stayed on the `-v` console (photo); Lukas
+waited, then forced a power-off (boot 19:44:00).
+- [measured, kernel log] 19:41:51 `trail: rmh`, `RM handles: kapiDevice … *** the accelerator can now build GPU page
+  tables ***`; three `nvAllocVram: 8323072 bytes VRAM, phys 0x7c22800000…` (+ 64 KB, 256 KB), each `MM commit: MAPPED
+  gpuVA 0x120000000 … *** the GPU can reach these bytes ***`; `surfvram` ok 2 refused 0. 24 MB in use at most.
+- [measured, WindowServer log] `NVMTL: vk: UP in this Metal process — "NVIDIA GeForce RTX 3050 6GB Laptop GPU (NVK
+  GA107-A)"`, command queue, CoreDisplay metallib, samplers; `IOAccelDisplayPipeUserClient2` opened. WindowServer
+  stayed alive (touchpad events 19:42:23), no crash report. **No display-pipe transaction** (no `iop: K6` line).
+  GPUWrangler: `gpu 0xd9df (IG) 8086.a7a8 … fb0:0 /NMIntelFB`, `gpu 0xcb26 (DG) 10de.25ac … accel /NVAccel`;
+  `IOPresentment: Unable to get AGDC information … Unable to acquire map` (also on IG).
+- [measured, trail in the log] after `found_framebuffer`: `ga:mirr is vbl-off`; never `vbl-on`, never `vbl1`; beat
+  `vbl=0` in every NMIntelFB test. NVRMFB's `setInterruptState` is a no-op and its VBL always fires (hw vblank or
+  timer). [inferred] the accelerated display pipe waits for a vsync that never comes.
+- [measured] `kapi: … VRAM budget 48 MB of BAR1 64 MB`: `getDeviceMemoryWithRegister(BAR1)` is stale after NVRM
+  places the 8 GB BAR1 (allocations landed at BAR1 + 552 MB).
+
+### intelfb-0012
+VBL fires whenever registered (`fVblOn` set at registration, `setInterruptState` cannot turn it off); knob
+`nullmoth-intelfb-vbl=0` = old behaviour; trail `vbl-always`, first fire `vbl1`. BAR1 = first device range ≥ 256 MB
+(NVRMFB's `surveyBar1`). Also moved a misplaced 0009 comment. `NMIntelFB c07eb921…`. Note: this also gives the
+software-composited boot (before `enable.sh`) a 144 Hz VBL for the first time.
+
+## RTX-11 — intelfb-0012 (pending)

@@ -59,7 +59,7 @@ Lukas cannot type `|`: when he runs commands, write to a file and `grep`/`tail` 
 | `nullmoth-gpu-ndrv` (`nmxndrv`) | 1 | remove the firmware IONDRV after it opens |
 | `nullmoth-gpu-vbl` (`nmxvbl`) | 0 | 1 offers the timer VBL |
 | `nullmoth-gpu-shadow` (`nmxshadow`) | 1 | shadow framebuffer in RAM |
-| `nullmoth-intelfb*` | — | NMIntelFB only: `=0`, `-dep` (1 own controller, 2 NVRM's group, 0 plain), `-head` (0 default, 4), `-kapi` (1, 0 = no NVKMS device), `-pm`, `-delay` |
+| `nullmoth-intelfb*` | — | NMIntelFB only: `=0`, `-dep` (1 own controller, 2 NVRM's group, 0 plain), `-head` (0 default, 4), `-kapi` (1, 0 = no NVKMS device), `-vbl` (1 always, 0 follow `setInterruptState`), `-pm`, `-delay` |
 
 ## Tools
 
