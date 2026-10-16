@@ -1,0 +1,142 @@
+--- a/intelfb.cpp
++++ b/intelfb.cpp
+@@ -22,6 +22,66 @@
+ #include <sys/sysctl.h>
+ 
+ #define IFBLOG(fmt, ...) IOLog("NMIntelFB: " fmt "\n", ##__VA_ARGS__)
++
++// nmx-intel: a trail of the steps in NVRAM ("nullmoth-intelfb-trail"), written and synced at each step, so a boot that
++// freezes before the log is saved still shows the last step reached (`nvram nullmoth-intelfb-trail`). And a boot guard:
++// "nullmoth-intelfb-attaching" is set while start() runs and removed when it returns; found at probe, the last start
++// never returned, so this boot leaves the panel to the firmware framebuffer. To try again: sudo nvram -d
++// nullmoth-intelfb-attaching
++#include <IOKit/IONVRAM.h>
++static IODTNVRAM *ifb_nvram()
++{
++    IORegistryEntry *e = IORegistryEntry::fromPath("/options", gIODTPlane);
++    IODTNVRAM *n = OSDynamicCast(IODTNVRAM, e);
++    if (n == nullptr && e != nullptr) e->release();
++    return n;
++}
++static void ifb_nv_set(const char *key, const char *val)
++{
++    IODTNVRAM *n = ifb_nvram();
++    if (!n) return;
++    const OSSymbol *k = OSSymbol::withCString(key);
++    if (k) {
++        if (val) { if (OSData *d = OSData::withBytes(val, (unsigned)strlen(val))) { n->setProperty(k, d); d->release(); } }
++        else n->removeProperty(k);
++        k->release();
++    }
++    n->sync();
++    n->release();
++}
++static bool ifb_nv_has(const char *key)
++{
++    IODTNVRAM *n = ifb_nvram();
++    if (!n) return false;
++    OSObject *o = n->copyProperty(key);
++    bool has = o != nullptr;
++    if (o) o->release();
++    n->release();
++    return has;
++}
++static char gIfbTrail[400];
++static void ifb_trail(const char *step)
++{
++    if (strlen(gIfbTrail) + strlen(step) + 2 >= sizeof(gIfbTrail)) return;
++    if (gIfbTrail[0]) strlcat(gIfbTrail, " ", sizeof(gIfbTrail));
++    strlcat(gIfbTrail, step, sizeof(gIfbTrail));
++    IFBLOG("trail: %s", step);
++    ifb_nv_set("nullmoth-intelfb-trail", gIfbTrail);
++}
++static uint32_t ifb_knob(const char *key, uint32_t def)
++{
++    IODTNVRAM *n = ifb_nvram();
++    if (!n) return def;
++    uint32_t v = def;
++    if (OSData *d = OSDynamicCast(OSData, n->copyProperty(key))) {
++        char b[12] = {}; unsigned len = d->getLength() < 11 ? d->getLength() : 11;
++        memcpy(b, d->getBytesNoCopy(), len);
++        if (b[0] >= '0' && b[0] <= '9') { v = 0; for (unsigned i = 0; i < len && b[i] >= '0' && b[i] <= '9'; i++) v = v * 10 + (uint32_t)(b[i] - '0'); }
++        d->release();
++    }
++    n->release();
++    return v;
++}
+ 
+ // kmutil places a kext in a kernel collection only with a _kmod_info symbol (Xcode generates it; this build does not)
+ #include <mach/kmod.h>
+@@ -138,6 +198,7 @@
+ public:
+     IOService *probe(IOService *provider, SInt32 *score) override;
+     bool start(IOService *provider) override;
++    bool startReal(IOService *provider);
+     void stop(IOService *provider) override;
+ 
+     IOReturn enableController() override { return kIOReturnSuccess; }
+@@ -253,6 +314,12 @@
+     uint16_t dev = pci->configRead16(kIOPCIConfigDeviceID);
+     fVer = displayVersion(dev);
+     if (!fVer) return nullptr;   // an Intel GPU this driver does not know (older ones have Apple's own driver)
++    if (ifb_nv_has("nullmoth-intelfb-attaching")) {
++        IFBLOG("the last start never returned (boot guard) - leaving the firmware screen; sudo nvram -d nullmoth-intelfb-attaching");
++        ifb_nv_set("nullmoth-intelfb-trail", "guard: the last start never returned");
++        return nullptr;
++    }
++    if (ifb_knob("nullmoth-intelfb", 1) == 0) { IFBLOG("off: nullmoth-intelfb=0"); return nullptr; }
+     IFBLOG("8086:%04x display version %u", dev, fVer);
+     return IOFramebuffer::probe(provider, score);
+ }
+@@ -326,6 +393,17 @@
+     IFBLOG("virtual panel published (1920x1080 at phys 0x%llx)", (unsigned long long)fApertureBase);
+     return true;
+ #endif
++    gIfbTrail[0] = 0;
++    ifb_nv_set("nullmoth-intelfb-attaching", "1");
++    ifb_trail("start");
++    bool ok = startReal(provider);
++    ifb_trail(ok ? "ok" : "declined");
++    ifb_nv_set("nullmoth-intelfb-attaching", nullptr);
++    return ok;
++}
++
++bool NMIntelFB::startReal(IOService *provider)
++{
+     fPCI = OSDynamicCast(IOPCIDevice, provider);
+     if (!fPCI) return false;
+     fPCI->setMemoryEnable(true);
+@@ -333,23 +411,31 @@
+     IODeviceMemory *ap = fPCI->getDeviceMemoryWithRegister(kIOPCIConfigBaseAddress2);
+     if (!fMMIO || !ap) { IFBLOG("BAR0 or BAR2 is not mapped - leaving the firmware screen"); OSSafeReleaseNULL(fMMIO); return false; }
+     fRegs = (volatile uint8_t *)fMMIO->getVirtualAddress();
++    ifb_trail("mmio");
+     fApertureBase = ap->getPhysicalAddress(); fApertureLen = ap->getLength();
+     if (!adoptFirmwareMode()) { OSSafeReleaseNULL(fMMIO); fRegs = nullptr; return false; }
+-    if (!IOFramebuffer::start(provider)) { OSSafeReleaseNULL(fMMIO); fRegs = nullptr; return false; }
++    { char t[64]; snprintf(t, sizeof t, "mode-%c-%ux%u-s%x", 'A' + fPipe, fWidth, fHeight, fSurf); ifb_trail(t); }
++    if (!IOFramebuffer::start(provider)) { ifb_trail("fb-start-failed"); OSSafeReleaseNULL(fMMIO); fRegs = nullptr; return false; }
++    ifb_trail("fb-started");
+     // Head 4 of the NVIDIA accelerator (NVAccel): WindowServer composites this panel on the NVIDIA card and the
+     // display pipe copies each frame into fSurfMap. Without NVAccel the panel stays a plain framebuffer.
+     if (IODeviceMemory *sm = IODeviceMemory::withRange(fApertureBase + fSurf, (IOPhysicalLength)fRowBytes * fHeight)) {
+         fSurfMap = sm->map(kIOMapWriteCombineCache); sm->release();
+     }
+-    if (fSurfMap) {
++    ifb_trail(fSurfMap ? "surf" : "surf-fail");
++    // nmx-intel: nullmoth-intelfb-dep=0 publishes a plain framebuffer, without joining NVAccel as head 4
++    if (fSurfMap && ifb_knob("nullmoth-intelfb-dep", 1)) {
+         setProperty("IOFBDependentID", 0x4E56524D00000001ull, 64);
+         setProperty("IOFBDependentIndex", 4ull, 32);
++        ifb_trail("dep");
+     } else IFBLOG("the surface would not map write-combined: NVIDIA rendering stays off for this panel");
+     setProperty("NMIntelFBPipe", fPipe, 32);
+     setProperty("NMIntelFBDisplayVersion", fVer, 32);
+     setProperty("built-in", kOSBooleanTrue);   // the panel is the laptop's own (kConnectionFlags says so too)
+     armVbl();
++    ifb_trail("vbl");
+     registerPowerDriver(this, kPowerStates, 2);
++    ifb_trail("power");
+     IFBLOG("built-in panel published (%ux%u)", fWidth, fHeight);
+     return true;
+ }

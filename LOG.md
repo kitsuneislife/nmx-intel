@@ -1044,3 +1044,28 @@ o nullmoth já tem um caminho feito para notebooks com o painel na Intel e sem M
 1. App 1401: desligar o driver de teste AMD / Intel (sem `nmxintel=1`).
 2. `sudo bash tools/intelfb/install.sh`, reiniciar. Esperado: desktop pelo NMIntelFB (ainda sem aceleração).
 3. `sudo bash tools/intelfb/enable.sh` e `sudo killall WindowServer`. Esperado: o desktop composto na RTX.
+
+## 2026-10-16: teste RTX-1 — **o boot trava logo depois da coleção auxiliar carregar**
+
+NMIntelFB `3b86a1e1…`, driver de teste da Intel desligado. O boot parou na tela de texto logo depois de
+`KextLog: Loading Aux KC … Collection UUID matches` / `Generation from SMC report as 2`, que é quando o NMIntelFB
+entra. Nenhum log salvo (o boot morreu antes de gravar). O boot com "Start once without NVIDIA driver" funcionou:
+`NMIntelFB: off: -nvoff` (o patch intelfb-0001 é a saída de emergência).
+
+Sem log, a causa não dá para ver. Suspeitas: o `IOFramebuffer::start` com o `IOFBDependentID` do NVRM sem nenhum
+NVRMFB publicado (a RTX não tem tela), ou a leitura dos registradores do display.
+
+### intelfb-0002: trilha na NVRAM, trava de boot e chaves
+
+- `nvram nullmoth-intelfb-trail`: `start mmio mode-<pipe>-<w>x<h>-s<surf> fb-started surf dep vbl power ok`, gravada
+  e sincronizada a cada passo.
+- Trava de boot: `nullmoth-intelfb-attaching` fica gravada enquanto o `start()` roda. Se o boot seguinte a encontra, o
+  NMIntelFB fica de fora e a tela fica com o firmware. Para tentar de novo: `sudo nvram -d nullmoth-intelfb-attaching`.
+- Chaves: `sudo nvram nullmoth-intelfb=0` (desliga), `sudo nvram nullmoth-intelfb-dep=0` (framebuffer simples,
+  sem virar cabeça 4 do NVAccel).
+
+Build: `NMIntelFB 9dbd6128…`, 64.416 B.
+
+## Próximo: teste RTX-2 (intelfb-0002)
+
+Se travar: boot com "Start once without NVIDIA driver", e `nvram nullmoth-intelfb-trail`.

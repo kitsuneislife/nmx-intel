@@ -78,7 +78,8 @@ Até 2026-10-15 o trabalho estava no branch `ccr-918d231a-luzxg0` dos dois outro
 **Caminho RTX (em teste):** o NMIntelFB do nullmoth (`kexts/NMIntelFB`, fora do pacote) publica o painel da Intel
 como cabeça 4 do NVAccel; com `debug.nvaccel_igpu=1` + `debug.nvaccelfb=3` + reiniciar o WindowServer, a RTX compõe o
 desktop e copia cada quadro para o painel. `tools/intelfb/{build,install,enable}.sh`. Precisa do driver de teste da
-Intel **desligado**. O NMIntelFB não sobe com `-nvoff` (patch nosso).
+Intel **desligado**. O NMIntelFB não sobe com `-nvoff` (patch nosso). RTX-1 travou o boot sem log; intelfb-0002 =
+trilha `nvram nullmoth-intelfb-trail`, trava de boot (`nullmoth-intelfb-attaching`) e chaves `nullmoth-intelfb{,-dep}` (RTX-2, `9dbd6128…`).
 **Teste 24:** **desktop pelo i915 e sem travar** (passou de 330 s), e o ANV enxerga `Intel(R) Graphics
 (RPL-P)`, Vulkan 1.4. Sem Metal da Intel ainda (NMXAccel desligado por 0024). Próximo: o `NMXGPUFB` (fb=1) sem
 congelar. WhateverXe (b00t0x) conferido: só Big Sur e TGL/ADL-N por enquanto.
