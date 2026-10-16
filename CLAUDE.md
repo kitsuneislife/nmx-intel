@@ -75,9 +75,11 @@ Até 2026-10-15 o trabalho estava no branch `ccr-918d231a-luzxg0` dos dois outro
 
 ## Onde paramos (2026-10-15, depois do teste 5)
 
-**Mais novo:** o NMXGPU já compila no Mac (`build/`), com `source-fixes/0001..0004` aplicados. O 0004 é a ponte de
-tela do i915: buffer na stolen, publicado pela aperture do GGTT. Foi compilado, mas **ainda não foi instalado nem
-testado** (ver o fim do `LOG.md`). O fb do GOP **não** é herdado: o pipe A já está desligado quando o i915 assume.
+**Mais novo (teste 6):** o NMXGPU compilado no Mac (`build/`) acendeu o painel pela Intel com o nosso buffer, mas
+o buffer novo na stolen caiu por cima do fb do GOP, onde o console do `-v` ainda escreve (imagem deslocada), e o
+Mac congelou sem gravar log. O `source-fixes/0006` toma o próprio fb do GOP (mesma stolen, mesmo offset do GGTT).
+Já está compilado (`da43cdbb…`), mas **ainda não foi instalado**: é o teste 7 (ver o fim do `LOG.md`). Como o log se
+perde quando o Mac congela, as fotos do console são o log. No zsh, use `/usr/bin/log`.
 O resto desta seção é o estado do teste 5, com os patches binários.
 
 

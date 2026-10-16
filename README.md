@@ -24,7 +24,8 @@ O NVIDIA (RTX 3050) já funciona com o driver original e não é afetado por nad
 | NMXAccel atende clientes Metal (user clients, GPU tasks) | ✅ começou |
 | fb do GOP herdado pelo i915 | ❌ não: o pipe A já está desligado quando o i915 assume. Fica o buffer na stolen |
 | **Compilar o NMXGPU no Mac** (`build/`) | ✅ o build sem mudanças bate com a release |
-| Ponte de tela: `the scan-out buffer would not map (102)` (GEM do i915 sem `.vmap`, buffer não contínuo) | 🔧 escrita (`source-fixes/0004`: buffer na stolen, publicado pela aperture), compilada, falta testar |
+| Ponte de tela: `the scan-out buffer would not map (102)` (GEM do i915 sem `.vmap`, buffer não contínuo) | ✅ teste 6: o i915 mostra o nosso buffer no painel |
+| Buffer novo na stolen caiu por cima do fb do GOP, onde o console ainda escreve (imagem deslocada, Mac congelou sem log) | 🔧 `source-fixes/0006`: tomar o fb do GOP, compilado, falta testar (teste 7) |
 | Patches 1 a 5 viram correções no fonte (`source-fixes/0001..0003`) | 🔧 compilado, falta testar |
 | Tela preta com o Mac vivo (sem framebuffer, o i915 desliga o pipe, DC6) | ❌ consequência da ponte |
 | Tela acelerada / Metal na Intel | ❌ ainda não |

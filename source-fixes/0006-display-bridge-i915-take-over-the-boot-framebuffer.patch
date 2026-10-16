@@ -1,0 +1,337 @@
+diff --git a/gpu-port/xkpi/bsdcompat/include/nmx_xnu.h b/gpu-port/xkpi/bsdcompat/include/nmx_xnu.h
+index 3cb6756..ace979f 100644
+--- a/gpu-port/xkpi/bsdcompat/include/nmx_xnu.h
++++ b/gpu-port/xkpi/bsdcompat/include/nmx_xnu.h
+@@ -165,6 +165,8 @@ void nmx_xnu_devfs_remove(void *node);
+ int nmx_xnu_map_user(const uint64_t *pages, size_t npages, int cache, int writable, uint64_t fixed, uint64_t *uaddr,
+                      void **handle);
+ void nmx_xnu_unmap_user(void *handle);
++/* the boot framebuffer (GOP): physical base and geometry; 0 when there is none (xnu/nmx_platform.cpp) */
++int nmx_xnu_boot_fb(uint64_t *phys, uint32_t *width, uint32_t *height, uint32_t *pitch);
+ 
+ /* implemented on the LinuxKPI side (override/src/nmx_linux_cdev.c), called by the device-node glue */
+ int nmx_cdev_open(void *cookie, int open_id, int fflags);
+diff --git a/gpu-port/xkpi/override/i915/nmx_i915_fb.c b/gpu-port/xkpi/override/i915/nmx_i915_fb.c
+index 6126a20..58117a7 100644
+--- a/gpu-port/xkpi/override/i915/nmx_i915_fb.c
++++ b/gpu-port/xkpi/override/i915/nmx_i915_fb.c
+@@ -3,22 +3,35 @@
+  *
+  * The generic bridge (override/src/nmx_fb_bridge.c) creates a dumb buffer and maps it with drm_client_buffer_vmap.
+  * i915's GEM objects have no .vmap, and their shmem pages are scattered, so neither the mapping nor the single
+- * physical range the IOFramebuffer publishes would exist. This does what i915's own fbdev does (intel_fbdev.c,
+- * intel_fbdev_fb.c): a buffer in stolen memory (shmem if stolen is short), pinned into the mappable GGTT. The CPU
+- * reaches it through the GGTT aperture (BAR2), where the buffer is one contiguous range whatever pages back it, so
+- * that aperture range is what macOS gets as the framebuffer's VRAM, exactly as fbdev publishes it as smem_start.
++ * physical range the IOFramebuffer publishes would exist. Here the buffer lives in the GGTT and the CPU reaches it
++ * through the GGTT aperture (BAR2), where it is one contiguous range whatever memory backs it; that aperture range
++ * is what macOS gets as the framebuffer's VRAM, as i915's own fbdev publishes it as smem_start.
++ *
++ * First choice: take over the firmware's boot framebuffer, as i915 does for a plane the BIOS left on
++ * (intel_plane_initial.c). macOS's console keeps drawing at the boot framebuffer's physical address, which is in
++ * the aperture, and i915 never rewrites those GGTT entries on Gen8+ (clear_range is a no-op there). A new buffer in
++ * stolen memory could land on the very pages the console still writes, which showed on screen as the console text
++ * shifted inside our buffer (test 6); anything else i915 placed at those GGTT offsets would be overwritten the same
++ * way. Taking the boot buffer itself - same stolen pages, same GGTT offset - makes the console, WindowServer and
++ * the display engine agree on one buffer at one address.
++ *
++ * Fallback: a buffer like i915's fbdev makes (stolen, else shmem), with the boot framebuffer's GGTT range held
++ * back so no GPU object lands under the console's writes.
+  */
+ #include <drm/drm_framebuffer.h>
+ #include <drm/drm_fourcc.h>
+ 
++#include "gem/i915_gem_region.h"
+ #include "gem/i915_gem_stolen.h"
+ #include "gt/intel_gt.h"
+ #include "i915_drv.h"
++#include "i915_gem_gtt.h"
+ #include "i915_vma.h"
+ #include "display/intel_display_types.h"
+ #include "display/intel_fb.h"
+ #include "display/intel_fb_pin.h"
+ 
++#include "nmx_xnu.h"
+ #include "nmx_i915_fb.h"
+ 
+ struct nmx_i915_fb {
+@@ -26,56 +39,166 @@ struct nmx_i915_fb {
+     struct i915_vma *vma;
+     unsigned long vma_flags;
+     void __iomem *vaddr;
++    struct drm_mm_node guard;           /* fallback only: the boot framebuffer's GGTT range, kept free */
++    struct i915_ggtt *ggtt;
+ };
+ 
++/* the boot framebuffer as an offset in the GGTT; false if there is none or it is not in the aperture */
++static bool boot_fb_ggtt(struct i915_ggtt *ggtt, u32 *base, u32 *size, u32 *width, u32 *height, u32 *pitch)
++{
++    uint64_t phys;
++    if (!nmx_xnu_boot_fb(&phys, width, height, pitch))
++        return false;
++    *size = round_up(*pitch * *height, I915_GTT_PAGE_SIZE);
++    if (phys < ggtt->gmadr.start || phys + *size > ggtt->gmadr.end + 1 ||
++        !IS_ALIGNED(phys - ggtt->gmadr.start, I915_GTT_PAGE_SIZE)) {
++        printf("NullMoth display: the boot framebuffer 0x%llx is not in the GGTT aperture 0x%llx-0x%llx\n",
++               (unsigned long long)phys, (unsigned long long)ggtt->gmadr.start,
++               (unsigned long long)ggtt->gmadr.end);
++        return false;
++    }
++    *base = (u32)(phys - ggtt->gmadr.start);
++    return true;
++}
++
++/*
++ * The boot framebuffer's stolen pages, as a preallocated stolen object bound at its own GGTT offset. NULL (and the
++ * reason in the log) if the GGTT does not map it to one contiguous run of stolen memory or the range is taken.
++ */
++static struct i915_vma *take_boot_fb(struct drm_i915_private *i915, u32 base, u32 size)
++{
++    struct i915_ggtt *ggtt = to_gt(i915)->ggtt;
++    struct intel_memory_region *mem = i915->mm.stolen_region;
++    gen8_pte_t __iomem *gte = (gen8_pte_t __iomem *)ggtt->gsm + base / I915_GTT_PAGE_SIZE;
++    struct drm_i915_gem_object *obj;
++    struct i915_vma *vma;
++    u64 pte, dma, off;
++    int err;
++
++    if (mem == NULL) {
++        printf("NullMoth display: i915 has no stolen memory region\n");
++        return NULL;
++    }
++    pte = ioread64(gte);
++    dma = pte & GEN12_GGTT_PTE_ADDR_MASK;
++    if (!(pte & GEN8_PAGE_PRESENT) || dma < mem->region.start || dma + size > mem->region.end + 1) {
++        printf("NullMoth display: GGTT 0x%x maps 0x%llx, not usable stolen memory (0x%llx-0x%llx)\n", base,
++               (unsigned long long)pte, (unsigned long long)mem->region.start,
++               (unsigned long long)mem->region.end);
++        return NULL;
++    }
++    for (u32 i = 1; i < size / I915_GTT_PAGE_SIZE; i++)
++        if ((ioread64(gte + i) & GEN12_GGTT_PTE_ADDR_MASK) != dma + (u64)i * I915_GTT_PAGE_SIZE) {
++            printf("NullMoth display: the boot framebuffer is not one run of stolen memory (page %u)\n", i);
++            return NULL;
++        }
++    off = dma - mem->region.start;
++
++    obj = i915_gem_object_create_region_at(mem, off, size, I915_BO_ALLOC_USER | I915_BO_PREALLOC);
++    if (IS_ERR(obj)) {
++        printf("NullMoth display: stolen 0x%llx+0x%x is taken (%ld)\n", (unsigned long long)off, size,
++               PTR_ERR(obj));
++        return NULL;
++    }
++    /* WT ahead of time, as intel_plane_initial.c does, so pinning for display does not change the cache level */
++    i915_gem_object_set_cache_coherency(obj, HAS_WT(i915) ? I915_CACHE_WT : I915_CACHE_NONE);
++
++    vma = i915_vma_instance(obj, &ggtt->vm, NULL);
++    if (IS_ERR(vma)) {
++        i915_gem_object_put(obj);
++        return NULL;
++    }
++    err = i915_vma_pin(vma, 0, 0, PIN_GLOBAL | PIN_OFFSET_FIXED | PIN_MAPPABLE | base);
++    if (err) {
++        printf("NullMoth display: GGTT 0x%x+0x%x is taken (%d)\n", base, size, err);
++        i915_gem_object_put(obj);
++        return NULL;
++    }
++    printf("NullMoth display: took over the boot framebuffer: stolen 0x%llx, GGTT 0x%x, %u KiB\n",
++           (unsigned long long)off, base, size >> 10);
++    return vma;     /* holds the object reference and one pin */
++}
++
+ int nmx_i915_fb_create(struct drm_device *drm, uint32_t width, uint32_t height, struct nmx_i915_fb_out *out)
+ {
+     struct drm_i915_private *i915 = to_i915(drm);
++    struct i915_ggtt *ggtt = to_gt(i915)->ggtt;
+     const struct i915_gtt_view view = { .type = I915_GTT_VIEW_NORMAL };
+     struct drm_mode_fb_cmd2 mode_cmd = {};
+     struct drm_i915_gem_object *obj = ERR_PTR(-ENODEV);
++    struct i915_vma *boot_vma = NULL;
+     struct i915_gem_ww_ctx ww;
+     intel_wakeref_t wakeref;
+     struct nmx_i915_fb *f;
+     struct i915_vma *vma;
+     struct drm_framebuffer *fb;
+-    const char *where = "stolen";
++    const char *where;
++    u32 bbase = 0, bsize = 0, bw = 0, bh = 0, bpitch = 0;
++    bool have_boot;
+     int size, ret;
+ 
+     memset(out, 0, sizeof(*out));
++    f = kzalloc(sizeof(*f), GFP_KERNEL);
++    if (f == NULL)
++        return -ENOMEM;
++    f->ggtt = ggtt;
++
+     mode_cmd.width = width;
+     mode_cmd.height = height;
+     mode_cmd.pitches[0] = ALIGN(width * 4, 64);
+     mode_cmd.pixel_format = DRM_FORMAT_XRGB8888;
+-    size = PAGE_ALIGN(mode_cmd.pitches[0] * height);
+-
+-    f = kzalloc(sizeof(*f), GFP_KERNEL);
+-    if (f == NULL)
+-        return -ENOMEM;
+ 
+-    /* intel_fbdev_fb_alloc's choice: stolen unless it would take more than half of it (and never on Meteor Lake) */
+-    if (!IS_METEORLAKE(i915) && size * 2 < i915->dsm.usable_size)
+-        obj = i915_gem_object_create_stolen(i915, size);
+-    if (IS_ERR(obj)) {
+-        where = "shmem";
+-        obj = i915_gem_object_create_shmem(i915, size);
++    wakeref = intel_runtime_pm_get(&i915->runtime_pm);
++    have_boot = boot_fb_ggtt(ggtt, &bbase, &bsize, &bw, &bh, &bpitch);
++    if (have_boot)
++        printf("NullMoth display: boot framebuffer %ux%u, pitch %u, GGTT 0x%x\n", bw, bh, bpitch, bbase);
++    if (have_boot && bw == width && bh == height && IS_ALIGNED(bpitch, 64) && bpitch >= width * 4) {
++        boot_vma = take_boot_fb(i915, bbase, bsize);
++        if (boot_vma != NULL) {
++            obj = boot_vma->obj;
++            mode_cmd.pitches[0] = bpitch;
++        }
+     }
+-    if (IS_ERR(obj)) {
+-        printf("NullMoth display: i915 has no memory for a %ux%u buffer (%ld)\n", width, height, PTR_ERR(obj));
+-        kfree(f);
+-        return PTR_ERR(obj);
++    size = PAGE_ALIGN(mode_cmd.pitches[0] * height);
++
++    if (boot_vma != NULL) {
++        where = "the boot framebuffer";
++    } else {
++        if (have_boot) {
++            /* the console keeps writing there: no GPU object may be bound under it */
++            mutex_lock(&ggtt->vm.mutex);
++            ret = i915_gem_gtt_reserve(&ggtt->vm, NULL, &f->guard, bsize, bbase, I915_COLOR_UNEVICTABLE,
++                                       PIN_NOEVICT);
++            mutex_unlock(&ggtt->vm.mutex);
++            if (ret)
++                printf("NullMoth display: could not hold the boot framebuffer's GGTT range (%d)\n", ret);
++        }
++        /* intel_fbdev_fb_alloc's choice, but never stolen while the console may still write into it */
++        where = "stolen";
++        if (!have_boot && !IS_METEORLAKE(i915) && size * 2 < i915->dsm.usable_size)
++            obj = i915_gem_object_create_stolen(i915, size);
++        if (IS_ERR(obj)) {
++            where = "shmem";
++            obj = i915_gem_object_create_shmem(i915, size);
++        }
++        if (IS_ERR(obj)) {
++            ret = PTR_ERR(obj);
++            printf("NullMoth display: i915 has no memory for a %ux%u buffer (%d)\n", width, height, ret);
++            goto out_free;
++        }
+     }
++
+     fb = intel_framebuffer_create(intel_bo_to_drm_bo(obj), &mode_cmd);
+-    i915_gem_object_put(obj);       /* the framebuffer holds its own reference */
++    if (boot_vma == NULL)
++        i915_gem_object_put(obj);       /* the framebuffer holds its own reference */
+     if (IS_ERR(fb)) {
+-        printf("NullMoth display: i915 refused the framebuffer (%ld)\n", PTR_ERR(fb));
+-        kfree(f);
+-        return PTR_ERR(fb);
++        ret = PTR_ERR(fb);
++        printf("NullMoth display: i915 refused the framebuffer (%d)\n", ret);
++        goto out_boot;
+     }
+     f->fb = fb;
+ 
+-    wakeref = intel_runtime_pm_get(&i915->runtime_pm);
+-    /* the display pins in the mappable part of the GGTT first, so the aperture covers the buffer */
++    /* the display pins in the mappable part of the GGTT first; the boot buffer's own binding already is there */
+     vma = intel_fb_pin_to_ggtt(fb, &view, to_intel_framebuffer(fb)->min_alignment, 0, false, &f->vma_flags);
+     if (IS_ERR(vma)) {
+         ret = PTR_ERR(vma);
+@@ -83,6 +206,14 @@ int nmx_i915_fb_create(struct drm_device *drm, uint32_t width, uint32_t height,
+         goto out_fb;
+     }
+     f->vma = vma;
++    if (boot_vma != NULL) {
++        if (vma != boot_vma)
++            printf("NullMoth display: the display pinned the boot buffer at GGTT 0x%x, not 0x%x\n",
++                   i915_ggtt_offset(vma), bbase);
++        i915_vma_unpin(boot_vma);       /* the display's pin keeps it bound */
++        i915_gem_object_put(obj);       /* take_boot_fb's reference; the framebuffer holds its own */
++        boot_vma = NULL;
++    }
+     if (!i915_vma_is_map_and_fenceable(vma)) {
+         printf("NullMoth display: the buffer landed outside the GGTT aperture\n");
+         ret = -ENOSPC;
+@@ -108,12 +239,13 @@ int nmx_i915_fb_create(struct drm_device *drm, uint32_t width, uint32_t height,
+ 
+     out->fb = fb;
+     out->pitch = fb->pitches[0];
+-    out->phys = to_gt(i915)->ggtt->gmadr.start + i915_ggtt_offset(vma);
++    out->phys = ggtt->gmadr.start + i915_ggtt_offset(vma);
+     out->size = size;
+     out->kva = (void *)f->vaddr;
+     out->priv = f;
+-    /* stolen memory holds whatever was there before; shmem pages come zeroed but clearing them costs little */
+-    memset_io(f->vaddr, 0, size);
++    /* the boot buffer keeps what the console drew; a new one may hold whatever stolen held before */
++    if (strcmp(where, "the boot framebuffer") != 0)
++        memset_io(f->vaddr, 0, size);
+     printf("NullMoth display: i915 buffer in %s, GGTT 0x%08x, aperture 0x%llx\n", where, i915_ggtt_offset(vma),
+            (unsigned long long)out->phys);
+     return 0;
+@@ -121,8 +253,19 @@ int nmx_i915_fb_create(struct drm_device *drm, uint32_t width, uint32_t height,
+ out_unpin:
+     intel_fb_unpin_vma(vma, f->vma_flags);
+ out_fb:
+-    intel_runtime_pm_put(&i915->runtime_pm, wakeref);
+     drm_framebuffer_remove(fb);
++out_boot:
++    if (boot_vma != NULL) {
++        i915_vma_unpin(boot_vma);
++        i915_gem_object_put(boot_vma->obj);
++    }
++out_free:
++    intel_runtime_pm_put(&i915->runtime_pm, wakeref);
++    if (drm_mm_node_allocated(&f->guard)) {
++        mutex_lock(&ggtt->vm.mutex);
++        drm_mm_remove_node(&f->guard);
++        mutex_unlock(&ggtt->vm.mutex);
++    }
+     kfree(f);
+     memset(out, 0, sizeof(*out));
+     return ret;
+@@ -138,5 +281,10 @@ void nmx_i915_fb_destroy(void *priv)
+     if (f->vma != NULL)
+         intel_fb_unpin_vma(f->vma, f->vma_flags);
+     drm_framebuffer_remove(f->fb);  /* turns off any plane still scanning it out, then drops it */
++    if (drm_mm_node_allocated(&f->guard)) {
++        mutex_lock(&f->ggtt->vm.mutex);
++        drm_mm_remove_node(&f->guard);
++        mutex_unlock(&f->ggtt->vm.mutex);
++    }
+     kfree(f);
+ }
+diff --git a/gpu-port/xkpi/xnu/nmx_platform.cpp b/gpu-port/xkpi/xnu/nmx_platform.cpp
+index 6eed7b8..6bef370 100644
+--- a/gpu-port/xkpi/xnu/nmx_platform.cpp
++++ b/gpu-port/xkpi/xnu/nmx_platform.cpp
+@@ -510,3 +510,22 @@ extern "C" size_t nmx_xnu_dmi_field(int field, char *buf, size_t max)
+     smb->release();
+     return out;
+ }
++
++/*
++ * The boot framebuffer (the firmware's GOP buffer that the kernel's console draws into): its physical address and
++ * geometry from the platform expert's console info. 0 when there is none or it is not 32 bits per pixel.
++ */
++extern "C" int nmx_xnu_boot_fb(uint64_t *phys, uint32_t *width, uint32_t *height, uint32_t *pitch)
++{
++    PE_Video v;
++    bzero(&v, sizeof(v));
++    IOPlatformExpert *pe = IOService::getPlatform();
++    if (pe == NULL || pe->getConsoleInfo(&v) != kIOReturnSuccess || v.v_baseAddr == 0 || v.v_depth != 32)
++        return 0;
++    /* on x86_64 the console info keeps the boot arguments' 64-bit physical base */
++    *phys = (uint64_t)v.v_baseAddr + v.v_offset;
++    *width = (uint32_t)v.v_width;
++    *height = (uint32_t)v.v_height;
++    *pitch = (uint32_t)v.v_rowBytes;
++    return 1;
++}

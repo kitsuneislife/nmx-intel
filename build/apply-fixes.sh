@@ -1,6 +1,6 @@
 #!/bin/bash
 # apply-fixes.sh: aplica source-fixes/ na árvore de ~/nmx-build (depois de setup.sh) e faz commit em cada clone.
-#   0001 e 0004 no nullmoth (branch nmx-intel-build), 0002, 0003 e 0005 no drm-kmod (branch nmx-intel).
+#   0001, 0004 e 0006 no nullmoth (branch nmx-intel-build), 0002, 0003 e 0005 no drm-kmod (branch nmx-intel).
 # Pode rodar de novo: um patch que já está aplicado é pulado.
 set -euo pipefail
 F=$(cd "$(dirname "$0")/../source-fixes" && pwd)
@@ -26,3 +26,4 @@ apply "$S/kpi/drm-kmod" 0003-i915-dp_tunnel-no-manager-is-not-an-error.patch
 apply "$B/nvidia-macos-driver" 0004-display-bridge-i915-buffer-in-stolen.patch
 # 0005 só tem efeito com -DNMX_DRM_DEBUG (a etapa "debug" do build-all.sh)
 apply "$S/kpi/drm-kmod" 0005-drm-debug-driver-and-kms-in-diagnostic-builds.patch
+apply "$B/nvidia-macos-driver" 0006-display-bridge-i915-take-over-the-boot-framebuffer.patch

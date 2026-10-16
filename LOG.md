@@ -313,3 +313,68 @@ Os únicos avisos nos arquivos novos são de conversão de sinal, como o resto d
   Tem 0001 a 0005.
 - `build/install.sh` copia o binário para `/Library/NullMoth/kexts/15/…`. Antes, confere o backup do original.
   Para voltar: `sudo bash patches/apply.sh restore`.
+
+## 2026-10-15: teste 6, NMXGPU compilado (0001 a 0005, debug do DRM)
+
+Instalado com `build/install.sh` (binário `df90b1b5…`). O `kextstat` do boot seguinte mostra o NMXGPU com
+`0xc1bffa` bytes, que é o tamanho do nosso build (o da release é maior). Ou seja, o binário certo foi carregado.
+
+Resultado (duas fotos, sem log):
+- Durante o boot, o console do `-v` mostra as mensagens de debug do i915, até
+  `[CONNECTOR:241:eDP-1] Detected Intel HDR backlight interface version 170` e `DRRS type: none`. Logo, o debug
+  do DRM pelo fonte (0005) funciona.
+- Depois disso, **o painel continua aceso pela Intel**, mas com uma imagem "glitchada": o texto antigo do
+  console aparece só numa faixa da direita, cortado na borda, e a metade esquerda fica preta. As últimas linhas
+  visíveis são do i915 (`intel_dp_aux_supports_hdr`, `intel_panel_init: [CONNEC…`).
+- **Nenhum log desse boot foi gravado.** O `log show` não tem nenhuma linha (nem do kernel) entre o desligamento
+  das 21:30 e o boot das 21:35 (que foi com `-nvoff`). É o que acontece quando o Mac congela antes de o `logd`
+  gravar no disco.
+  - Atenção: o `~/n7.txt` que o Lukas gravou pegou o boot com `-nvoff` (o "last boot"), por isso veio vazio.
+  - No zsh, chamar como `/usr/bin/log`.
+
+### Causa provável da imagem
+
+- No Gen8+ o i915 usa `ggtt->vm.clear_range = nop_clear_range` (`intel_ggtt.c`). As entradas do GGTT que o GOP
+  programou continuam valendo, e a aperture em `0x4000000000` (GGTT 0) continua apontando para o início da stolen.
+- O console do macOS continua escrevendo no endereço de boot (`0x4000000000`), ou seja, nas páginas da stolen
+  do framebuffer do GOP.
+- O nosso buffer novo (`i915_gem_object_create_stolen`) foi alocado **por cima** dessas páginas, com um
+  deslocamento de meia linha mais algumas linhas. A tela mostra o nosso buffer, que é o texto do console
+  deslocado: as linhas começam no meio da tela e o resto delas "volta" pela esquerda da linha seguinte, que é
+  preta. Isso bate com as fotos.
+- Então a varredura do i915 **funciona**: ele mostra o nosso buffer no painel, com o modo certo. O que está
+  errado é onde o buffer foi parar.
+- Risco extra: sem ninguém dono da faixa GGTT 0..8 MiB, o i915 pode pôr qualquer objeto da GPU ali (ring, GuC), e
+  o console escreveria por cima. Isso pode ser a causa do congelamento, mas sem log não dá para provar.
+
+### Correção: 0006, tomar o framebuffer do GOP
+
+`source-fixes/0006` (nullmoth), no lugar de criar um buffer novo, faz o que o i915 faz com um plano que a BIOS
+deixa ligado (`intel_plane_initial.c`):
+1. `nmx_xnu_boot_fb` (novo, em `xnu/nmx_platform.cpp`): endereço e geometria do framebuffer de boot por
+   `IOPlatformExpert::getConsoleInfo`.
+2. Se ele está na aperture e tem o mesmo tamanho do modo (1920x1080), o offset no GGTT é
+   `phys - gmadr.start` (aqui deve ser 0).
+3. Lê as PTEs do GGTT nesse offset e confere que apontam para **uma faixa contínua da stolen**.
+4. `i915_gem_object_create_region_at(stolen, offset, size, PREALLOC)`, WT, e `i915_vma_pin` com
+   `PIN_OFFSET_FIXED` no mesmo offset do GGTT.
+5. O framebuffer usa esse objeto com o pitch do GOP, sem zerar. O endereço publicado para o macOS volta a ser o
+   próprio `0x4000000000`.
+- Resultado esperado: o console, o WindowServer e o display engine usam o mesmo buffer. **O texto do `-v` continua
+  legível na tela depois que o i915 assume**, então o console vira o log: se travar, a foto mostra onde.
+- Se a tomada falhar, cai no buffer novo, mas só em shmem e com a faixa do GGTT do console reservada
+  (`i915_gem_gtt_reserve`), para nenhum objeto da GPU ficar embaixo das escritas do console.
+- Mensagens novas: `boot framebuffer WxH, pitch P, GGTT 0x…`, `took over the boot framebuffer: stolen 0x…,
+  GGTT 0x…`, ou o motivo da falha (`not in the GGTT aperture`, `not one run of stolen memory`, `… is taken`).
+
+Build: i915 275/275, debug `0x6` conferido. `NMXGPU da43cdbb3cf4cc0e1701f7c2990584c2075d5cd8a599d4d826815884a00b3109`,
+15.240.648 B. **Não instalado.**
+
+## Próximo: teste 7 (0001 a 0006, debug)
+
+- Mesma instalação: `sudo bash build/install.sh`, depois desligar e ligar o driver no app, e reiniciar.
+- **Fotografar a tela** depois que o i915 assumir (o console deve continuar legível), principalmente as linhas
+  `NullMoth display: …`.
+- Anotar se o Mac responde (luz do Caps Lock).
+- Se o Mac estiver vivo, gravar o log **antes** de reiniciar:
+  `/usr/bin/log show --last boot --info --debug --predicate 'sender == "NMXGPU"' > ~/n7.txt`
