@@ -73,7 +73,14 @@ Até 2026-10-15 o trabalho estava no branch `ccr-918d231a-luzxg0` dos dois outro
   o NMXGPU não desiste sozinho porque o attach retorna. Para usar o Mac normalmente: driver de teste da Intel
   **desligado** no app. O NVIDIA não é afetado.
 
-## Onde paramos (2026-10-15, teste 5)
+## Onde paramos (2026-10-15, depois do teste 5)
+
+**Mais novo:** o NMXGPU já compila no Mac (`build/`), com `source-fixes/0001..0004` aplicados. O 0004 é a ponte de
+tela do i915: buffer na stolen, publicado pela aperture do GGTT. Foi compilado, mas **ainda não foi instalado nem
+testado** (ver o fim do `LOG.md`). O fb do GOP **não** é herdado: o pipe A já está desligado quando o i915 assume.
+O resto desta seção é o estado do teste 5, com os patches binários.
+
+
 
 O binário instalado no Mac é o `apply.sh debug` (patches 1 a 5), SHA-256 `c55a4432…`.
 

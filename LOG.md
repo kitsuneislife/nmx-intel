@@ -253,3 +253,51 @@ compilador: o nullmoth compila cruzado num Apple Silicon. **O build bate com a r
    (patches 4 e 5) no fonte.
 2. Ponte de tela: para o i915, criar o buffer na stolen memory e publicar o endereço físico.
 3. Antes de instalar: guardar o binário original e explicar o teste para o Lukas.
+
+## 2026-10-15: correções no fonte e ponte de tela nova para o i915 (compilado, não instalado)
+
+Tudo em `source-fixes/`. Para aplicar numa árvore nova: `build/setup.sh` e depois `build/apply-fixes.sh`.
+- `0001` (nullmoth): o `linux_pci_find` só olha a tabela do driver que está fazendo o probe. Substitui o patch 1
+  **sem** desligar o xe.
+- `0002` (drm-kmod): sem PCH visível, usa o mesmo chute de uma VM. Raptor Lake-P é subtipo de Alder Lake-P, então
+  o chute dá `0x7A80`, que é `PCH_ADP`, o mesmo tipo do patch 2. O `pch_id` muda de `0x5180` para `0x7A80`, mas o
+  i915 só usa o tipo.
+- `0003` (drm-kmod): sem gerenciador de túnel DP não é erro, e sem túnel não há banda para conferir. Substitui
+  os patches 4 e 5. No `.o`, `intel_dp_tunnel_mgr_init` agora termina em `xorl %eax,%eax`.
+- `0004` (nullmoth): **a ponte de tela para o i915.**
+
+### A ponte nova (`override/i915/nmx_i915_fb.c`)
+
+Faz o mesmo que o fbdev do próprio i915 (`intel_fbdev.c` e `intel_fbdev_fb.c`):
+1. `i915_gem_object_create_stolen` (1920x1080x4 ≈ 8 MiB, bem menos que a metade dos 64 MiB). Se não couber,
+   usa shmem.
+2. `intel_framebuffer_create`, XRGB8888 linear, pitch alinhado a 64. Linear não usa DPT no display 13.
+3. `intel_fb_pin_to_ggtt`, que fixa primeiro na parte mapeável do GGTT, e depois confere
+   `i915_vma_is_map_and_fenceable`.
+4. `i915_vma_pin_iomap` para a CPU (write-combining, pela aperture), e o buffer é zerado.
+5. O endereço publicado para o macOS é `ggtt->gmadr.start + i915_ggtt_offset(vma)`, isto é, a aperture (BAR2),
+   **não** o físico da stolen (`0x3e800000`). É o que o Linux publica como `smem_start`. Pela aperture o buffer é
+   uma faixa contínua, e a CPU não acessa a stolen direto. O `nmx_fb.cpp` só usa esse endereço num
+   `IODeviceMemory`, como faz com a VRAM (BAR) das AMD.
+
+O `nmx_fb_bridge.c` só desvia quando `drm->driver->name` é `"i915"`. O caminho das AMD não mudou.
+
+Mensagens novas no log:
+- `NullMoth display: i915 buffer in stolen, GGTT 0x…, aperture 0x…` quando funciona.
+- Na falha: `i915 has no memory…`, `i915 refused the framebuffer…`, `could not pin the buffer in the GGTT…`,
+  `landed outside the GGTT aperture` ou `would not map through the aperture…`.
+
+Build: amd 900, runtime 76, i915 275/275 (o arquivo novo a mais), xe 193.
+`NMXGPU cf8b2a2c4ed20df426f1f2eaceb7bea92f3c5251ba3b20c489a1172dce4d79af`, 15.236.328 B, em `~/nmx-build/out`.
+Os únicos avisos nos arquivos novos são de conversão de sinal, como o resto do port.
+
+**Não instalado.**
+
+## Próximo: teste 6, o NMXGPU compilado
+
+- Este binário **não** tem o patch 3 (debug do DRM). Antes do teste, decidir entre ligar `__drm_debug` no
+  fonte (mais log) ou testar assim.
+- Instalar: guardar o binário atual, trocar o binário em `/Library/NullMoth/kexts/15/NMXGPU.kext/Contents/MacOS/`,
+  desligar e ligar o driver de teste no app, e reiniciar. Confirmar com o Lukas antes.
+- Procurar no log: `i915 buffer in stolen`, `NullMoth display: 1920x1080, pitch 7680, phys 0x40…`, e se a tela
+  acende.

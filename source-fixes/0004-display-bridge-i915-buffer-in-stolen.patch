@@ -1,0 +1,281 @@
+diff --git a/gpu-port/xkpi/override/src/nmx_fb_bridge.c b/gpu-port/xkpi/override/src/nmx_fb_bridge.c
+index 3d7bb9b..b165c91 100644
+--- a/gpu-port/xkpi/override/src/nmx_fb_bridge.c
++++ b/gpu-port/xkpi/override/src/nmx_fb_bridge.c
+@@ -7,6 +7,9 @@
+  * the kext publishes its physical range as the IOFramebuffer's VRAM and WindowServer draws straight into what the
+  * display engine scans out. Smaller outputs show the top-left of the buffer (mirrored), as fbdev does.
+  *
++ * i915 is the exception: its GEM objects have no .vmap and are not contiguous, so it gets the buffer its own fbdev
++ * would make, in stolen memory and published through the GGTT aperture (override/i915/nmx_i915_fb.c).
++ *
+  * Any step that fails leaves no client behind and reports why; the kext then publishes no framebuffer.
+  */
+ #include <linux/kernel.h>
+@@ -16,6 +19,7 @@
+ 
+ #include <drm/drm_client.h>
+ #include <drm/drm_device.h>
++#include <drm/drm_drv.h>
+ #include <drm/drm_fourcc.h>
+ #include <drm/drm_framebuffer.h>
+ #include <drm/drm_modes.h>
+@@ -25,10 +29,13 @@
+ 
+ #include "nmx_xnu.h"
+ #include "nmx_port.h"
++#include "nmx_i915_fb.h"
+ 
+ struct nmx_fb {
+     struct drm_client_dev client;
+     struct drm_client_buffer *buffer;
++    struct drm_framebuffer *dfb;        /* what the outputs scan out: buffer->fb, or i915's own */
++    void *i915;                         /* nmx_i915_fb_create's buffer, on i915 */
+     struct iosys_map map;
+     int mapped;
+     struct nmx_fb_info info;
+@@ -73,14 +80,14 @@ static int bridge_hotplug(struct drm_client_dev *client)
+ {
+     struct nmx_fb *fb = container_of(client, struct nmx_fb, client);
+     struct drm_mode_set *ms;
+-    if (fb->buffer == NULL)
++    if (fb->dfb == NULL)
+         return 0;
+     if (drm_client_modeset_probe(client, fb->info.width, fb->info.height) != 0)
+         return 0;
+     mutex_lock(&client->modeset_mutex);
+     drm_client_for_each_modeset(ms, client)
+         if (ms->mode != NULL)
+-            ms->fb = fb->buffer->fb;
++            ms->fb = fb->dfb;
+     mutex_unlock(&client->modeset_mutex);
+     drm_client_modeset_commit(client);
+     return 0;
+@@ -122,6 +129,7 @@ static void bridge_free(struct nmx_fb *fb)
+         drm_client_buffer_vunmap(fb->buffer);
+     if (fb->buffer != NULL)
+         drm_client_framebuffer_delete(fb->buffer);
++    nmx_i915_fb_destroy(fb->i915);
+     drm_client_release(&fb->client);
+     kfree(fb);
+ }
+@@ -180,6 +188,20 @@ int nmx_fb_open(void *devp, struct nmx_fb_info *out)
+         goto fail;
+     }
+ 
++    if (strcmp(drm->driver->name, "i915") == 0) {
++        struct nmx_i915_fb_out ib;
++        err = -nmx_i915_fb_create(drm, out->width, out->height, &ib);
++        if (err)
++            goto fail;
++        fb->i915 = ib.priv;
++        fb->dfb = ib.fb;
++        out->pitch = ib.pitch;
++        out->phys = ib.phys;
++        out->size = round_page(ib.size);
++        out->kva = (uint64_t)(uintptr_t)ib.kva;
++        goto lit;
++    }
++
+     fb->buffer = drm_client_framebuffer_create(&fb->client, out->width, out->height, DRM_FORMAT_XRGB8888);
+     if (IS_ERR(fb->buffer)) {
+         err = -PTR_ERR(fb->buffer);
+@@ -187,6 +209,7 @@ int nmx_fb_open(void *devp, struct nmx_fb_info *out)
+         printf("NullMoth display: no %ux%u scan-out buffer (%d)\n", out->width, out->height, err);
+         goto fail;
+     }
++    fb->dfb = fb->buffer->fb;
+     out->pitch = fb->buffer->fb->pitches[0];
+ 
+     err = -drm_client_buffer_vmap(fb->buffer, &fb->map);
+@@ -216,10 +239,11 @@ int nmx_fb_open(void *devp, struct nmx_fb_info *out)
+     out->kva = (uint64_t)(uintptr_t)va;
+     memset(__DECONST(char *, va), 0, size);       /* black until WindowServer draws */
+ 
++lit:
+     mutex_lock(&fb->client.modeset_mutex);
+     drm_client_for_each_modeset(ms, &fb->client)
+         if (ms->mode != NULL)
+-            ms->fb = fb->buffer->fb;
++            ms->fb = fb->dfb;
+     mutex_unlock(&fb->client.modeset_mutex);
+     err = -drm_client_modeset_commit(&fb->client);
+     if (err) {
+diff --git a/gpu-port/xkpi/override/i915/nmx_i915_fb.c b/gpu-port/xkpi/override/i915/nmx_i915_fb.c
+new file mode 100644
+index 0000000..6126a20
+--- /dev/null
++++ b/gpu-port/xkpi/override/i915/nmx_i915_fb.c
+@@ -0,0 +1,142 @@
++/*
++ * The display bridge's scan-out buffer on i915 (Intel integrated graphics).
++ *
++ * The generic bridge (override/src/nmx_fb_bridge.c) creates a dumb buffer and maps it with drm_client_buffer_vmap.
++ * i915's GEM objects have no .vmap, and their shmem pages are scattered, so neither the mapping nor the single
++ * physical range the IOFramebuffer publishes would exist. This does what i915's own fbdev does (intel_fbdev.c,
++ * intel_fbdev_fb.c): a buffer in stolen memory (shmem if stolen is short), pinned into the mappable GGTT. The CPU
++ * reaches it through the GGTT aperture (BAR2), where the buffer is one contiguous range whatever pages back it, so
++ * that aperture range is what macOS gets as the framebuffer's VRAM, exactly as fbdev publishes it as smem_start.
++ */
++#include <drm/drm_framebuffer.h>
++#include <drm/drm_fourcc.h>
++
++#include "gem/i915_gem_stolen.h"
++#include "gt/intel_gt.h"
++#include "i915_drv.h"
++#include "i915_vma.h"
++#include "display/intel_display_types.h"
++#include "display/intel_fb.h"
++#include "display/intel_fb_pin.h"
++
++#include "nmx_i915_fb.h"
++
++struct nmx_i915_fb {
++    struct drm_framebuffer *fb;
++    struct i915_vma *vma;
++    unsigned long vma_flags;
++    void __iomem *vaddr;
++};
++
++int nmx_i915_fb_create(struct drm_device *drm, uint32_t width, uint32_t height, struct nmx_i915_fb_out *out)
++{
++    struct drm_i915_private *i915 = to_i915(drm);
++    const struct i915_gtt_view view = { .type = I915_GTT_VIEW_NORMAL };
++    struct drm_mode_fb_cmd2 mode_cmd = {};
++    struct drm_i915_gem_object *obj = ERR_PTR(-ENODEV);
++    struct i915_gem_ww_ctx ww;
++    intel_wakeref_t wakeref;
++    struct nmx_i915_fb *f;
++    struct i915_vma *vma;
++    struct drm_framebuffer *fb;
++    const char *where = "stolen";
++    int size, ret;
++
++    memset(out, 0, sizeof(*out));
++    mode_cmd.width = width;
++    mode_cmd.height = height;
++    mode_cmd.pitches[0] = ALIGN(width * 4, 64);
++    mode_cmd.pixel_format = DRM_FORMAT_XRGB8888;
++    size = PAGE_ALIGN(mode_cmd.pitches[0] * height);
++
++    f = kzalloc(sizeof(*f), GFP_KERNEL);
++    if (f == NULL)
++        return -ENOMEM;
++
++    /* intel_fbdev_fb_alloc's choice: stolen unless it would take more than half of it (and never on Meteor Lake) */
++    if (!IS_METEORLAKE(i915) && size * 2 < i915->dsm.usable_size)
++        obj = i915_gem_object_create_stolen(i915, size);
++    if (IS_ERR(obj)) {
++        where = "shmem";
++        obj = i915_gem_object_create_shmem(i915, size);
++    }
++    if (IS_ERR(obj)) {
++        printf("NullMoth display: i915 has no memory for a %ux%u buffer (%ld)\n", width, height, PTR_ERR(obj));
++        kfree(f);
++        return PTR_ERR(obj);
++    }
++    fb = intel_framebuffer_create(intel_bo_to_drm_bo(obj), &mode_cmd);
++    i915_gem_object_put(obj);       /* the framebuffer holds its own reference */
++    if (IS_ERR(fb)) {
++        printf("NullMoth display: i915 refused the framebuffer (%ld)\n", PTR_ERR(fb));
++        kfree(f);
++        return PTR_ERR(fb);
++    }
++    f->fb = fb;
++
++    wakeref = intel_runtime_pm_get(&i915->runtime_pm);
++    /* the display pins in the mappable part of the GGTT first, so the aperture covers the buffer */
++    vma = intel_fb_pin_to_ggtt(fb, &view, to_intel_framebuffer(fb)->min_alignment, 0, false, &f->vma_flags);
++    if (IS_ERR(vma)) {
++        ret = PTR_ERR(vma);
++        printf("NullMoth display: i915 could not pin the buffer in the GGTT (%d)\n", ret);
++        goto out_fb;
++    }
++    f->vma = vma;
++    if (!i915_vma_is_map_and_fenceable(vma)) {
++        printf("NullMoth display: the buffer landed outside the GGTT aperture\n");
++        ret = -ENOSPC;
++        goto out_unpin;
++    }
++
++    for_i915_gem_ww(&ww, ret, false) {
++        ret = i915_gem_object_lock(vma->obj, &ww);
++        if (ret)
++            continue;
++        f->vaddr = i915_vma_pin_iomap(vma);
++        if (IS_ERR(f->vaddr)) {
++            ret = PTR_ERR(f->vaddr);
++            f->vaddr = NULL;
++            continue;
++        }
++    }
++    if (ret) {
++        printf("NullMoth display: the buffer would not map through the aperture (%d)\n", ret);
++        goto out_unpin;
++    }
++    intel_runtime_pm_put(&i915->runtime_pm, wakeref);
++
++    out->fb = fb;
++    out->pitch = fb->pitches[0];
++    out->phys = to_gt(i915)->ggtt->gmadr.start + i915_ggtt_offset(vma);
++    out->size = size;
++    out->kva = (void *)f->vaddr;
++    out->priv = f;
++    /* stolen memory holds whatever was there before; shmem pages come zeroed but clearing them costs little */
++    memset_io(f->vaddr, 0, size);
++    printf("NullMoth display: i915 buffer in %s, GGTT 0x%08x, aperture 0x%llx\n", where, i915_ggtt_offset(vma),
++           (unsigned long long)out->phys);
++    return 0;
++
++out_unpin:
++    intel_fb_unpin_vma(vma, f->vma_flags);
++out_fb:
++    intel_runtime_pm_put(&i915->runtime_pm, wakeref);
++    drm_framebuffer_remove(fb);
++    kfree(f);
++    memset(out, 0, sizeof(*out));
++    return ret;
++}
++
++void nmx_i915_fb_destroy(void *priv)
++{
++    struct nmx_i915_fb *f = priv;
++    if (f == NULL)
++        return;
++    if (f->vaddr != NULL)
++        i915_vma_unpin_iomap(f->vma);
++    if (f->vma != NULL)
++        intel_fb_unpin_vma(f->vma, f->vma_flags);
++    drm_framebuffer_remove(f->fb);  /* turns off any plane still scanning it out, then drops it */
++    kfree(f);
++}
+diff --git a/gpu-port/xkpi/override/include/nmx_i915_fb.h b/gpu-port/xkpi/override/include/nmx_i915_fb.h
+new file mode 100644
+index 0000000..7814a5a
+--- /dev/null
++++ b/gpu-port/xkpi/override/include/nmx_i915_fb.h
+@@ -0,0 +1,24 @@
++/*
++ * The display bridge's scan-out buffer on i915 (override/i915/nmx_i915_fb.c), called from the generic bridge
++ * (override/src/nmx_fb_bridge.c), which is built without i915's headers.
++ */
++#ifndef NMX_I915_FB_H
++#define NMX_I915_FB_H
++
++struct drm_device;
++struct drm_framebuffer;
++
++struct nmx_i915_fb_out {
++    struct drm_framebuffer *fb;     /* XRGB8888, linear */
++    uint32_t pitch;
++    uint64_t phys;                  /* the buffer through the GGTT aperture (BAR2): one contiguous range */
++    uint64_t size;
++    void *kva;                      /* the kernel's write-combined view of that range */
++    void *priv;                     /* for nmx_i915_fb_destroy */
++};
++
++/* a buffer for a width x height mode, pinned and mapped; a negative errno if not */
++int nmx_i915_fb_create(struct drm_device *drm, uint32_t width, uint32_t height, struct nmx_i915_fb_out *out);
++void nmx_i915_fb_destroy(void *priv);
++
++#endif
