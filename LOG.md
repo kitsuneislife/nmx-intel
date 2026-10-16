@@ -1356,3 +1356,28 @@ Build `rt kext`: `NMXGPU 523057651f56331baf7da6982fe82a046a80fcd29b4b3b3f28f9c1d
 
 Mesmo procedimento. Esperado: ~45 s depois do boot a segunda tela some (`ndrv-term ndrv-gone`). Se travar de novo:
 `sudo nvram nullmoth-gpu-ndrv=0` volta ao estado do teste 27 (desktop com glitches).
+
+## 2026-10-16: teste 30 (0030) — **uma tela só, sem travar**; os glitches continuam
+
+Binário `52305765…`. Trilha: `… ndrv-c2-1 published ndrv-wait … fb-vbl-off ndrv-term ndrv-gone fb-gam fb-vbl-on @139143`.
+- A tela do firmware saiu sem panic (`ndrv-gone`). `ioreg` só tem o `NMXGPUFB`; `system_profiler`: uma tela,
+  1920x1080 a 144 Hz, principal.
+- O Lukas: chegou ao desktop, mas com os mesmos glitches (pisca, partes só redesenham onde o mouse passa).
+- Então a tela duplicada não era a causa principal.
+- `Unsupported sw composite destination` (SkyLight, ~5.000 por boot) aparece em **todos** os boots, também com o
+  IONDRV: é o WindowServer sem aceleração, não o nosso framebuffer.
+- O que ainda difere do IONDRV (cujo desktop, nos testes 18–24, desenhava certo): **o VBL**. O IONDRV não oferece
+  VBL. O nosso oferece um VBL de timer, que não é o vblank do painel: no teste 26 o WindowServer registrou e nunca
+  recebeu nenhum (mesmos glitches), e do 27 ao 30 recebeu o do timer (mesmos glitches).
+
+### 0031: sem VBL por padrão, como o IONDRV
+
+`registerForInterruptType(kIOFBVBLInterruptType)` devolve `kIOReturnUnsupported` (trilha `fb-novbl`). Chave
+`nullmoth-gpu-vbl=1` volta ao VBL de timer.
+
+Build `rt kext`: `NMXGPU c14455178cc2419e88a7f81fac06cf58ecf2090f0815df96b6ec21ad94854a14`, 15.255.296 B.
+
+## Próximo: teste 31 (0031)
+
+Mesmo procedimento. Se os glitches sumirem, o próximo passo é um VBL de verdade (a interrupção de vblank do pipe A
+do i915).

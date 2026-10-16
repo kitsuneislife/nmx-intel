@@ -1,0 +1,47 @@
+From 3da32b1dc0aed2e12a7b7299b20fb63b2b03e070 Mon Sep 17 00:00:00 2001
+From: kitsuneislife <kitsuneislif3@gmail.com>
+Date: Fri, 16 Oct 2026 17:20:21 -0300
+Subject: [PATCH] nmx-intel 0031: no VBL interrupt by default, like
+ IONDRVFramebuffer
+
+---
+ gpu-port/xkpi/xnu/nmx_fb.cpp | 9 +++++++++
+ 1 file changed, 9 insertions(+)
+
+diff --git a/gpu-port/xkpi/xnu/nmx_fb.cpp b/gpu-port/xkpi/xnu/nmx_fb.cpp
+index 56e75d4..c4708e5 100644
+--- a/gpu-port/xkpi/xnu/nmx_fb.cpp
++++ b/gpu-port/xkpi/xnu/nmx_fb.cpp
+@@ -33,6 +33,7 @@ class NMXGPUFB : public IOFramebuffer {
+     Irq fVbl, fConnect;
+     uint64_t fVblNext = 0;
+     volatile bool fStopping = false, fVblOn = false, fVblRunning = false;
++    bool fVblOffered = false;
+     /* the first call of each method, in the NVRAM trail: what IOGraphics had asked when the Mac froze */
+     volatile uint32_t fSeen = 0;
+     void once(int bit, const char *step) {
+@@ -71,6 +72,7 @@ public:
+         if (!init()) return false;
+         fDev = dev;
+         fInfo = info;
++        fVblOffered = nmx_xnu_knob("nmxvbl", "nullmoth-gpu-vbl", 0) != 0;
+         if (info.pclk_khz && info.htotal && info.vtotal) {
+             uint64_t mhz = (uint64_t)info.pclk_khz * 1000000ull / ((uint64_t)info.htotal * info.vtotal);   /* milli-Hz */
+             if (mhz >= 20000 && mhz <= 500000) {
+@@ -193,6 +195,13 @@ public:
+         /* nmx-intel 0027: a VBL interrupt starts enabled, as IOFramebuffer expects: it only calls setInterruptState when
+            it throttles the VBL (updateVBL/deferredVBLDisable), so with it off WindowServer had no VBL at all (test 26:
+            no fb-vbl-on, parts of the screen redrawn only when the cursor passed) */
++        /* nmx-intel 0031: no VBL by default, as the firmware's IONDRVFramebuffer (whose desktop drew right in tests
++           18-24). Ours is a timer, not the panel's vblank: with it (test 27-30) and without its calls (test 26) the
++           desktop flickered and parts were redrawn only where the cursor passed. nmxvbl=1 / nullmoth-gpu-vbl=1 offers it */
++        if (type == kIOFBVBLInterruptType && !fVblOffered) {
++            once(22, "fb-novbl");
++            return kIOReturnUnsupported;
++        }
+         if (type == kIOFBVBLInterruptType) {
+             fVbl = { proc, target, ref };
+             if (iref) *iref = &fVbl;
+-- 
+2.39.5 (Apple Git-154)
+
