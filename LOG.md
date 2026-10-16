@@ -1109,3 +1109,28 @@ ao disco.
 Build: `NMIntelFB 65901097…`, 70.272 B.
 
 ## Próximo: teste RTX-4
+
+## 2026-10-16: teste RTX-4 (intelfb-0004/0005) — **o macOS abre a tela inteira e trava depois do `setInterruptState`**
+
+Tela preta e travamento de novo. A trava de boot ficou armada (`attaching 1`), então o boot seguinte deixou o painel
+para o firmware. Trilha, depois do `ok sp-done`:
+```
+ga:gnps con ec ri:'vbl ' ga:vclt ri:'dci ' ri:dpir ri:hdci ga:crsr gc:lddc gc:cena gc:pcnt gc:flgs gc:hddc gc:asns
+gc:enab gc:thrm vbl1 ga:mrdf cdm dmc dms info cf tim pix ga:wsrv sa:sHDC sa:hdcp setdm gc:parm gc:rgsc gc:ggsc
+gc:bgsc gc:vblm apr vram sc:rgsc sc:ggsc sc:bgsc sc:vblm sc:flus ga:vrsv is
+```
+- É o `IOFramebuffer::open` inteiro: interrupções (VBL, connect), conexão, modo, timing, pixel, `setDisplayMode`,
+  gamma, abertura e VRAM. O último método novo é `is` (`setInterruptState`, que liga o VBL).
+- O VBL roda (`vbl1`). A tela fica preta (o `open` limpa o framebuffer, então as escritas pela aperture chegam) e
+  nada mais é desenhado.
+- A trilha só guarda a **primeira** chamada de cada método; o que veio depois do `is` não aparece.
+
+### intelfb-0006: batimento
+
+`nvram nullmoth-intelfb-beat` a cada 1 s por 3 min depois do `start`: `ms=… vbl=… calls=… last=…` (a última chamada
+de qualquer método, inclusive repetida). Se o batimento parar, o Mac travou; se o `vbl` parar de subir antes, o
+travamento é no VBL; o `last` diz a chamada em andamento.
+
+Build: `NMIntelFB bf5091eb…`, 70.800 B.
+
+## Próximo: teste RTX-5

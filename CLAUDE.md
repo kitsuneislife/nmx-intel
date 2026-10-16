@@ -84,6 +84,8 @@ RTX-2: acha o painel (pipe A 1920x1080, surf 0) e trava no `registerPowerDriver`
 `IOFramebuffer::start` (como o NVRMFB), trilha `pm/sp1/sp-done/power`, chave `nullmoth-intelfb-pm=0` (RTX-3, `261eca1c…`).
 RTX-3: o `start` termina (`… power sp1 ok sp-done`), tela preta e trava depois, sem log. intelfb-0004 = primeira
 chamada de cada método na trilha; 0005 = trava de boot até 2 min vivo (`alive`) (RTX-4, `65901097…`).
+RTX-4: o `IOFramebuffer::open` vai inteiro; último método novo `is` (`setInterruptState`), tela preta e trava.
+intelfb-0006 = batimento `nvram nullmoth-intelfb-beat` (ms, vbl, calls, last) (RTX-5, `bf5091eb…`).
 **Teste 24:** **desktop pelo i915 e sem travar** (passou de 330 s), e o ANV enxerga `Intel(R) Graphics
 (RPL-P)`, Vulkan 1.4. Sem Metal da Intel ainda (NMXAccel desligado por 0024). Próximo: o `NMXGPUFB` (fb=1) sem
 congelar. WhateverXe (b00t0x) conferido: só Big Sur e TGL/ADL-N por enquanto.

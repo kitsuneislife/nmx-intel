@@ -1,0 +1,57 @@
+--- a/intelfb.cpp
++++ b/intelfb.cpp
+@@ -96,9 +96,32 @@
+ 
+ // nmx-intel (intelfb-0004): the first call of each IOFramebuffer method, and the first of each attribute, in the trail,
+ // so a freeze after start() shows the last call macOS made into this framebuffer
+-#define IFB_ONCE(tag) do { static bool _ifbDone; if (!_ifbDone) { _ifbDone = true; ifb_trail(tag); } } while (0)
++// intelfb-0006: every call (not only the first) leaves its tag in gIfbLast for the heartbeat
++static const char *volatile gIfbLast = "none";
++static volatile SInt32 gIfbCalls, gIfbVbl;
++static char gIfbLastAttr[24];
++#define IFB_ONCE(tag) do { gIfbLast = tag; OSIncrementAtomic(&gIfbCalls); static bool _ifbDone; if (!_ifbDone) { _ifbDone = true; ifb_trail(tag); } } while (0)
++
++// intelfb-0006: heartbeat every second for three minutes after start(): "nullmoth-intelfb-beat" = ms since start, VBL
++// calls, framebuffer calls and the last call made. A freeze leaves the last beat: whether VBLs still ran, and the call
++static thread_call_t gIfbBeat;
++static uint64_t gIfbT0;
++static void ifb_beat(thread_call_param_t, thread_call_param_t)
++{
++    uint64_t ns; absolutetime_to_nanoseconds(mach_absolute_time() - gIfbT0, &ns);
++    char b[96];
++    snprintf(b, sizeof b, "ms=%llu vbl=%d calls=%d last=%s", ns / 1000000ull, (int)gIfbVbl, (int)gIfbCalls, (const char *)gIfbLast);
++    ifb_nv_set("nullmoth-intelfb-beat", b);
++    if (ns < 180ull * 1000000000ull) {
++        uint64_t d; clock_interval_to_deadline(1, kSecondScale, &d);
++        thread_call_enter_delayed(gIfbBeat, d);
++    }
++}
+ static void ifb_attr(const char *pfx, uint32_t a)
+ {
++    OSIncrementAtomic(&gIfbCalls);
++    snprintf(gIfbLastAttr, sizeof gIfbLastAttr, "%s:%x", pfx, a);
++    gIfbLast = gIfbLastAttr;
+     static uint32_t seen[40]; static unsigned n;
+     uint32_t key = a ^ ((uint32_t)(uint8_t)pfx[0] << 1) ^ ((uint32_t)(uint8_t)pfx[1] << 9);
+     for (unsigned i = 0; i < n; i++) if (seen[i] == key) return;
+@@ -166,7 +189,7 @@
+     static void vblFire(thread_call_param_t p0, thread_call_param_t) {
+         NMIntelFB *me = (NMIntelFB *)p0;
+         if (me->fStopping) return;
+-        if (me->fVbl.proc) { IFB_ONCE("vbl1"); me->fVbl.proc(me->fVbl.target, me->fVbl.ref); me->fVblCalls++; }
++        if (me->fVbl.proc) { OSIncrementAtomic(&gIfbVbl); static bool _v1; if (!_v1) { _v1 = true; ifb_trail("vbl1"); } me->fVbl.proc(me->fVbl.target, me->fVbl.ref); me->fVblCalls++; }
+         uint64_t period; nanoseconds_to_absolutetime(me->fFrameNs, &period);
+         uint64_t now = mach_absolute_time();
+         me->fVblNext = (me->fVblNext && me->fVblNext + period > now) ? me->fVblNext + period : now + period;
+@@ -425,6 +448,11 @@
+     // intelfb-0005: RTX-3 froze after start() returned, so the boot guard stays armed until the Mac has lived two
+     // minutes with this framebuffer; a freeze before that leaves the panel to the firmware on the next boot
+     if (ok) {
++        gIfbT0 = mach_absolute_time();
++        if ((gIfbBeat = thread_call_allocate(ifb_beat, nullptr)) != nullptr) {
++            uint64_t d; clock_interval_to_deadline(1, kSecondScale, &d);
++            thread_call_enter_delayed(gIfbBeat, d);
++        }
+         if (thread_call_t alive = thread_call_allocate([](thread_call_param_t, thread_call_param_t) {
+                 ifb_trail("alive");
+                 ifb_nv_set("nullmoth-intelfb-attaching", nullptr);

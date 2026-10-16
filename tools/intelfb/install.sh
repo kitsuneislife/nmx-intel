@@ -39,5 +39,5 @@ if [ "${1:-}" != remove ]; then
 fi
 mv -f "$NEWKC" "$KC" && rm -rf "$T" || { echo "não consegui trocar a coleção"; exit 1; }
 # um build novo merece outra tentativa: limpa a trava de boot e a trilha do NMIntelFB (intelfb-0002)
-nvram -d nullmoth-intelfb-attaching 2>/dev/null; nvram -d nullmoth-intelfb-trail 2>/dev/null
+nvram -d nullmoth-intelfb-attaching 2>/dev/null; nvram -d nullmoth-intelfb-trail 2>/dev/null; nvram -d nullmoth-intelfb-beat 2>/dev/null
 echo "pronto. Reinicie."
