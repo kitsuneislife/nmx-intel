@@ -803,3 +803,31 @@ Build sem debug, completo: `NMXGPU 47133df7d3da0853135d4d6194ed42e76701c0304312b
 ## Próximo: teste 18 (0017, `fb=2`, probe instalado)
 
 Esperado no probe: `open … driver i915`, `drmGetDevices2: 1 device(s)` e o ANV com 1 dispositivo (Raptor Lake).
+
+## 2026-10-16: teste 18, um vnode por nó (0017) — **desktop no painel pelo i915**
+
+Binário `47133df7…`, com `fb=2`. **O Mac chegou ao desktop** e o Lukas está usando essa sessão. O i915 controla o
+painel, mostrando o fb do GOP, e o macOS desenha nele pelo `IONDRVFramebuffer`. O `system_profiler` mostra a Intel
+`0xa7a8` com "Metal: Supported" (NMXAccel), 1920x1080, Main Display, Online.
+
+Probe aos 45 s:
+```
+open /dev/dri/renderD128: Device not configured
+open /dev/dri/card0: Device not configured
+drmGetDevices2: 0 device(s); ANV: 0 device(s)
+```
+- O erro mudou de ENODEV para **ENXIO**. Com o vnode, o `drm_stub_open` agora funciona.
+- O `linux_dev_fdopen` termina, como no FreeBSD, com `finit(...)` + `return (ENXIO)`: é o jeito de dizer "instalei
+  as minhas fileops" (o `devfs_open` do FreeBSD trata isso como sucesso).
+- O `nmx_cdev_open` do port trata isso como erro: a abertura que deu certo volta como "Device not configured", e o
+  `drm_file` fica perdido.
+
+### 0018: ENXIO depois do finit é sucesso
+
+`nmx_cdev_open`: com `d_fdopen` e `fp->f_ops` instaladas, ENXIO vira 0. Build `rt kext`:
+`NMXGPU 7a16c6adb2a0eb0a76b8ab2cec17d91fbc7cafe62c20e7a1b63448044e479abd`, 15.250.288 B.
+
+## Próximo: teste 19 (0018, `fb=2`, probe)
+
+Esperado: `open … driver i915`, `drmGetDevices2: 1`, ANV com 1 dispositivo. Os apps passam a ter o Metal da Intel. O
+WindowServer continua sem ele (`headless GPU`), porque o nosso IOFramebuffer está desligado.

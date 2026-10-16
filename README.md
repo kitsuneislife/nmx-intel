@@ -36,7 +36,8 @@ O NVIDIA (RTX 3050) já funciona com o driver original e não é afetado por nad
 | Teste 14: **a tomada do fb do GOP funciona** (`took`): o painel mostra o console do macOS pelo i915. Ainda congela depois do attach | ✅ testado no teste 15 |
 | Teste 15 (`fb=2`, sem o nosso IOFramebuffer): **o Mac não congela** (viveu 91 s, WindowServer subiu). O congelamento vem do `NMXGPUFB`. O painel fica parado no quadro do modeset (FBC/PSR) | ✅ testado no teste 16 |
 | Teste 16: **o painel atualiza** (console ao vivo pelo i915) e o Mac fica vivo. O WindowServer sobe, mas não mostra o desktop; o ANV acha 0 GPUs | ✅ testado no teste 17 |
-| Teste 17 (probe): os nós `/dev/dri` existem, mas toda abertura falha com ENODEV. Bug do port: a `struct file` não tem vnode, e o `drm_stub_open` não acha o minor | 🔧 `0017`: um vnode por nó (teste 18) |
+| Teste 17 (probe): os nós `/dev/dri` existem, mas toda abertura falha com ENODEV. Bug do port: a `struct file` não tem vnode, e o `drm_stub_open` não acha o minor | ✅ testado no teste 18 |
+| Teste 18: **desktop no painel, com o i915 controlando a tela** (`fb=2`). A abertura do DRM agora funciona, mas o port lê o ENXIO do `finit` como erro | 🔧 `0018` (teste 19) |
 | Patches 1 a 5 viram correções no fonte (`source-fixes/0001..0003`) | 🔧 compilado, falta testar |
 | Tela preta com o Mac vivo (sem framebuffer, o i915 desliga o pipe, DC6) | ❌ consequência da ponte |
 | Tela acelerada / Metal na Intel | ❌ ainda não |

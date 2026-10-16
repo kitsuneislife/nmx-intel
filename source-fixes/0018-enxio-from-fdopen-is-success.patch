@@ -1,0 +1,18 @@
+diff --git a/gpu-port/xkpi/override/src/nmx_linux_cdev.c b/gpu-port/xkpi/override/src/nmx_linux_cdev.c
+index ca055d2..2318426 100644
+--- a/gpu-port/xkpi/override/src/nmx_linux_cdev.c
++++ b/gpu-port/xkpi/override/src/nmx_linux_cdev.c
+@@ -305,6 +305,13 @@ int nmx_cdev_open(void *cookie, int open_id, int fflags)
+         err = sw->d_fdopen(c, fflags, curthread, fp);
+     else if (sw->d_open != NULL)
+         err = sw->d_open(c, fflags, 0x2000 /* S_IFCHR */, curthread);
++    /*
++     * FreeBSD's convention, kept by LinuxKPI's linux_dev_fdopen: a d_fdopen that installed its own file operations
++     * on the file (finit) returns ENXIO, and devfs_open takes that as success. Taken as a failure here, every DRM
++     * open that worked was reported as "Device not configured" (test 18) and its drm_file leaked.
++     */
++    if (err == ENXIO && sw->d_fdopen != NULL && fp->f_ops != NULL)
++        err = 0;
+     if (err) {
+         devfs_clear_cdevpriv();
+         leave(prev);
