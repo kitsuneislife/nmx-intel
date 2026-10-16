@@ -1168,3 +1168,22 @@ A trilha e o batimento não mostram mais nada útil a partir daí.
 
 Framebuffer simples, sem entrar no grupo de telas do NVRM (`IOFBDependentID`). Se chegar ao desktop, o travamento vem
 do grupo do NVRM (sem nenhum NVRMFB publicado); se travar igual, vem do próprio framebuffer.
+
+## 2026-10-16: teste RTX-6b (`nullmoth-intelfb-dep=0`) — **o framebuffer simples trava no `registerPowerDriver`**
+
+Trilha: `start mmio mode-A-1920x1080-s0 surf fb-started vbl pm` (sem `power`). A tela parou no texto do boot (não
+ficou preta). É o mesmo travamento do RTX-2, quando o dependent ID entrava depois do `start`: fora do grupo de telas do
+NVRM, o `registerPowerDriver` não volta. Dentro do grupo, ele passa, e o travamento vem ~18–21 s depois.
+
+Nas issues do nullmoth, ninguém relata o NMIntelFB num notebook de verdade (ele está fora do pacote). As issues de
+notebook com o painel na Intel (#76, #119, #135) ficam no framebuffer do firmware, sem aceleração.
+
+### intelfb-0008: espera antes de assumir o painel
+
+`sudo nvram nullmoth-intelfb-delay=45`: o `start` espera 45 s (trilha `wait`/`go`) antes de assumir o painel. Nesse
+tempo o log do boot chega ao disco, e o NVRM/NVAccel (auto-go aos ~20 s) já subiu. Se o travamento for uma corrida com
+a pilha da NVIDIA no começo do boot, ele muda; se não, pelo menos o log mostra o que vem depois.
+
+Build: `NMIntelFB e2c417e7…`, 70.832 B.
+
+## Próximo: teste RTX-7 (`dep=1`, `delay=45`)

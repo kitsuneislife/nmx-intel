@@ -1,0 +1,18 @@
+--- a/intelfb.cpp
++++ b/intelfb.cpp
+@@ -470,6 +470,15 @@
+     gIfbTrail[0] = 0;
+     ifb_nv_set("nullmoth-intelfb-attaching", "1");
+     ifb_trail("start");
++    // intelfb-0008: nullmoth-intelfb-delay=<s> waits before taking the panel, so the boot log reaches the disk and the
++    // NVIDIA stack (NVRM auto-go, NVAccel) has started before this framebuffer exists. The firmware screen stays meanwhile
++    if (uint32_t w = ifb_knob("nullmoth-intelfb-delay", 0)) {
++        if (w > 120) w = 120;
++        IFBLOG("waiting %u s before taking the panel (nullmoth-intelfb-delay)", w);
++        ifb_trail("wait");
++        IOSleep(w * 1000);
++        ifb_trail("go");
++    }
+     bool ok = startReal(provider);
+     ifb_trail(ok ? "ok" : "declined");
+     // intelfb-0005: RTX-3 froze after start() returned, so the boot guard stays armed until the Mac has lived two
