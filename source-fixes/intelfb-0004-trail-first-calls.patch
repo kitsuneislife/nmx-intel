@@ -1,0 +1,169 @@
+--- a/intelfb.cpp
++++ b/intelfb.cpp
+@@ -59,7 +59,7 @@
+     n->release();
+     return has;
+ }
+-static char gIfbTrail[400];
++static char gIfbTrail[900];   // intelfb-0004: room for the first-call tokens
+ static void ifb_trail(const char *step)
+ {
+     if (strlen(gIfbTrail) + strlen(step) + 2 >= sizeof(gIfbTrail)) return;
+@@ -94,6 +94,22 @@
+ extern "C" kern_return_t _start(kmod_info_t *ki, void *d) { return KERN_SUCCESS; }
+ extern "C" kern_return_t _stop(kmod_info_t *ki, void *d)  { return KERN_SUCCESS; }
+ 
++// nmx-intel (intelfb-0004): the first call of each IOFramebuffer method, and the first of each attribute, in the trail,
++// so a freeze after start() shows the last call macOS made into this framebuffer
++#define IFB_ONCE(tag) do { static bool _ifbDone; if (!_ifbDone) { _ifbDone = true; ifb_trail(tag); } } while (0)
++static void ifb_attr(const char *pfx, uint32_t a)
++{
++    static uint32_t seen[40]; static unsigned n;
++    uint32_t key = a ^ ((uint32_t)(uint8_t)pfx[0] << 1) ^ ((uint32_t)(uint8_t)pfx[1] << 9);
++    for (unsigned i = 0; i < n; i++) if (seen[i] == key) return;
++    if (n < 40) seen[n++] = key; else return;
++    char c[5] = { (char)(a >> 24), (char)(a >> 16), (char)(a >> 8), (char)a, 0 }, t[24];
++    bool printable = true;
++    for (int i = 0; i < 4; i++) if (c[i] < 0x20 || c[i] > 0x7e || c[i] == ' ') printable = false;
++    if (printable) snprintf(t, sizeof t, "%s:%s", pfx, c); else snprintf(t, sizeof t, "%s:%x", pfx, a);
++    ifb_trail(t);
++}
++
+ namespace {
+ // display version by PCI device ID, from Linux include/drm/intel/pciids.h (MIT); 0 = not ours
+ struct Id { uint16_t id; uint8_t ver; };
+@@ -150,7 +166,7 @@
+     static void vblFire(thread_call_param_t p0, thread_call_param_t) {
+         NMIntelFB *me = (NMIntelFB *)p0;
+         if (me->fStopping) return;
+-        if (me->fVbl.proc) { me->fVbl.proc(me->fVbl.target, me->fVbl.ref); me->fVblCalls++; }
++        if (me->fVbl.proc) { IFB_ONCE("vbl1"); me->fVbl.proc(me->fVbl.target, me->fVbl.ref); me->fVblCalls++; }
+         uint64_t period; nanoseconds_to_absolutetime(me->fFrameNs, &period);
+         uint64_t now = mach_absolute_time();
+         me->fVblNext = (me->fVblNext && me->fVblNext + period > now) ? me->fVblNext + period : now + period;
+@@ -201,19 +217,20 @@
+     bool startReal(IOService *provider);
+     void stop(IOService *provider) override;
+ 
+-    IOReturn enableController() override { return kIOReturnSuccess; }
+-    bool isConsoleDevice() override { return true; }
++    IOReturn enableController() override { IFB_ONCE("ec"); return kIOReturnSuccess; }
++    bool isConsoleDevice() override { IFB_ONCE("con"); return true; }
+     IODeviceMemory *getApertureRange(IOPixelAperture aperture) override;
+     const char *getPixelFormats() override { return IO32BitDirectPixels "\0"; }
+-    IOItemCount getDisplayModeCount() override { return 1; }
+-    IOReturn getDisplayModes(IODisplayModeID *modes) override { modes[0] = 1; return kIOReturnSuccess; }
++    IOItemCount getDisplayModeCount() override { IFB_ONCE("dmc"); return 1; }
++    IOReturn getDisplayModes(IODisplayModeID *modes) override { IFB_ONCE("dms"); modes[0] = 1; return kIOReturnSuccess; }
+     IOReturn getInformationForDisplayMode(IODisplayModeID mode, IODisplayModeInformation *info) override;
+     UInt64 getPixelFormatsForDisplayMode(IODisplayModeID, IOIndex) override { return 0; }
+     IOReturn getPixelInformation(IODisplayModeID mode, IOIndex depth, IOPixelAperture aperture, IOPixelInformation *pi) override;
+-    IOReturn getCurrentDisplayMode(IODisplayModeID *mode, IOIndex *depth) override { *mode = 1; *depth = 0; return kIOReturnSuccess; }
+-    IOReturn getStartupDisplayMode(IODisplayModeID *mode, IOIndex *depth) override { return getCurrentDisplayMode(mode, depth); }
++    IOReturn getCurrentDisplayMode(IODisplayModeID *mode, IOIndex *depth) override { IFB_ONCE("cdm"); *mode = 1; *depth = 0; return kIOReturnSuccess; }
++    IOReturn getStartupDisplayMode(IODisplayModeID *mode, IOIndex *depth) override { IFB_ONCE("sdm"); return getCurrentDisplayMode(mode, depth); }
+     // WindowServer showed the panel at 0.00 Hz without this (virtual panel)
+     IOReturn getTimingInfoForDisplayMode(IODisplayModeID mode, IOTimingInformation *info) override {
++        IFB_ONCE("tim");
+         if (mode != 1 || !info) return kIOReturnUnsupportedMode;
+         bzero(info, sizeof(*info));
+         info->appleTimingID = kIOTimingIDInvalid;
+@@ -227,20 +244,21 @@
+         info->flags = kIODetailedTimingValid;
+         return kIOReturnSuccess;
+     }
+-    IOReturn setDisplayMode(IODisplayModeID mode, IOIndex depth) override { return (mode == 1 && depth == 0) ? kIOReturnSuccess : kIOReturnUnsupported; }
+-    IOItemCount getConnectionCount() override { return 1; }
++    IOReturn setDisplayMode(IODisplayModeID mode, IOIndex depth) override { IFB_ONCE("setdm"); return (mode == 1 && depth == 0) ? kIOReturnSuccess : kIOReturnUnsupported; }
++    IOItemCount getConnectionCount() override { IFB_ONCE("cc"); return 1; }
+     IOReturn callPlatformFunction(const OSSymbol *fn, bool wait, void *p1, void *p2, void *p3, void *p4) override;
+     IOReturn registerForInterruptType(IOSelect type, IOFBInterruptProc proc, OSObject *target, void *ref, void **iref) override {
++        ifb_attr("ri", (uint32_t)type);
+         if (type == kIOFBVBLInterruptType) { fVbl = { proc, target, ref }; if (iref) *iref = &fVbl; return kIOReturnSuccess; }
+         if (type == kIOFBConnectInterruptType) { fConnect = { proc, target, ref }; if (iref) *iref = &fConnect; return kIOReturnSuccess; }
+         return kIOReturnUnsupported;
+     }
+     IOReturn unregisterInterrupt(void *) override { return kIOReturnSuccess; }
+-    IOReturn setInterruptState(void *, UInt32) override { return kIOReturnSuccess; }
+-    IOReturn setGammaTable(UInt32, UInt32, UInt32, void *) override { return kIOReturnSuccess; }
+-    IOReturn setGammaTable(UInt32, UInt32, UInt32, void *, bool) override { return kIOReturnSuccess; }
+-    IOReturn setCLUTWithEntries(IOColorEntry *, UInt32, UInt32, IOOptionBits) override { return kIOReturnSuccess; }
+-    IOReturn setApertureEnable(IOPixelAperture, IOOptionBits) override { return kIOReturnSuccess; }
++    IOReturn setInterruptState(void *, UInt32) override { IFB_ONCE("is"); return kIOReturnSuccess; }
++    IOReturn setGammaTable(UInt32, UInt32, UInt32, void *) override { IFB_ONCE("gam"); return kIOReturnSuccess; }
++    IOReturn setGammaTable(UInt32, UInt32, UInt32, void *, bool) override { IFB_ONCE("gam2"); return kIOReturnSuccess; }
++    IOReturn setCLUTWithEntries(IOColorEntry *, UInt32, UInt32, IOOptionBits) override { IFB_ONCE("clut"); return kIOReturnSuccess; }
++    IOReturn setApertureEnable(IOPixelAperture, IOOptionBits) override { IFB_ONCE("ape"); return kIOReturnSuccess; }
+     IOReturn setStartupDisplayMode(IODisplayModeID, IOIndex) override { return kIOReturnSuccess; }
+     // Power and connection handling copied from NVRMFB, which shares this controller (same IOFBDependentID). Left to
+     // IOFramebuffer's base class, a power change queues on the shared controller thread and waits for an acknowledge
+@@ -254,6 +272,7 @@
+         return kIOPMAckImplied;
+     }
+     IOReturn setAttribute(IOSelect attribute, uintptr_t value) override {
++        ifb_attr("sa", (uint32_t)attribute);
+         if (attribute == kIOWindowServerActiveAttribute) return kIOReturnSuccess;
+         if (attribute == kIOPowerAttribute) {
+             if (value) { IOReturn r = IOFramebuffer::setAttribute(attribute, value); handleEvent(kIOFBNotifyDidPowerOn);
+@@ -265,6 +284,7 @@
+         return IOFramebuffer::setAttribute(attribute, value);
+     }
+     IOReturn setAttributeForConnection(IOIndex idx, IOSelect attribute, uintptr_t value) override {
++        ifb_attr("sc", (uint32_t)attribute);
+         switch (attribute) {
+         case kConnectionPower: case kConnectionColorModesSupported: case kConnectionColorDepthsSupported:
+         case kConnectionControllerColorDepth: case kConnectionControllerDepthsSupported: case kConnectionColorMode:
+@@ -274,11 +294,13 @@
+         }
+     }
+     IOReturn connectFlags(IOIndex, IODisplayModeID, IOOptionBits *flags) override {
++        IFB_ONCE("cf");
+         if (flags) *flags = kDisplayModeValidFlag | kDisplayModeSafeFlag | kDisplayModeDefaultFlag;
+         return kIOReturnSuccess;
+     }
+-    IODeviceMemory *getVRAMRange() override { return getApertureRange(kIOFBSystemAperture); }
++    IODeviceMemory *getVRAMRange() override { IFB_ONCE("vram"); return getApertureRange(kIOFBSystemAperture); }
+     IOReturn getAttribute(IOSelect attribute, uintptr_t *value) override {
++        ifb_attr("ga", (uint32_t)attribute);
+         if (attribute == kIOWindowServerActiveAttribute) { if (value) *value = 1; return kIOReturnSuccess; }
+         return IOFramebuffer::getAttribute(attribute, value);
+     }
+@@ -462,12 +484,14 @@
+ 
+ IODeviceMemory *NMIntelFB::getApertureRange(IOPixelAperture aperture)
+ {
++    IFB_ONCE("apr");
+     if (aperture != kIOFBSystemAperture) return nullptr;
+     return IODeviceMemory::withRange(fApertureBase + fSurf, (IOPhysicalLength)fRowBytes * fHeight);
+ }
+ 
+ IOReturn NMIntelFB::getInformationForDisplayMode(IODisplayModeID mode, IODisplayModeInformation *info)
+ {
++    IFB_ONCE("info");
+     if (mode != 1 || !info) return kIOReturnBadArgument;
+     bzero(info, sizeof(*info));
+     info->maxDepthIndex = 0; info->nominalWidth = fWidth; info->nominalHeight = fHeight;
+@@ -477,6 +501,7 @@
+ 
+ IOReturn NMIntelFB::getPixelInformation(IODisplayModeID mode, IOIndex depth, IOPixelAperture aperture, IOPixelInformation *pi)
+ {
++    IFB_ONCE("pix");
+     if (mode != 1 || depth != 0 || aperture != kIOFBSystemAperture || !pi) return kIOReturnUnsupportedMode;
+     bzero(pi, sizeof(*pi));
+     pi->bytesPerRow = fRowBytes; pi->bytesPerPlane = 0; pi->bitsPerPixel = 32; pi->pixelType = kIORGBDirectPixels;
+@@ -489,6 +514,7 @@
+ 
+ IOReturn NMIntelFB::getAttributeForConnection(IOIndex idx, IOSelect attr, uintptr_t *value)
+ {
++    ifb_attr("gc", (uint32_t)attr);
+     if (idx != 0 || !value) return kIOReturnBadArgument;
+     switch (attr) {
+     case kConnectionEnable: *value = 1; return kIOReturnSuccess;
+@@ -508,6 +534,7 @@
+ IOReturn NMIntelFB::callPlatformFunction(const OSSymbol *fn, bool wait, void *p1, void *p2, void *p3, void *p4)
+ {
+     if (fn && fn->isEqualTo(NVRM_VRAM_FN_SCANOUT)) {
++        IFB_ONCE("scan");
+         NVRMVramRequest *r = (NVRMVramRequest *)p1;
+         if (!r || r->version != NVRM_VRAM_ABI_VERSION) return kIOReturnBadArgument;
+         if (!fSurfMap) return kIOReturnNotReady;

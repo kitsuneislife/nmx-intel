@@ -82,6 +82,8 @@ Intel **desligado**. O NMIntelFB não sobe com `-nvoff` (patch nosso). RTX-1 tra
 trilha `nvram nullmoth-intelfb-trail`, trava de boot (`nullmoth-intelfb-attaching`) e chaves `nullmoth-intelfb{,-dep}` (RTX-2, `9dbd6128…`).
 RTX-2: acha o painel (pipe A 1920x1080, surf 0) e trava no `registerPowerDriver`; intelfb-0003 = dependent ID antes do
 `IOFramebuffer::start` (como o NVRMFB), trilha `pm/sp1/sp-done/power`, chave `nullmoth-intelfb-pm=0` (RTX-3, `261eca1c…`).
+RTX-3: o `start` termina (`… power sp1 ok sp-done`), tela preta e trava depois, sem log. intelfb-0004 = primeira
+chamada de cada método na trilha; 0005 = trava de boot até 2 min vivo (`alive`) (RTX-4, `65901097…`).
 **Teste 24:** **desktop pelo i915 e sem travar** (passou de 330 s), e o ANV enxerga `Intel(R) Graphics
 (RPL-P)`, Vulkan 1.4. Sem Metal da Intel ainda (NMXAccel desligado por 0024). Próximo: o `NMXGPUFB` (fb=1) sem
 congelar. WhateverXe (b00t0x) conferido: só Big Sur e TGL/ADL-N por enquanto.

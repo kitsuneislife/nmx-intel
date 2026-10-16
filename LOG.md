@@ -1090,3 +1090,22 @@ Trilha: `start mmio mode-A-1920x1080-s0 fb-started surf dep vbl`. A trava de boo
 Build: `NMIntelFB 261eca1c…`.
 
 ## Próximo: teste RTX-3
+
+## 2026-10-16: teste RTX-3 (intelfb-0003) — **o `start` termina; o travamento (tela preta) vem depois**
+
+Trilha: `start mmio mode-A-1920x1080-s0 surf dep fb-started vbl pm power sp1 ok sp-done`. Com o dependent ID antes do
+`IOFramebuffer::start`, o `registerPowerDriver` passou e o `start()` voltou (`ok`); a trava de boot foi apagada. O
+travamento veio depois, com a tela preta, quando o macOS passa a usar o framebuffer novo. Nenhum log do boot chegou
+ao disco.
+
+### intelfb-0004 / 0005
+
+- 0004: a primeira chamada de cada método do IOFramebuffer entra na trilha (`ec`, `apr`, `info`, `pix`, `setdm`,
+  `tim`, `vbl1`, `scan`…), e a primeira de cada atributo (`sa:`/`ga:`/`sc:`/`gc:`/`ri:` + o código). A trilha cabe
+  900 caracteres. A última chamada antes do travamento fica na NVRAM.
+- 0005: a trava de boot fica armada até o Mac viver 2 min com o framebuffer (`alive` na trilha). Um travamento antes
+  disso deixa o painel para o firmware no boot seguinte.
+
+Build: `NMIntelFB 65901097…`, 70.272 B.
+
+## Próximo: teste RTX-4

@@ -1,0 +1,21 @@
+--- a/intelfb.cpp
++++ b/intelfb.cpp
+@@ -422,7 +422,17 @@
+     ifb_trail("start");
+     bool ok = startReal(provider);
+     ifb_trail(ok ? "ok" : "declined");
+-    ifb_nv_set("nullmoth-intelfb-attaching", nullptr);
++    // intelfb-0005: RTX-3 froze after start() returned, so the boot guard stays armed until the Mac has lived two
++    // minutes with this framebuffer; a freeze before that leaves the panel to the firmware on the next boot
++    if (ok) {
++        if (thread_call_t alive = thread_call_allocate([](thread_call_param_t, thread_call_param_t) {
++                ifb_trail("alive");
++                ifb_nv_set("nullmoth-intelfb-attaching", nullptr);
++            }, nullptr)) {
++            uint64_t d; clock_interval_to_deadline(120, kSecondScale, &d);
++            thread_call_enter_delayed(alive, d);
++        } else ifb_nv_set("nullmoth-intelfb-attaching", nullptr);
++    } else ifb_nv_set("nullmoth-intelfb-attaching", nullptr);
+     return ok;
+ }
+ 
