@@ -982,3 +982,34 @@ Build `rt kext`: `NMXGPU 7fd87526d8ef26cc9db34ae4ebb0f81e489792fb67f761423ebf671
 
 Esperado: desktop e sem travar depois de 5 min. Conferir `nvram nullmoth-gpu-trail` (`noaccel`) e o probe (o ANV deve
 achar 1 GPU).
+
+## 2026-10-16: teste 24, 0024 — **desktop, sem travar, e o Vulkan da Intel enxerga a GPU**
+
+Kext `7fd87526…`, libdrm `719cb625…`, `fb=2`. **Chegou ao desktop** pelo i915 e passou dos 330 s (batimento
+`ms=333134`), bem depois do ponto em que os testes 21–23 travavam. Trilha com `noaccel`; nenhuma linha
+`RM refused` neste boot.
+
+Probe (120 s):
+```
+drmGetDevices2: 1 device(s)
+  device 0: bustype 0, nodes mask 0x5, pci 8086:a7a8
+open /dev/dri/renderD128: driver i915 1.6.0
+ANV: vkEnumeratePhysicalDevices -> 0, 1 device(s)
+  0: Intel(R) Graphics (RPL-P), 8086:a7a8, api 1.4
+```
+O Vulkan da Intel (ANV) cria a instância e enxerga a GPU pelo i915. O Metal da Intel ainda não, porque o NMXAccel
+fica desligado enquanto não houver o nosso IOFramebuffer (0024).
+
+**Confirmado:** o travamento dos testes 21–23 era o watchdog do macOS sobre o WindowServer preso no NMXAccel.
+
+### WhateverXe (b00t0x, 2026-10-09)
+
+Plugin do Lilu derivado do WhateverGreen que adapta os drivers **da Apple** (Tiger Lake) para alguns Xe-LP, com o
+root patch de um fork do OCLP. Hoje: só **Big Sur 20G1443**, Tiger Lake (`9A40/9A49/9A78`) e Alder Lake-N
+(`46D0–46D4`), só telas externas. Raptor Lake, tela interna e Monterey a Tahoe estão no roadmap. **Não serve para
+nós agora** (Sequoia, `a7a8`, painel interno). É outro caminho (driver da Apple em vez do i915); vale acompanhar.
+
+## Próximo
+
+Fazer o `NMXGPUFB` (fb=1) funcionar sem congelar (testes 10–14). Com ele, o NMXAccel volta a ter framebuffer e o
+WindowServer ganha o Metal da Intel.

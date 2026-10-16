@@ -75,7 +75,10 @@ Até 2026-10-15 o trabalho estava no branch `ccr-918d231a-luzxg0` dos dois outro
 
 ## Onde paramos (2026-10-15, depois do teste 5)
 
-**Mais novo (teste 23):** a GPU estava parada (`iot` 140 s antes, `irq` baixo). O travamento é o watchdog do macOS: a
+**Mais novo (teste 24):** **desktop pelo i915 e sem travar** (passou de 330 s), e o ANV enxerga `Intel(R) Graphics
+(RPL-P)`, Vulkan 1.4. Sem Metal da Intel ainda (NMXAccel desligado por 0024). Próximo: o `NMXGPUFB` (fb=1) sem
+congelar. WhateverXe (b00t0x) conferido: só Big Sur e TGL/ADL-N por enquanto.
+**Teste 23:** a GPU estava parada (`iot` 140 s antes, `irq` baixo). O travamento é o watchdog do macOS: a
 thread principal do WindowServer fica em loop no NMXAccel (`RM refused 8294400`, sem framebuffer nosso com `fb=2`). 0024 =
 não pôr `nmxgpu-claimed` sem o nosso IOFramebuffer (chave `nullmoth-gpu-accel`) (teste 24, `7fd87526…`).
 **Teste 22:** com 0021, trava aos ~4 min, sem panic e sem RCU esperando, longe dos pedidos do ANV. O
