@@ -1,0 +1,54 @@
+diff --git a/gpu-port/xkpi/bsdcompat/include/sys/conf.h b/gpu-port/xkpi/bsdcompat/include/sys/conf.h
+index 3046829..92c4369 100644
+--- a/gpu-port/xkpi/bsdcompat/include/sys/conf.h
++++ b/gpu-port/xkpi/bsdcompat/include/sys/conf.h
+@@ -86,6 +86,7 @@ struct cdev {
+     int nmx_base_minor;             /* minor of the clone node; opens get their own minors */
+     u_int nmx_refs;                 /* creation reference + one per open (dev_ref/dev_rel) */
+     int nmx_gone;                   /* destroy_dev ran: no new opens */
++    struct vnode *nmx_vnode;        /* the node's inode for LinuxKPI opens (iminor), made at its first open */
+     TAILQ_ENTRY(cdev) nmx_link;
+     LIST_ENTRY(cdev) si_list;       /* in si_devsw->d_devs */
+ };
+diff --git a/gpu-port/xkpi/override/src/nmx_linux_cdev.c b/gpu-port/xkpi/override/src/nmx_linux_cdev.c
+index 2534b0a..ca055d2 100644
+--- a/gpu-port/xkpi/override/src/nmx_linux_cdev.c
++++ b/gpu-port/xkpi/override/src/nmx_linux_cdev.c
+@@ -20,6 +20,7 @@
+ #include <sys/mutex.h>
+ #include <sys/conf.h>
+ #include <sys/file.h>
++#include <sys/vnode.h>
+ #include <sys/uio.h>
+ #include <sys/proc.h>
+ #include <sys/stdarg.h>
+@@ -264,6 +265,29 @@ int nmx_cdev_open(void *cookie, int open_id, int fflags)
+         free(fp, M_NMXCDEV);
+         return ENOMEM;
+     }
++    /*
++     * The node's inode. LinuxKPI's open passes fp->f_vnode as the Linux inode, and drm_stub_open looks the minor up
++     * with iminor(inode) (v_rdev's linux_cdev): with no vnode iminor is -1 and every DRM open failed with ENODEV, so
++     * Mesa found no GPU (test 17: open of /dev/dri/renderD128 -> "Operation not supported by device"). One per node,
++     * kept until the node goes: files that outlive their open (fdrop) still vrele it.
++     */
++    if (__atomic_load_n(&c->nmx_vnode, __ATOMIC_ACQUIRE) == NULL) {
++        struct vnode *vp = malloc(sizeof(*vp), M_NMXCDEV, M_WAITOK | M_ZERO), *none = NULL;
++        if (vp == NULL) {
++            free(o, M_NMXCDEV);
++            free(fp, M_NMXCDEV);
++            return ENOMEM;
++        }
++        vp->v_rdev = c;
++        vp->v_type = VCHR;
++        vp->v_usecount = 1;
++        mtx_init(&vp->v_interlock, "nmx node vnode", NULL, MTX_DEF);
++        if (!__atomic_compare_exchange_n(&c->nmx_vnode, &none, vp, false, __ATOMIC_ACQ_REL, __ATOMIC_ACQUIRE)) {
++            mtx_destroy(&vp->v_interlock);
++            free(vp, M_NMXCDEV);
++        }
++    }
++    fp->f_vnode = c->nmx_vnode;
+     dev_ref(c);
+     fp->f_count = 1;
+     fp->f_flag = (u_int)fflags & (FREAD | FWRITE | O_NONBLOCK | O_APPEND);

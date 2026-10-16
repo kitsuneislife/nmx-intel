@@ -75,7 +75,9 @@ Até 2026-10-15 o trabalho estava no branch `ccr-918d231a-luzxg0` dos dois outro
 
 ## Onde paramos (2026-10-15, depois do teste 5)
 
-**Mais novo (teste 16):** com 0016 e `fb=2`, o painel atualiza (console ao vivo pelo i915) e o Mac fica vivo. O
+**Mais novo (teste 17):** o probe mostrou que toda abertura de `/dev/dri/*` falhava com ENODEV (bug do port: sem
+`f_vnode`, o `iminor` dá -1). 0017 corrige; teste 18 com o build completo `47133df7…`.
+**Teste 16:** com 0016 e `fb=2`, o painel atualiza (console ao vivo pelo i915) e o Mac fica vivo. O
 WindowServer sobe, mas o desktop não aparece; o ANV (Metal da Intel) acha 0 GPUs e ninguém abre o nó DRM.
 `tools/probe` grava o diagnóstico em `/Users/Shared/nmx-probe.txt` no boot (teste 17).
 **Teste 15:** com `nullmoth-gpu-fb=2` (sem o nosso IOFramebuffer) o Mac **não congela**; o congelamento
@@ -86,7 +88,7 @@ depois do attach. 0015 = chaves na NVRAM (`sudo nvram nullmoth-gpu-fb=2` etc.); 
 fb do GOP, que o macOS (console e IONDRVFramebuffer) ainda desenha pela aperture. 0014 reserva essas páginas (teste 14).
 **Teste 12:** congela < 2 s depois do registro do nosso IOFramebuffer; o `IONDRVFramebuffer` do firmware
 continua na Intel (dois fbs "console" na mesma GPU). 0013 = teste 13, com chaves `nmxcon=0`/`nmxfb=2`/`nmxfb=0` (ver LOG).
-**Teste 11:** o NMXGPU é compilado no Mac (`build/`), com `source-fixes/0001..0016`. A trilha na NVRAM
+**Teste 11:** o NMXGPU é compilado no Mac (`build/`), com `source-fixes/0001..0017`. A trilha na NVRAM
 (`nvram nullmoth-gpu-trail`) mostrou que **o attach inteiro termina** (`published`, a marca de attach é apagada) e que o
 Mac congela depois, antes do macOS usar o nosso framebuffer (sem `fb-vram`/`fb-setmode`). A tomada do fb do GOP cai em
 `tk-obj` (a faixa da stolen já tem dono). Próximo: teste 12, com batimento e trilha depois do attach (ver o fim do `LOG.md`).

@@ -771,3 +771,35 @@ Instalar: `sudo bash tools/probe/install.sh`. Tirar: `... install.sh remove`.
 ## Próximo: teste 17 (mesmo binário, `fb=2`, com o probe)
 
 Descobrir por que o ANV não vê a Intel. Em paralelo, o congelamento com o nosso IOFramebuffer (`fb=1`) continua aberto.
+
+## 2026-10-16: teste 17, o probe no boot (`fb=2`)
+
+Mesmo binário `8ce69ba8…`. O Mac viveu 117 s (o batimento termina em `@116933`), então só a rodada dos 45 s do probe
+foi gravada (`/Users/Shared/nmx-probe.prev.txt`):
+```
+/dev/dri/renderD128 mode 666 dev 22,268
+/dev/dri/card0 mode 600 dev 22,269
+drmGetDevices2: 0 device(s)
+open /dev/dri/renderD128: Operation not supported by device
+open /dev/dri/card0: Operation not supported by device
+ANV: vkEnumeratePhysicalDevices -> 0, 0 device(s)
+```
+Depois do probe, o batimento mostrou `open=2 ioctl=0`: as duas aberturas chegaram ao NMXGPU e falharam lá dentro.
+
+**Causa (bug do nullmoth, `override/src/nmx_linux_cdev.c`):**
+- `nmx_cdev_open` monta a `struct file` sem `f_vnode`.
+- O `linux_dev_fdopen` do LinuxKPI passa `file->f_vnode` como inode para o `open` do Linux.
+- O `drm_stub_open` acha o minor com `iminor(inode)`, que dá `-1` sem vnode. `drm_minor_acquire` devolve `-ENODEV`.
+- Ou seja: **nenhuma abertura de nó DRM funciona** no port, então o libdrm não lista a GPU e o ANV acha 0 dispositivos.
+  Não há issue sobre isso no upstream.
+
+### 0017: um vnode por nó
+
+- `struct cdev` ganha `nmx_vnode`, criado na primeira abertura (`v_rdev` = o nó, `VCHR`), e `fp->f_vnode` aponta para ele.
+- A estrutura muda, então o build é completo (`amd rt i915 xe nodebug kext`).
+
+Build sem debug, completo: `NMXGPU 47133df7d3da0853135d4d6194ed42e76701c0304312be1eca6b0d2f74a6c155`, 15.250.288 B.
+
+## Próximo: teste 18 (0017, `fb=2`, probe instalado)
+
+Esperado no probe: `open … driver i915`, `drmGetDevices2: 1 device(s)` e o ANV com 1 dispositivo (Raptor Lake).
