@@ -1409,3 +1409,20 @@ Build `rt kext`: `NMXGPU 9823079e7d51aae3e8bb7d0819f1bfb68a49af1c5fb43656c3ad2fa
 ## Próximo: teste 32 (0032)
 
 Mesmo procedimento. Esperado: o desktop sem as piscadas e o WindowServer com bem menos CPU. Conferir com `top`.
+
+## 2026-10-16: teste 32 (0032) — **o WindowServer ainda tem duas telas**
+
+Binário `9823079e…`. Trilha: `… fb-start fb-shadow fb-started … fb-copy ndrv-term ndrv-gone fb-gam @322996`. A sombra
+e a cópia funcionam. O Lukas: glitches quase iguais; dá para ver linhas de atualização cruzando a tela; **o mouse, ao
+bater na borda direita, aparece do lado esquerdo e deixa um quadrado branco**; a barra (Dock) não aparece.
+- WindowServer continua a ~225 % de CPU (thread principal ~85 % + 6 threads do compositor a ~20 %).
+- **`tools/vram/displays.c` (CoreGraphics): 2 telas online e ativas.** A nossa (`5b81c5c1`, 0,0) e a do firmware
+  (`5b81c5c0`, em 1920,0, à direita), embora o `.Display_boot` já tenha saído do IOKit (`ndrv-gone`). O
+  `IOService::terminate` (0030) não manda o `kIOFBNotifyTerminated`, e o WindowServer nunca tira essa tela.
+- **Essa é a causa dos glitches desde o teste 26.** A tela do firmware desenha direto nas páginas do fb do GOP, que
+  são as que o painel mostra. O mouse "à direita" está nela, e aparece na esquerda do painel; a Dock pode estar nela.
+  Duas telas escrevem na mesma memória: uma apaga a outra.
+- Teste ao vivo: `tools/vram/mirror.c` espelha a tela do firmware na nossa (`CGConfigureDisplayMirrorOfDisplay`, só
+  nesta sessão).
+- Pesquisa: o nullmoth diz nas notas da release que, nos notebooks com o painel na Intel, a tela interna não é
+  acelerada; as issues #119/#219 confirmam. Ninguém publicou um caminho para isso.
