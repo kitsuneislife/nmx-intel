@@ -1,0 +1,118 @@
+From 2c495dd7e8830387e9586bb4f5e17393d155b686 Mon Sep 17 00:00:00 2001
+From: kitsuneislife <kitsuneislif3@gmail.com>
+Date: Fri, 16 Oct 2026 11:22:49 -0300
+Subject: [PATCH] 0023-i915-power-events-in-the-request-log.patch
+
+---
+ .../drm/i915/display/intel_display_power_well.c  | 16 ++++++++++++++++
+ drivers/gpu/drm/i915/gt/intel_gt_pm.c            | 10 ++++++++++
+ drivers/gpu/drm/i915/i915_driver.c               | 11 +++++++++++
+ 3 files changed, 37 insertions(+)
+
+diff --git a/drivers/gpu/drm/i915/display/intel_display_power_well.c b/drivers/gpu/drm/i915/display/intel_display_power_well.c
+index 7f1f706fd9..d99d5b5ad0 100644
+--- a/drivers/gpu/drm/i915/display/intel_display_power_well.c
++++ b/drivers/gpu/drm/i915/display/intel_display_power_well.c
+@@ -31,6 +31,14 @@
+ #include "vlv_sideband.h"
+ #include "vlv_sideband_reg.h"
+ 
++/* nmx-intel 0023: GPU power events in the NVRAM request log (nullmoth-gpu-io) */
++#ifdef NMXKPI
++void nmx_xnu_iolog(const char *tok);
++#define NMX_IOLOG(t) nmx_xnu_iolog(t)
++#else
++#define NMX_IOLOG(t) do { } while (0)
++#endif
++
+ struct i915_power_well_regs {
+ 	i915_reg_t bios;
+ 	i915_reg_t driver;
+@@ -778,6 +786,14 @@ void gen9_set_dc_state(struct intel_display *display, u32 state)
+ 	val &= ~mask;
+ 	val |= state;
+ 
++#ifdef NMXKPI
++	{
++		char tok[8];
++
++		snprintf(tok, sizeof(tok), "D%x", state);
++		nmx_xnu_iolog(tok);
++	}
++#endif
+ 	gen9_write_dc_state(display, val);
+ 
+ 	power_domains->dc_state = val & mask;
+diff --git a/drivers/gpu/drm/i915/gt/intel_gt_pm.c b/drivers/gpu/drm/i915/gt/intel_gt_pm.c
+index d48411f72b..6d50753fe3 100644
+--- a/drivers/gpu/drm/i915/gt/intel_gt_pm.c
++++ b/drivers/gpu/drm/i915/gt/intel_gt_pm.c
+@@ -82,12 +82,21 @@ static void runtime_end(struct intel_gt *gt)
+ #endif
+ }
+ 
++/* nmx-intel 0023: GPU power events in the NVRAM request log (nullmoth-gpu-io) */
++#ifdef NMXKPI
++void nmx_xnu_iolog(const char *tok);
++#define NMX_IOLOG(t) nmx_xnu_iolog(t)
++#else
++#define NMX_IOLOG(t) do { } while (0)
++#endif
++
+ static int __gt_unpark(struct intel_wakeref *wf)
+ {
+ 	struct intel_gt *gt = container_of(wf, typeof(*gt), wakeref);
+ 	struct drm_i915_private *i915 = gt->i915;
+ 
+ 	GT_TRACE(gt, "\n");
++	NMX_IOLOG("Gu");
+ 
+ 	/*
+ 	 * It seems that the DMC likes to transition between the DC states a lot
+@@ -121,6 +130,7 @@ static int __gt_park(struct intel_wakeref *wf)
+ 	struct drm_i915_private *i915 = gt->i915;
+ 
+ 	GT_TRACE(gt, "\n");
++	NMX_IOLOG("Gp");
+ 
+ 	runtime_end(gt);
+ 	intel_gt_park_requests(gt);
+diff --git a/drivers/gpu/drm/i915/i915_driver.c b/drivers/gpu/drm/i915/i915_driver.c
+index f794341b4c..0362f4662f 100644
+--- a/drivers/gpu/drm/i915/i915_driver.c
++++ b/drivers/gpu/drm/i915/i915_driver.c
+@@ -111,6 +111,11 @@
+ #include "vlv_sideband.h"
+ #include "vlv_suspend.h"
+ 
++#ifdef NMXKPI
++/* nmx-intel 0023: runtime suspend/resume in the NVRAM request log */
++void nmx_xnu_iolog(const char *tok);
++#endif
++
+ static const struct drm_driver i915_drm_driver;
+ 
+ static int i915_workqueues_init(struct drm_i915_private *dev_priv)
+@@ -1494,6 +1499,9 @@ static int intel_runtime_suspend(struct device *kdev)
+ 	struct drm_i915_private *dev_priv = kdev_to_i915(kdev);
+ 	struct intel_display *display = &dev_priv->display;
+ 	struct intel_runtime_pm *rpm = &dev_priv->runtime_pm;
++#ifdef NMXKPI
++	nmx_xnu_iolog("Rs");
++#endif
+ #ifdef __linux__
+ 	struct pci_dev *pdev = to_pci_dev(dev_priv->drm.dev);
+ 	struct pci_dev *root_pdev;
+@@ -1597,6 +1605,9 @@ static int intel_runtime_resume(struct device *kdev)
+ 	struct drm_i915_private *dev_priv = kdev_to_i915(kdev);
+ 	struct intel_display *display = &dev_priv->display;
+ 	struct intel_runtime_pm *rpm = &dev_priv->runtime_pm;
++#ifdef NMXKPI
++	nmx_xnu_iolog("Rr");
++#endif
+ #ifdef __linux__
+ 	struct pci_dev *pdev = to_pci_dev(dev_priv->drm.dev);
+ 	struct pci_dev *root_pdev;
+-- 
+2.39.5 (Apple Git-154)
+

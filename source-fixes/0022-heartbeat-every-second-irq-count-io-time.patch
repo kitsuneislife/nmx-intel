@@ -1,0 +1,122 @@
+From cf6834584d21d69055a144526f41784b43a9d4ae Mon Sep 17 00:00:00 2001
+From: kitsuneislife <kitsuneislif3@gmail.com>
+Date: Fri, 16 Oct 2026 11:22:49 -0300
+Subject: [PATCH] 0022-heartbeat-every-second-irq-count-io-time.patch
+
+---
+ gpu-port/xkpi/xnu/nmx_kext.cpp | 48 ++++++++++++++++++++--------------
+ gpu-port/xkpi/xnu/nmx_pci.cpp  |  4 +++
+ 2 files changed, 32 insertions(+), 20 deletions(-)
+
+diff --git a/gpu-port/xkpi/xnu/nmx_kext.cpp b/gpu-port/xkpi/xnu/nmx_kext.cpp
+index 2964501..5d9d9c7 100644
+--- a/gpu-port/xkpi/xnu/nmx_kext.cpp
++++ b/gpu-port/xkpi/xnu/nmx_kext.cpp
+@@ -251,8 +251,20 @@ extern "C" void nmx_xnu_trail(const char *step)
+  * characters are kept. The first 400 tokens are each written as they happen; after that the buffer still follows
+  * every token and the heartbeat writes it when it changed, so the end before a freeze is there too (0021).
+  */
++static uint64_t gAttachStart, gPublished;
++
++static int64_t nmx_ms_since(uint64_t t)
++{
++    if (t == 0)
++        return -1;
++    uint64_t ns;
++    absolutetime_to_nanoseconds(mach_absolute_time() - t, &ns);
++    return (int64_t)(ns / 1000000);
++}
++
+ static IOLock *gIoLock;
+ static char gIo[480];
++static int64_t gIoLastMs;   /* ms since the attach began of the newest token (0022) */
+ static unsigned gIoWrites;
+ static bool gIoDirty;
+ 
+@@ -273,6 +285,7 @@ extern "C" void nmx_xnu_iolog(const char *tok)
+     if (len)
+         gIo[len++] = ' ';
+     memcpy(gIo + len, tok, add + 1);
++    gIoLastMs = nmx_ms_since(gAttachStart);
+     if (gIoWrites >= 400)
+         gIoDirty = true;
+     else {
+@@ -325,20 +338,11 @@ static void nmx_trail_commit_locked()
+ 
+ /*
+  * From the start of the attach: "nullmoth-gpu-beat" = ms since the attach began, ms since the outputs were published
+- * (-1 before), and what user space has asked of the GPU (opens, ioctls, ioctls in flight, last command). Every 0.5 s
+- * for the first minute, then every 5 s until 5 min. A boot that freezes leaves the last beat in NVRAM, so the next
++ * (-1 before), and what user space has asked of the GPU (opens, ioctls, ioctls in flight, last command), the RCU
++ * waiters, the interrupts so far and when the newest request-log token came. Every 0.5 s for the first minute, then
++ * every second until 10 min. A boot that freezes leaves the last beat in NVRAM, so the next
+  * boot shows how long the Mac lived after each step.
+  */
+-static uint64_t gAttachStart, gPublished;
+-
+-static int64_t nmx_ms_since(uint64_t t)
+-{
+-    if (t == 0)
+-        return -1;
+-    uint64_t ns;
+-    absolutetime_to_nanoseconds(mach_absolute_time() - t, &ns);
+-    return (int64_t)(ns / 1000000);
+-}
+ static const char *const kBeat = "nullmoth-gpu-beat";
+ 
+ static void nmx_beat_write(const char *s)
+@@ -364,22 +368,26 @@ static void nmx_beat_write(const char *s)
+ }
+ 
+ extern "C" volatile int nmx_rcu_waiting;
++extern "C" volatile SInt32 nmx_irq_count;
+ 
+ static void nmx_beat_thread(void *, wait_result_t)
+ {
+     char s[128];
+     nmx_xnu_trail("beat");
+-    for (int i = 0; nmx_ms_since(gAttachStart) < 300000; i++) {
+-        IOSleep(i < 120 ? 500 : 5000);
+-        IOLockLock(gTrailLock);
+-        snprintf(gTrailBeat, sizeof(gTrailBeat), " @%lld", nmx_ms_since(gAttachStart));
+-        nmx_trail_commit_locked();
+-        IOLockUnlock(gTrailLock);
++    /* 0022: every 0.5 s for the first minute, then every second up to 10 minutes (the freezes came at 3-5 min) */
++    for (int i = 0; nmx_ms_since(gAttachStart) < 600000; i++) {
++        IOSleep(i < 120 ? 500 : 1000);
++        if (i < 120 || i % 10 == 0) {
++            IOLockLock(gTrailLock);
++            snprintf(gTrailBeat, sizeof(gTrailBeat), " @%lld", nmx_ms_since(gAttachStart));
++            nmx_trail_commit_locked();
++            IOLockUnlock(gTrailLock);
++        }
+         int opens, ioctls, inside;
+         uint32_t cmd;
+         nmx_xnu_node_stats(&opens, &ioctls, &inside, &cmd);
+-        snprintf(s, sizeof(s), "ms=%lld pub=%lld open=%d ioctl=%d in=%d cmd=0x%x rcu=%d", nmx_ms_since(gAttachStart),
+-                 nmx_ms_since(gPublished), opens, ioctls, inside, cmd, nmx_rcu_waiting);
++        snprintf(s, sizeof(s), "ms=%lld open=%d ioctl=%d in=%d cmd=0x%x rcu=%d irq=%d iot=%lld",
++                 nmx_ms_since(gAttachStart), opens, ioctls, inside, cmd, nmx_rcu_waiting, (int)nmx_irq_count, gIoLastMs);
+         nmx_beat_write(s);
+         if (gIoLock != nullptr) {
+             IOLockLock(gIoLock);
+diff --git a/gpu-port/xkpi/xnu/nmx_pci.cpp b/gpu-port/xkpi/xnu/nmx_pci.cpp
+index 52e5cb6..4849a20 100644
+--- a/gpu-port/xkpi/xnu/nmx_pci.cpp
++++ b/gpu-port/xkpi/xnu/nmx_pci.cpp
+@@ -106,8 +106,12 @@ public:
+ };
+ OSDefineMetaClassAndStructors(NMXIrq, OSObject)
+ 
++/* interrupts delivered so far, for the heartbeat (nmx-intel 0022): a jump before a freeze would be a storm */
++extern "C" { volatile SInt32 nmx_irq_count; }
++
+ static void irq_action(OSObject *owner, IOInterruptEventSource *src, int count)
+ {
++    OSAddAtomic(count > 0 ? count : 1, &nmx_irq_count);
+     NMXIrq *irq = OSDynamicCast(NMXIrq, owner);
+     if (irq)
+         irq->handler(irq->arg);
+-- 
+2.39.5 (Apple Git-154)
+

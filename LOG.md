@@ -922,3 +922,32 @@ Build `rt kext`: `NMXGPU 9a361f0ebdcd581ed88720192eefc4516d228bb27f1648b22ba7b33
 ## Próximo: teste 22 (0021, mesmo libdrm, `fb=2`)
 
 Esperado: sem o congelamento no `close`. Depois: `nvram nullmoth-gpu-beat`, `nvram nullmoth-gpu-io` e o probe.
+
+## 2026-10-16: teste 22, 0021 — **outro travamento, sem panic e longe do `close`**
+
+Kext `9a361f0e…`, libdrm `719cb625…`, `fb=2`. Ficou na tela de texto (sem desktop) e travou.
+- Batimento `ms=263427 open=66 ioctl=377 in=0 cmd=0xc0186474 rcu=0`: travou aos ~263 s do attach (teste 21: ~208 s),
+  sem ioctl em andamento e **sem `synchronize_rcu` esperando**. Não houve panic desta vez.
+- O fim de `nullmoth-gpu-io` é uma sessão inteira do ANV (`… d46 + d74 + c`), mas os clientes Metal só aparecem no
+  log até 11:08:30, e o travamento foi às ~11:11:50. O fim do registro pode ter sido minutos antes do travamento.
+- O log do macOS termina 34 s antes do travamento (o buffer não foi gravado).
+- O WindowServer tenta usar o NMXAccel da Intel e toda superfície falha (`NVTask::allocate: RM refused 8294400 bytes`,
+  ~1.100 por minuto): o NMXAccel não tem `nvAccelRmHandles` para a Intel ("no framebuffer has published yet"). Nos
+  testes 18 e 19 (desktop) isso deu 2 linhas; nos 15–17 e 21–22 (sem desktop), milhares. É por isso que o desktop não
+  aparece; não parece ser a causa do travamento (nos testes 15–17 o Mac ficou vivo com a mesma enxurrada).
+- Visto na tela e no log: `MobileSoftwareUpdate`/`Installer Progress` ativos (o macOS parece preparar uma atualização).
+
+### 0022 / 0023: diagnóstico mais fino
+
+- 0022 (nullmoth): batimento a cada 1 s até 10 min (0,5 s no 1º minuto), com `irq=` (interrupções da GPU até agora,
+  para ver uma tempestade) e `iot=` (ms do token mais novo do registro). A trilha só é regravada a cada 10 s depois do
+  1º minuto.
+- 0023 (drm-kmod): eventos de energia da GPU no registro `nullmoth-gpu-io`: `Gu`/`Gp` (GT acorda/estaciona), `Rs`/`Rr`
+  (runtime suspend/resume) e `D<estado>` (estado DC do display).
+
+Build `rt i915 kext`: `NMXGPU 2f1e76300c88d4b1e6d673076eb53b3fabdc811d02fe273800f331d4a53baadc`, 15.250.936 B.
+
+## Próximo: teste 23 (0022 + 0023, mesmo libdrm, `fb=2`)
+
+Depois do travamento: `nvram nullmoth-gpu-beat` e `nvram nullmoth-gpu-io`. Comparar `iot` com `ms` (a GPU estava sendo
+usada na hora?), `irq` (subiu de repente?) e os últimos `Gu`/`Gp`/`D…`.

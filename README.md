@@ -41,6 +41,7 @@ O NVIDIA (RTX 3050) já funciona com o driver original e não é afetado por nad
 | Teste 19: desktop de novo; **o i915 responde ao espaço do usuário** (`drmGetVersion` = i915 1.6.0). O libdrm não acha a GPU (nós clone) e o `GET_PCIINFO` dá ENODEV | ✅ testado no teste 20 |
 | Teste 20: **o libdrm acha a GPU** (`GET_PCIINFO` responde) e o Mac trava logo depois, quando os processos do macOS carregam o ANV | 🔧 `0020`: cada pedido na NVRAM (teste 21) |
 | Teste 21: o ANV conversa com o i915 (centenas de pedidos). O travamento é o RCU do port: `synchronize_rcu` no `close` gira sem interrupções (panic TLB flush timeout) | 🔧 `0021`: RCU com leitores que podem dormir (teste 22) |
+| Teste 22: com 0021, trava aos ~4 min sem panic e sem RCU esperando; o desktop não aparece porque o NMXAccel da Intel recusa as superfícies do WindowServer | 🔧 `0022`/`0023`: batimento de 1 s, interrupções e eventos de energia da GPU (teste 23) |
 | Patches 1 a 5 viram correções no fonte (`source-fixes/0001..0003`) | 🔧 compilado, falta testar |
 | Tela preta com o Mac vivo (sem framebuffer, o i915 desliga o pipe, DC6) | ❌ consequência da ponte |
 | Tela acelerada / Metal na Intel | ❌ ainda não |

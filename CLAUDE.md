@@ -75,7 +75,10 @@ Até 2026-10-15 o trabalho estava no branch `ccr-918d231a-luzxg0` dos dois outro
 
 ## Onde paramos (2026-10-15, depois do teste 5)
 
-**Mais novo (teste 21):** o ANV faz centenas de pedidos ao i915. O travamento é o RCU do port: o `sched_pin` desliga as
+**Mais novo (teste 22):** com 0021, trava aos ~4 min, sem panic e sem RCU esperando, longe dos pedidos do ANV. O
+desktop não aparece porque o NMXAccel da Intel recusa toda superfície do WindowServer (`RM refused 8294400`). 0022/0023 =
+batimento de 1 s com `irq=`/`iot=` e `Gu`/`Gp`/`Rs`/`Rr`/`D…` no registro (teste 23, `2f1e7630…`).
+**Teste 21:** o ANV faz centenas de pedidos ao i915. O travamento é o RCU do port: o `sched_pin` desliga as
 interrupções por CPU, um leitor que dorme muda de CPU, e o `synchronize_rcu` do `close` gira para sempre (panic do teste 20).
 0021 = `override/src/linux_rcu.c` com contadores globais (teste 22, `9a361f0e…`). A v2.1.0 do nullmoth só traz logs.
 **Teste 20:** com o libdrm corrigido, o ANV acha a GPU (`GET_PCIINFO` ok) e o Mac trava ~0,5 s depois.
