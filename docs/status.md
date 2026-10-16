@@ -13,17 +13,17 @@ B works. 60 Hz is not wanted.
 
 - **i915 path (Intel test driver on):** stable desktop on `NMXGPUFB`, 144 Hz, software compositing (~225 % CPU).
   Ghost firmware display hidden by `tools/mirror` (fixed 10-16: it had never run; now `state = running`).
-- **RTX path (Intel test driver off, now installed):** RTX-8 (intelfb-0009, own controller) **ended the freezes**:
-  WindowServer opened NMIntelFB fully, Mac stayed up. But NVAccel only uses head 0 as its framebuffer, so the panel
-  (head 4) was never registered and WindowServer stayed in software. intelfb-0010 publishes it as head 0.
-  Details: [tests/rtx-8-accelerated-desktop.md](tests/rtx-8-accelerated-desktop.md).
-- **Built, not installed:** `NMIntelFB 0d6239e0…`. Installed: `NMIntelFB ca82df9d…` (RTX-8), `NMXGPU 9823079e…`
-  (inactive while the Intel test driver is off). NVRAM `nullmoth-intelfb-delay=45`.
+- **RTX path (Intel test driver off):** RTX-8 ended the freezes (own controller). RTX-9 (head 0): NVAccel registered
+  the panel's pipe, but the restarted WindowServer hung: NVAccel asks its primary framebuffer for RM handles and VRAM,
+  which only NVRMFB answered (and NVRMFB quits with no NVIDIA display). intelfb-0011: NMIntelFB owns an NVKMS device
+  and answers them. Details: [tests/rtx-8-accelerated-desktop.md](tests/rtx-8-accelerated-desktop.md).
+- **Built, not installed:** `NMIntelFB 29893f31…`. Installed: `NMIntelFB 0d6239e0…` (RTX-9). NVRAM
+  `nullmoth-intelfb-delay=45`.
 
 ## Next step
 
-RTX-9: `tools/intelfb/build.sh` output → `tools/intelfb/install.sh`, reboot; after login `enable.sh` (now also
-`nvaccel_iop=1`) + WindowServer restart. Success: `heads_piped` 0x1, `nvaccel_iop_ok_h0` growing, smooth desktop.
+RTX-10: `tools/intelfb/install.sh`, reboot; 1 min after login `enable.sh`, then `killall -9 WindowServer`
+(TERM is ignored). Success: trail `kapi-dev … rmh vram1`, `nvaccel_iop_ok_h0` growing, the desktop back after login.
 
 ## Open problems
 

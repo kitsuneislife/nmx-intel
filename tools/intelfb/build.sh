@@ -14,8 +14,22 @@ for p in "$HERE"/source-fixes/intelfb/intelfb-*.patch; do
   patch -s -d "$W/src" -p1 < "$p"
   echo "patch: $(basename "$p")"
 done
+# intelfb-0011 needs NVKMS's kernel API headers, from NVIDIA's open-gpu-kernel-modules at the tag NVRM is built from
+# (MIT/GPL; fetched once, not versioned here)
+KAPI=$W/kapi-hdr; OGKM_TAG=610.57.04
+if [ ! -s "$KAPI/nvkms-kapi.h" ]; then
+  mkdir -p "$KAPI"
+  for f in nvidia-modeset/kapi/interface/nvkms-kapi.h common/sdk/nvidia/inc/nvtypes.h common/inc/nv_mig_types.h \
+           nvidia/arch/nvalloc/unix/include/nv-gpu-info.h common/unix/common/inc/nv_dpy_id.h \
+           common/unix/common/inc/nv_common_utils.h nvidia-modeset/interface/nvkms-api-types.h \
+           nvidia-modeset/interface/nvkms-format.h common/sdk/nvidia/inc/cpuopsys.h common/sdk/nvidia/inc/nvlimits.h \
+           common/sdk/nvidia/inc/nvmisc.h common/sdk/nvidia/inc/nvstatus.h common/sdk/nvidia/inc/nvstatuscodes.h; do
+    curl -sfL -o "$KAPI/$(basename "$f")" "https://raw.githubusercontent.com/NVIDIA/open-gpu-kernel-modules/$OGKM_TAG/src/$f" \
+      || { echo "could not fetch $f"; rm -f "$KAPI/nvkms-kapi.h"; exit 1; }
+  done
+fi
 SDK=$(xcrun --show-sdk-path); KHDR="$SDK/System/Library/Frameworks/Kernel.framework/Headers"
-xcrun clang++ -arch x86_64 -fapple-kext -mkernel -nostdinc -I"$KHDR" -I"$W/src" \
+xcrun clang++ -arch x86_64 -fapple-kext -mkernel -nostdinc -I"$KHDR" -I"$W/src" -I"$KAPI" \
   -DKERNEL -DKERNEL_PRIVATE -DDRIVER_PRIVATE -DAPPLE -DNeXT -std=c++17 -fno-rtti -fno-exceptions -fno-builtin \
   -fno-common -Wall -Wno-unused-parameter -Wno-inconsistent-missing-override -O2 \
   -c "$W/src/intelfb.cpp" -o "$W/out/intelfb.o"

@@ -47,6 +47,8 @@ Other series:
 - `intelfb-0009` (fix/knob, RTX-8) — own `IOFBDependentID` (`0x4E4D494E00000001`); index 4 at publish (NVAccel's head
   number), index 0 set in `open()` (IOGraphics' `fFbs[]` slot). `nullmoth-intelfb-dep=2` = old NVRM group.
 - `intelfb-0010` (fix/knob, RTX-9) — publish as NVAccel head 0 (its only possible `fFB`); `nullmoth-intelfb-head=4` = RTX-8.
+- `intelfb-0011` (fix/knob, RTX-10) — own NVKMS device; answers `nvRmHandles`, `nvAllocVram`, `nvFreeVram` for NVAccel;
+  `nullmoth-intelfb-kapi=0` turns it off.
 - `source-fixes/libdrm/libdrm-0001` — Darwin node numbers from names (clone nodes). Built by `tools/libdrm/build.sh`.
 - `build/nmx-src-paths.patch` — source paths for building on this Mac (applied by `build/setup.sh`).
 

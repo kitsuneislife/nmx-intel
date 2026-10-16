@@ -1,0 +1,198 @@
+diff -ruN a/intelfb.cpp src/intelfb.cpp
+--- a/intelfb.cpp	2026-10-16 19:35:46
++++ b/intelfb.cpp	2026-10-16 19:35:57
+@@ -15,6 +15,14 @@
+ #include <IOKit/graphics/IOFramebuffer.h>
+ #include <libkern/OSAtomic.h>
+ #include "nvrm_vram_abi.h"
++// intelfb-0011: NVKMS's kernel API (open-gpu-kernel-modules 610.57.04 headers, fetched by tools/intelfb/build.sh) and
++// the RM-handles call NVAccel makes to its primary framebuffer (same ABI as kexts/NVRM/nvrm_gpuva_abi.h)
++extern "C" {
++#include "nvkms-kapi.h"
++}
++#define NVRM_GPUVA_ABI_VERSION 1u
++#define NVRM_GPUVA_FN_HANDLES  "nvRmHandles"
++struct NVRMRmHandles { unsigned int version; void *kapiDevice; unsigned int hClient, hDevice, hSubDevice; };
+ #include <IOKit/IOBufferMemoryDescriptor.h>
+ #include <IOKit/IOTimerEventSource.h>
+ #include <IOKit/IOWorkLoop.h>
+@@ -198,7 +206,19 @@
+     // it (RTX-5: vbl=2, the heartbeat stopped at 21 s, then the Mac froze)
+     uint64_t fVblNext = 0, fVblCalls = 0;
+     volatile bool fStopping = false, fVblOn = false, fVblRunning = false;
+-    bool fOwnGroup = false;   // intelfb-0009: own IOFBDependentID, index 4 for NVAccel until open(), 0 for IOGraphics after
++    bool fOwnGroup = false;
++    // intelfb-0011: as head 0 this panel is NVAccel's primary framebuffer, which NVAccel asks for RM handles and VRAM
++    // (NVRMFB answers on a machine with an NVIDIA display; here no NVRMFB starts). An NVKMS device of our own answers.
++    struct NvKmsKapiFunctionsTable *fKms = nullptr;
++    struct NvKmsKapiDevice *fDev = nullptr;
++    NvU64 (*fPhysForVa)(const void *) = nullptr;
++    uint64_t fVramBudget = 0, fVramBytes = 0, fVramCookie = 0;
++    unsigned fVramLogged = 0;
++    IOLock *fVramLock = nullptr;
++    void kapiInit();
++    void kapiFree();
++    IOReturn vramGrant(NVRMVramRequest *r);
++    IOReturn vramRelease(NVRMVramRequest *r);   // intelfb-0009: own IOFBDependentID, index 4 for NVAccel until open(), 0 for IOGraphics after
+     static void vblThread(void *p0, wait_result_t) {
+         NMIntelFB *me = (NMIntelFB *)p0;
+         uint64_t period; nanoseconds_to_absolutetime(me->fFrameNs, &period);
+@@ -545,6 +565,7 @@
+     setProperty("built-in", kOSBooleanTrue);   // the panel is the laptop's own (kConnectionFlags says so too)
+     armVbl();
+     ifb_trail("vbl");
++    if (fOwnGroup && ifb_knob("nullmoth-intelfb-head", 0) != 4) kapiInit();
+     // nmx-intel: nullmoth-intelfb-pm=0 leaves power management out (RTX-2 hung inside this call)
+     if (ifb_knob("nullmoth-intelfb-pm", 1)) {
+         ifb_trail("pm");
+@@ -565,10 +586,128 @@
+     fVblOn = false;
+     thread_wakeup((event_t)&fVblNext);
+     while (fVblRunning) IOSleep(5);
++    kapiFree();
+     OSSafeReleaseNULL(fSurfMap); OSSafeReleaseNULL(fMMIO); fRegs = nullptr;
+     IOFramebuffer::stop(provider);
+ }
+ 
++// intelfb-0011. The table of VRAM blocks handed to NVAccel (one NMIntelFB per machine).
++struct IfbVram { struct NvKmsKapiMemory *m; void *k; uint64_t n, cookie; };
++static IfbVram gIfbVram[2048];
++
++static void ifb_kapi_event(const struct NvKmsKapiEvent *) {}
++
++// The NVRMDisplay nubs NVRM publishes carry the NVKMS function table, the GPU id and RM's VA-to-physical lookup
++// (what NVRMFB starts from). Ownership is not grabbed: it is for mode sets, and NVRMFB may still hold it.
++void NMIntelFB::kapiInit()
++{
++    if (!ifb_knob("nullmoth-intelfb-kapi", 1)) { ifb_trail("kapi-off"); return; }
++    fVramLock = IOLockAlloc();
++    OSDictionary *m = IOService::serviceMatching("NVRMDisplay");
++    IOService *nub = m ? IOService::waitForMatchingService(m, 20ull * NSEC_PER_SEC) : nullptr;
++    OSSafeReleaseNULL(m);
++    if (!nub || !fVramLock) { ifb_trail("kapi-none"); IFBLOG("kapi: no NVRMDisplay nub - NVAccel gets no VRAM from this panel"); OSSafeReleaseNULL(nub); return; }
++    OSNumber *k = OSDynamicCast(OSNumber, nub->getProperty("nvkms-kapi"));
++    OSNumber *g = OSDynamicCast(OSNumber, nub->getProperty("gpu-id"));
++    OSNumber *pv = OSDynamicCast(OSNumber, nub->getProperty("phys-for-va"));
++    fKms = k ? (struct NvKmsKapiFunctionsTable *)(uintptr_t)k->unsigned64BitValue() : nullptr;
++    fPhysForVa = pv ? (NvU64 (*)(const void *))(uintptr_t)pv->unsigned64BitValue() : nullptr;
++    uint64_t bar = 0;
++    IOService *rm = nub->getProvider();
++    if (IOPCIDevice *pci = rm ? OSDynamicCast(IOPCIDevice, rm->getProvider()) : nullptr)
++        if (IODeviceMemory *b1 = pci->getDeviceMemoryWithRegister(kIOPCIConfigBaseAddress1)) bar = b1->getLength();
++    // NVRMFB's budget (nvrmVramBudget): half of a resizable BAR1, three quarters of a smaller one
++    fVramBudget = bar >= (4ull << 30) ? bar / 2 : bar / 4 * 3;
++    if (!fKms || !g || !fPhysForVa || !fKms->allocateDevice || !fVramBudget) {
++        ifb_trail("kapi-none"); IFBLOG("kapi: nub lacks nvkms-kapi/gpu-id/phys-for-va or BAR1 (%llu)", bar); nub->release(); return;
++    }
++    struct NvKmsKapiAllocateDeviceParams ap = {};
++    ap.gpuId = g->unsigned32BitValue(); ap.privateData = this; ap.eventCallback = ifb_kapi_event;
++    nub->release();
++    fDev = fKms->allocateDevice(&ap);
++    ifb_trail(fDev ? "kapi-dev" : "kapi-fail");
++    IFBLOG("kapi: allocateDevice(gpu 0x%x) -> %p, VRAM budget %llu MB of BAR1 %llu MB", ap.gpuId, fDev,
++           fVramBudget >> 20, bar >> 20);
++}
++
++void NMIntelFB::kapiFree()
++{
++    if (!fKms || !fDev) return;
++    IOLockLock(fVramLock);
++    for (IfbVram &e : gIfbVram) {
++        if (!e.m) continue;
++        fKms->unmapMemory(fDev, e.m, NVKMS_KAPI_MAPPING_TYPE_KERNEL, e.k);
++        fKms->freeMemory(fDev, e.m);
++        e = {};
++    }
++    fKms->freeDevice(fDev); fDev = nullptr; fVramBytes = 0;
++    IOLockUnlock(fVramLock);
++}
++
++// NVRMFB's vramGrant without its NVIDIA-display parts (no NVIDIA scanout or console to keep clear of here)
++IOReturn NMIntelFB::vramGrant(NVRMVramRequest *r)
++{
++    r->phys = 0; r->kva = nullptr; r->handle = nullptr; r->actualSize = 0; r->mappedTotal = 0;
++    if (!fKms || !fDev) return kIOReturnNotReady;
++    const NvU64 want = (r->size + 0xFFFFull) & ~0xFFFFull;
++    if (!want) return kIOReturnBadArgument;
++    IOLockLock(fVramLock);
++    IfbVram *slot = nullptr;
++    for (IfbVram &e : gIfbVram) if (!e.m) { slot = &e; break; }
++    if (!slot || fVramBytes + want > fVramBudget) {
++        IOLockUnlock(fVramLock);
++        IFBLOG("nvAllocVram(%llu): refused (%s, %llu of %llu bytes)", want, slot ? "budget" : "table full", fVramBytes, fVramBudget);
++        return kIOReturnNoMemory;
++    }
++    struct NvKmsKapiAllocateMemoryParams mp = {};
++    NvU8 compressible = 0;
++    mp.layout = NvKmsSurfaceMemoryLayoutPitch; mp.type = NVKMS_KAPI_ALLOCATION_TYPE_SCANOUT;
++    mp.size = want; mp.useVideoMemory = NV_TRUE; mp.compressible = &compressible;
++    struct NvKmsKapiMemory *m = fKms->allocateMemory(fDev, &mp);
++    void *k = nullptr;
++    NvU64 p = 0;
++    if (m && fKms->mapMemory(fDev, m, NVKMS_KAPI_MAPPING_TYPE_KERNEL, &k) && k) p = fPhysForVa(k);
++    bool live = false;
++    if (p) {
++        bzero(k, (size_t)want);
++        volatile NvU64 *q = (volatile NvU64 *)k;
++        q[0] = 0x5A5AA5A5C0FFEE01ull; live = q[0] == 0x5A5AA5A5C0FFEE01ull; q[0] = 0;
++    }
++    if (!live) {
++        if (k) fKms->unmapMemory(fDev, m, NVKMS_KAPI_MAPPING_TYPE_KERNEL, k);
++        if (m) fKms->freeMemory(fDev, m);
++        IOLockUnlock(fVramLock);
++        IFBLOG("nvAllocVram(%llu): %s", want, !m ? "allocateMemory failed" : !k ? "mapMemory failed" : !p ? "no physical address" : "the mapping is not live");
++        return kIOReturnNoMemory;
++    }
++    *slot = { m, k, want, ++fVramCookie };
++    fVramBytes += want;
++    r->handle = m; r->kva = k; r->phys = p; r->actualSize = want; r->mappedTotal = fVramBytes;
++    r->allocationCookie = slot->cookie;
++    IOLockUnlock(fVramLock);
++    if (fVramLogged < 16) { fVramLogged++; IFBLOG("nvAllocVram: %llu bytes VRAM, phys 0x%llx (%llu MB in use)", want, p, fVramBytes >> 20); }
++    if (fVramLogged == 1) ifb_trail("vram1");
++    return kIOReturnSuccess;
++}
++
++IOReturn NMIntelFB::vramRelease(NVRMVramRequest *r)
++{
++    if (!fKms || !fDev || !r->handle) return kIOReturnBadArgument;
++    IOLockLock(fVramLock);
++    for (IfbVram &e : gIfbVram) {
++        if (e.m != r->handle || e.cookie != r->allocationCookie) continue;
++        fKms->unmapMemory(fDev, e.m, NVKMS_KAPI_MAPPING_TYPE_KERNEL, e.k);
++        fKms->freeMemory(fDev, e.m);
++        fVramBytes -= e.n;
++        e = {};
++        IOLockUnlock(fVramLock);
++        r->handle = nullptr; r->kva = nullptr; r->phys = 0; r->actualSize = 0; r->allocationCookie = 0;
++        return kIOReturnSuccess;
++    }
++    IOLockUnlock(fVramLock);
++    return kIOReturnBadArgument;
++}
++
+ IODeviceMemory *NMIntelFB::getApertureRange(IOPixelAperture aperture)
+ {
+     IFB_ONCE("apr");
+@@ -629,6 +768,21 @@
+         r->phys = 0; r->actualSize = 0;
+         r->width = fWidth; r->height = fHeight; r->pitch = fRowBytes;
+         return kIOReturnSuccess;
++    }
++    // intelfb-0011: what NVAccel asks its primary framebuffer for, answered from our NVKMS device
++    if (fn && fn->isEqualTo(NVRM_GPUVA_FN_HANDLES)) {
++        NVRMRmHandles *h = (NVRMRmHandles *)p1;
++        if (!h || h->version != NVRM_GPUVA_ABI_VERSION) return kIOReturnBadArgument;
++        if (!fDev) return kIOReturnNotReady;
++        IFB_ONCE("rmh");
++        h->kapiDevice = fDev; h->hClient = 0; h->hDevice = 0; h->hSubDevice = 0;
++        return kIOReturnSuccess;
++    }
++    const bool alloc = fn && fn->isEqualTo(NVRM_VRAM_FN_ALLOC), release = fn && fn->isEqualTo(NVRM_VRAM_FN_FREE);
++    if (alloc || release) {
++        NVRMVramRequest *r = (NVRMVramRequest *)p1;
++        if (!r || r->version != NVRM_VRAM_ABI_VERSION) return kIOReturnBadArgument;
++        return alloc ? vramGrant(r) : vramRelease(r);
+     }
+     return IOFramebuffer::callPlatformFunction(fn, wait, p1, p2, p3, p4);
+ }

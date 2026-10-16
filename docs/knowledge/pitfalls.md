@@ -29,6 +29,14 @@
   NVRM's auto-go arms `nvaccelfb` and `nvaccel_iop` only when heads publish within ~20 s. Fix: NMIntelFB publishes as
   head 0 (intelfb-0010) and `enable.sh` writes `nvaccel_iop=1`.
 
+### NVAccel's primary framebuffer must own an NVKMS device
+- [measured, RTX-9] WindowServer on NVAccel needs `fFB` to answer `nvRmHandles` and `nvAllocVram`; without them
+  `NVTask::allocate: RM refused 8294400 bytes` and WindowServer hangs (screen stays on the `-v` console). Fix:
+  intelfb-0011.
+
+### `killall WindowServer` (TERM) is ignored; `killall -9` restarts it
+- [measured, RTX-9] TERM left the same pid running; `-9` relaunched it (loginwindow + LaunchAgents came back).
+
 ### `ioreg -c Class -d1` finds nothing below the root; `log` in zsh is a builtin
 - Use `ioreg -r -c Class -d1`. In scripts run by zsh, call `/usr/bin/log show` (the builtin says "too many arguments").
 

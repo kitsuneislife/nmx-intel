@@ -47,7 +47,8 @@ phase file; open only the row you need.
 | 31 | 10-16 | `c1445517` | 0031 no VBL | same glitches; aperture reads 2.6 MB/s | [25-32](25-32-framebuffer.md) |
 | 32 | 10-16 | `9823079e` | 0032 shadow fb | stale 2nd WS display; **mirror → no glitches** | [25-32](25-32-framebuffer.md) |
 | RTX-8 | 10-16 | `ca82df9d` | intelfb-0009 own controller | **no freeze**, full `open`, `alive`; NVAccel never registers head 4 | [rtx-8](rtx-8-accelerated-desktop.md) |
-| RTX-9 | 10-16 | `0d6239e0` | intelfb-0010 publish as head 0; `enable.sh` +iop | pending | [rtx-8](rtx-8-accelerated-desktop.md) |
+| RTX-9 | 10-16 | `0d6239e0` | intelfb-0010 publish as head 0; `enable.sh` +iop | pipe registered; new WS hangs: no RM handles/VRAM | [rtx-8](rtx-8-accelerated-desktop.md) |
+| RTX-10 | 10-16 | `29893f31` | intelfb-0011 own NVKMS device answers NVAccel | pending | [rtx-8](rtx-8-accelerated-desktop.md) |
 
 Adding a test: one row here, the entry at the end of the current phase file (start a new phase file when the goal
 changes), then [../status.md](../status.md).
