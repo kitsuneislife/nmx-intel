@@ -1,0 +1,154 @@
+diff --git a/gpu-port/xkpi/bsdcompat/include/nmx_xnu.h b/gpu-port/xkpi/bsdcompat/include/nmx_xnu.h
+index 394e4b3..036a166 100644
+--- a/gpu-port/xkpi/bsdcompat/include/nmx_xnu.h
++++ b/gpu-port/xkpi/bsdcompat/include/nmx_xnu.h
+@@ -172,6 +172,8 @@ int nmx_xnu_boot_fb(uint64_t *phys, uint32_t *width, uint32_t *height, uint32_t
+  * last step reached survives a freeze that loses the log (`nvram nullmoth-gpu-trail` on the next boot)
+  */
+ void nmx_xnu_trail(const char *step);
++/* xnu/nmx_devfs.cpp: device node opens, ioctls so far, ioctls running now and the last ioctl command */
++void nmx_xnu_node_stats(int *opens, int *ioctls, int *inside, uint32_t *last_cmd);
+ 
+ /* implemented on the LinuxKPI side (override/src/nmx_linux_cdev.c), called by the device-node glue */
+ int nmx_cdev_open(void *cookie, int open_id, int fflags);
+diff --git a/gpu-port/xkpi/override/i915/nmx_i915_fb.c b/gpu-port/xkpi/override/i915/nmx_i915_fb.c
+index 5bce373..38c5b8c 100644
+--- a/gpu-port/xkpi/override/i915/nmx_i915_fb.c
++++ b/gpu-port/xkpi/override/i915/nmx_i915_fb.c
+@@ -26,6 +26,7 @@
+ #include "gem/i915_gem_stolen.h"
+ #include "gt/intel_gt.h"
+ #include "i915_drv.h"
++#include "i915_gem.h"
+ #include "i915_gem_gtt.h"
+ #include "i915_vma.h"
+ #include "display/intel_display_types.h"
+@@ -143,6 +144,12 @@ static struct i915_vma *take_boot_fb(struct drm_i915_private *i915, u32 base, u3
+         }
+     off = dma - mem->region.start;
+ 
++    /*
++     * intel_plane_initial.c creates this same stolen object for the BIOS framebuffer and drops it when it cannot pin
++     * it in the held range. Its pages go back to the stolen allocator only when the freed objects are reaped (a
++     * worker after an RCU grace period), so reap them first.
++     */
++    i915_gem_drain_freed_objects(i915);
+     obj = i915_gem_object_create_region_at(mem, off, size, I915_BO_ALLOC_USER | I915_BO_PREALLOC);
+     if (IS_ERR(obj)) {
+         printf("NullMoth display: stolen 0x%llx+0x%x is taken (%ld)\n", (unsigned long long)off, size,
+diff --git a/gpu-port/xkpi/xnu/nmx_devfs.cpp b/gpu-port/xkpi/xnu/nmx_devfs.cpp
+index 89fe9a9..8c2db46 100644
+--- a/gpu-port/xkpi/xnu/nmx_devfs.cpp
++++ b/gpu-port/xkpi/xnu/nmx_devfs.cpp
+@@ -82,12 +82,25 @@ static void *cookie_for_open(int m, int *node_out)
+ 
+ /* ---- entry points ------------------------------------------------------------------------------------------------- */
+ 
++/* for the heartbeat in nmx_kext.cpp: what user space (Metal, through Mesa) has asked of the GPU so far */
++static volatile SInt32 g_opens, g_ioctls, g_in_ioctl;
++static volatile UInt32 g_last_cmd;
++
++extern "C" void nmx_xnu_node_stats(int *opens, int *ioctls, int *inside, uint32_t *last_cmd)
++{
++    *opens = g_opens;
++    *ioctls = g_ioctls;
++    *inside = g_in_ioctl;
++    *last_cmd = g_last_cmd;
++}
++
+ static int nmx_open(dev_t dev, int flags, int devtype, struct proc *p)
+ {
+     int m = minor(dev);
+     void *cookie = cookie_for_open(m, nullptr);
+     if (cookie == nullptr)
+         return ENXIO;
++    OSIncrementAtomic(&g_opens);
+     int err = nmx_cdev_open(cookie, m, flags);
+     if (err) {
+         IOLockLock(g_lock);
+@@ -110,7 +123,12 @@ static int nmx_close(dev_t dev, int flags, int devtype, struct proc *p)
+ 
+ static int nmx_ioctl(dev_t dev, u_long cmd, caddr_t data, int fflag, struct proc *p)
+ {
+-    return nmx_cdev_ioctl(minor(dev), cmd, data, fflag);
++    OSIncrementAtomic(&g_ioctls);
++    OSIncrementAtomic(&g_in_ioctl);
++    g_last_cmd = (UInt32)cmd;
++    int err = nmx_cdev_ioctl(minor(dev), cmd, data, fflag);
++    OSDecrementAtomic(&g_in_ioctl);
++    return err;
+ }
+ 
+ /*
+diff --git a/gpu-port/xkpi/xnu/nmx_kext.cpp b/gpu-port/xkpi/xnu/nmx_kext.cpp
+index e9ef2d2..affd2f6 100644
+--- a/gpu-port/xkpi/xnu/nmx_kext.cpp
++++ b/gpu-port/xkpi/xnu/nmx_kext.cpp
+@@ -226,6 +226,49 @@ extern "C" void nmx_xnu_trail(const char *step)
+     IOLockUnlock(gTrailLock);
+ }
+ 
++/*
++ * After the attach: every 2 s for 5 min, "nullmoth-gpu-beat" = seconds since the outputs were published, plus what
++ * user space has asked of the GPU (opens, ioctls, ioctls in flight, last command). A boot that freezes leaves the
++ * last beat in NVRAM, so the next boot shows how long the Mac lived and whether Metal was in the GPU at the time.
++ */
++static const char *const kBeat = "nullmoth-gpu-beat";
++
++static void nmx_beat_write(const char *s)
++{
++    IODTNVRAM *n = nmx_nvram();
++    if (n == nullptr)
++        return;
++    const OSSymbol *k = OSSymbol::withCString(kBeat);
++    if (k != nullptr) {
++        if (s != nullptr) {
++            OSData *d = OSData::withBytes(s, (unsigned)strlen(s));
++            if (d != nullptr) {
++                n->setProperty(k, d);
++                d->release();
++            }
++        } else {
++            n->removeProperty(k);
++        }
++        k->release();
++    }
++    n->sync();
++    n->release();
++}
++
++static void nmx_beat_thread(void *, wait_result_t)
++{
++    char s[96];
++    for (int t = 2; t <= 300; t += 2) {
++        IOSleep(2000);
++        int opens, ioctls, inside;
++        uint32_t cmd;
++        nmx_xnu_node_stats(&opens, &ioctls, &inside, &cmd);
++        snprintf(s, sizeof(s), "t=%d open=%d ioctl=%d in=%d cmd=0x%x", t, opens, ioctls, inside, cmd);
++        nmx_beat_write(s);
++    }
++    thread_terminate(current_thread());
++}
++
+ void NMXGPU::attachNow()
+ {
+     int err = nmx_xnu_wait_firmware_root(300);
+@@ -247,6 +290,7 @@ void NMXGPU::attachNow()
+         gTrailLock = IOLockAlloc();
+     gTrail[0] = 0;
+     gTrailWrites = 0;
++    nmx_beat_write(nullptr);
+     nmx_xnu_trail("attach");
+     dev_ = nmx_port_attach(pci_);
+     nmx_xnu_trail(dev_ ? "attached" : "no-driver");
+@@ -276,6 +320,9 @@ void NMXGPU::attachNow()
+     fb_ = nmx_fb_publish(this, dev_);
+     nmx_xnu_trail(fb_ ? "published" : "no-fb");
+     nmx_marker_write(false);
++    thread_t beat;
++    if (kernel_thread_start(nmx_beat_thread, nullptr, &beat) == KERN_SUCCESS)
++        thread_deallocate(beat);
+     IOLog("NullMoth GPU: driving %04x:%04x\n", pci_->configRead16(kIOPCIConfigVendorID),
+           pci_->configRead16(kIOPCIConfigDeviceID));
+     OSSynchronizeIO();

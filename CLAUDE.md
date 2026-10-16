@@ -75,7 +75,7 @@ Até 2026-10-15 o trabalho estava no branch `ccr-918d231a-luzxg0` dos dois outro
 
 ## Onde paramos (2026-10-15, depois do teste 5)
 
-**Mais novo (teste 11):** o NMXGPU é compilado no Mac (`build/`), com `source-fixes/0001..0011`. A trilha na NVRAM
+**Mais novo (teste 11):** o NMXGPU é compilado no Mac (`build/`), com `source-fixes/0001..0012`. A trilha na NVRAM
 (`nvram nullmoth-gpu-trail`) mostrou que **o attach inteiro termina** (`published`, a marca de attach é apagada) e que o
 Mac congela depois, antes do macOS usar o nosso framebuffer (sem `fb-vram`/`fb-setmode`). A tomada do fb do GOP cai em
 `tk-obj` (a faixa da stolen já tem dono). Próximo: teste 12, com batimento e trilha depois do attach (ver o fim do `LOG.md`).

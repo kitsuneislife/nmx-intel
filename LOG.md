@@ -587,3 +587,20 @@ Suspeitos para o congelamento, depois do attach e antes do WindowServer:
 Trilha depois de `published`: um batimento numa variável separada (para saber quanto tempo o Mac vive depois do
 attach) e passos no NMXAccel e nos workers do i915. E, para a tomada, esvaziar os objetos liberados
 (`i915_gem_drain_freed_objects`) antes de criar o objeto na stolen.
+
+### 0012: batimento depois do attach e a tomada com os objetos liberados reaproveitados
+
+- `nullmoth-gpu-beat` na NVRAM, a cada 2 s por 5 min depois de `published`:
+  `t=<s> open=<aberturas do nó DRM> ioctl=<ioctls> in=<ioctls em andamento> cmd=<último ioctl>`. O último
+  valor gravado mostra quanto tempo o Mac viveu depois do attach e se o Metal (Mesa/ANV pelo NMXAccel) estava
+  dentro do i915 na hora (`in=1`).
+- `take_boot_fb` chama `i915_gem_drain_freed_objects` antes de `i915_gem_object_create_region_at`. O
+  `initial_plane_vma` cria o mesmo objeto na stolen e o solta quando o pin esbarra na nossa faixa segurada, mas a
+  liberação é adiada.
+
+Build sem debug: `NMXGPU 821d791cbe95f6ac754870eaee4b6124f440910e4991eafede018e68d0f1253a`, 15.245.696 B.
+
+## Próximo: teste 12 (0012)
+
+O mesmo procedimento. Depois do congelamento, bootar com `-nvoff` e ler `nvram nullmoth-gpu-trail` e
+`nvram nullmoth-gpu-beat`.
