@@ -13,21 +13,20 @@ B works. 60 Hz is not wanted.
 
 - **i915 path (Intel test driver on):** stable desktop on `NMXGPUFB`, 144 Hz, software compositing (~225 % CPU).
   Ghost firmware display hidden by `tools/mirror` (fixed 10-16: it had never run; now `state = running`).
-- **RTX path (Intel test driver off):** RTX-8 ended the freezes (own controller); RTX-9 registered the panel as
-  NVAccel head 0; RTX-10 (own NVKMS device) got **WindowServer running on the RTX's Metal** with VRAM mapped, but no
-  frame reached the panel: the panel's VBL never fired. intelfb-0012 makes it fire always (as NVRMFB) and fixes the
-  BAR1 budget. Details: [tests/rtx-8-accelerated-desktop.md](tests/rtx-8-accelerated-desktop.md).
-- **Built, not installed:** `NMIntelFB c07eb921…`. Installed: `NMIntelFB 29893f31…` (RTX-10). NVRAM
+- **RTX path (Intel test driver off):** RTX-8 ended the freezes; RTX-9 registered the panel as NVAccel head 0;
+  RTX-10 got **WindowServer on the RTX's Metal** with VRAM mapped; RTX-11 made the VBL fire. Still no frame: CoreDisplay
+  saw the panel on the Intel GPU, which has no display pipe. intelfb-0013 moves NMIntelFB under NVRM (claim + nub).
+  Details: [tests/rtx-8-accelerated-desktop.md](tests/rtx-8-accelerated-desktop.md).
+- **Built, not installed:** `NMIntelFB b230f46f…`. Installed: `NMIntelFB c07eb921…` (RTX-11). NVRAM
   `nullmoth-intelfb-delay=45`.
 
 ## Next step
 
-RTX-11: `tools/intelfb/install.sh`, reboot; 1 min after login `enable.sh`, then `killall -9 WindowServer`.
-Success: trail `vbl-always … vbl1`, `nvaccel_iop_ok_h0` growing, the login screen back. If not: IG/DG ownership
-(GPUWrangler puts NMIntelFB on the Intel GPU; nullmoth's virtual build nests it under NVRM).
+RTX-12: `tools/intelfb/install.sh`, reboot; 1 min after login `enable.sh`, then `killall -9 WindowServer`.
+Success: GPUWrangler lists `fb0:0 /NMIntelFB` under the DG GPU, `nvaccel_iop_ok_h0` growing, the login screen back.
 
 ## Open problems
 
-1. RTX-11 result (frames copied? CPU copy cost BAR1 → Intel aperture at 144 Hz).
+1. RTX-12 result (frames copied? CPU copy cost BAR1 → Intel aperture at 144 Hz).
 2. Making it automatic at boot (drop the delay so NVRM's auto-go arms it) once it works.
 3. Proper ghost fix (WindowServer never adopting `.Display_boot`) still open; mirror covers both paths.

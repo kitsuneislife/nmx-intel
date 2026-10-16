@@ -51,6 +51,8 @@ Other series:
   `nullmoth-intelfb-kapi=0` turns it off.
 - `intelfb-0012` (fix/knob, RTX-11) — VBL always fires once registered (`nullmoth-intelfb-vbl=0` = old); BAR1 size as
   NVRMFB measures it.
+- `intelfb-0013` (fix/knob, RTX-12) — `NMIntelFBClaim` holds GFX0 and publishes an Intel-panel `NVRMDisplay` nub under
+  NVRM; NMIntelFB runs on it (`nullmoth-intelfb-nvparent=0` = on GFX0).
 - `source-fixes/libdrm/libdrm-0001` — Darwin node numbers from names (clone nodes). Built by `tools/libdrm/build.sh`.
 - `build/nmx-src-paths.patch` — source paths for building on this Mac (applied by `build/setup.sh`).
 

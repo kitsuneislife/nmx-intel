@@ -1,0 +1,169 @@
+diff -ruN a/Info.plist src/Info.plist
+--- a/Info.plist	2026-10-16 20:03:37
++++ b/Info.plist	2026-10-16 20:03:38
+@@ -9,6 +9,22 @@
+   <key>CFBundleShortVersionString</key><string>0.1</string>
+   <key>CFBundleInfoDictionaryVersion</key><string>6.0</string>
+   <key>IOKitPersonalities</key><dict>
++    <key>NMIntelFBClaim</key><dict>
++      <key>CFBundleIdentifier</key><string>com.nullmoth.NMIntelFB</string>
++      <key>IOClass</key><string>NMIntelFBClaim</string>
++      <key>IOProviderClass</key><string>IOPCIDevice</string>
++      <key>IOPCIMatch</key><string>0x00008086&amp;0x0000ffff</string>
++      <key>IOPCIClassMatch</key><string>0x03000000&amp;0xff000000</string>
++      <key>IOProbeScore</key><integer>61000</integer>
++      <key>IOMatchCategory</key><string>IOFramebuffer</string>
++    </dict>
++    <key>NMIntelFBPanel</key><dict>
++      <key>CFBundleIdentifier</key><string>com.nullmoth.NMIntelFB</string>
++      <key>IOClass</key><string>NMIntelFB</string>
++      <key>IOProviderClass</key><string>NVRMDisplay</string>
++      <key>IOPropertyMatch</key><dict><key>nm-intel-panel</key><true/></dict>
++      <key>IOProbeScore</key><integer>60000</integer>
++    </dict>
+     <key>NMIntelFB</key><dict>
+       <key>CFBundleIdentifier</key><string>com.nullmoth.NMIntelFB</string>
+       <key>IOClass</key><string>NMIntelFB</string>
+diff -ruN a/intelfb.cpp src/intelfb.cpp
+--- a/intelfb.cpp	2026-10-16 20:03:37
++++ b/intelfb.cpp	2026-10-16 20:03:38
+@@ -403,6 +403,10 @@
+             nmintelfb_sample_sysctl, "A", "64 pixels of the virtual panel: non-black and varied counts");
+ #endif
+ 
++// intelfb-0013: the Intel GPU whose panel this driver shows, kept by NMIntelFBClaim when the framebuffer sits under NVRM
++static IOPCIDevice *gIfbPCI = nullptr;
++static bool ifb_pci_ok(IOPCIDevice *pci, uint8_t *ver);
++
+ IOService *NMIntelFB::probe(IOService *provider, SInt32 *score)
+ {
+ #ifdef NMINTELFB_VIRTUAL
+@@ -411,24 +415,36 @@
+     // machine with no Intel GPU (frames composited on the NVIDIA card must arrive in this buffer)
+     fVer = 0xFF; return IOFramebuffer::probe(provider, score);
+ #endif
++    // intelfb-0013: the Intel-panel nub NMIntelFBClaim publishes under NVRM (the PCI checks ran in the claim's probe)
++    if (provider->getProperty("nm-intel-panel") && gIfbPCI) {
++        fVer = displayVersion(gIfbPCI->configRead16(kIOPCIConfigDeviceID));
++        return fVer ? IOFramebuffer::probe(provider, score) : nullptr;
++    }
+     IOPCIDevice *pci = OSDynamicCast(IOPCIDevice, provider);
+     if (!pci) return nullptr;
+-    if (PE_parse_boot_argn("-nmintelfboff", nullptr, 0)) { IFBLOG("off by boot-arg"); return nullptr; }
++    return ifb_pci_ok(pci, &fVer) ? IOFramebuffer::probe(provider, score) : nullptr;
++}
++
++// The checks that decide whether this driver takes the Intel panel at all (NMIntelFB's own probe before intelfb-0013)
++static bool ifb_pci_ok(IOPCIDevice *pci, uint8_t *ver)
++{
++    uint8_t &fVer = *ver;
++    if (PE_parse_boot_argn("-nmintelfboff", nullptr, 0)) { IFBLOG("off by boot-arg"); return false; }
+     // nmx-intel: "Start once without NVIDIA driver" (-nvoff) also leaves the panel to the firmware framebuffer, so a
+     // hang never needs the Recovery; and with the AMD/Intel test driver on (nmxintel=1) i915 owns this GPU's display
+-    if (PE_parse_boot_argn("-nvoff", nullptr, 0)) { IFBLOG("off: -nvoff"); return nullptr; }
+-    { uint32_t nmx = 0; if (PE_parse_boot_argn("nmxintel", &nmx, sizeof nmx) && nmx) { IFBLOG("off: nmxintel=1 (NMXGPU drives this GPU)"); return nullptr; } }
++    if (PE_parse_boot_argn("-nvoff", nullptr, 0)) { IFBLOG("off: -nvoff"); return false; }
++    { uint32_t nmx = 0; if (PE_parse_boot_argn("nmxintel", &nmx, sizeof nmx) && nmx) { IFBLOG("off: nmxintel=1 (NMXGPU drives this GPU)"); return false; } }
+     uint16_t dev = pci->configRead16(kIOPCIConfigDeviceID);
+     fVer = displayVersion(dev);
+-    if (!fVer) return nullptr;   // an Intel GPU this driver does not know (older ones have Apple's own driver)
++    if (!fVer) return false;   // an Intel GPU this driver does not know (older ones have Apple's own driver)
+     if (ifb_nv_has("nullmoth-intelfb-attaching")) {
+         IFBLOG("the last start never returned (boot guard) - leaving the firmware screen; sudo nvram -d nullmoth-intelfb-attaching");
+         ifb_nv_set("nullmoth-intelfb-trail", "guard: the last start never returned");
+-        return nullptr;
++        return false;
+     }
+-    if (ifb_knob("nullmoth-intelfb", 1) == 0) { IFBLOG("off: nullmoth-intelfb=0"); return nullptr; }
++    if (ifb_knob("nullmoth-intelfb", 1) == 0) { IFBLOG("off: nullmoth-intelfb=0"); return false; }
+     IFBLOG("8086:%04x display version %u", dev, fVer);
+-    return IOFramebuffer::probe(provider, score);
++    return true;
+ }
+ 
+ bool NMIntelFB::adoptFirmwareMode()
+@@ -528,6 +544,7 @@
+ bool NMIntelFB::startReal(IOService *provider)
+ {
+     fPCI = OSDynamicCast(IOPCIDevice, provider);
++    if (!fPCI) fPCI = gIfbPCI;   // intelfb-0013: under NVRM, the Intel GPU the claim holds
+     if (!fPCI) return false;
+     fPCI->setMemoryEnable(true);
+     fMMIO = fPCI->mapDeviceMemoryWithRegister(kIOPCIConfigBaseAddress0);
+@@ -793,6 +810,76 @@
+         return alloc ? vramGrant(r) : vramRelease(r);
+     }
+     return IOFramebuffer::callPlatformFunction(fn, wait, p1, p2, p3, p4);
++}
++
++// intelfb-0013. CoreDisplay pairs a framebuffer with the GPU above it in the registry: under the Intel GPU the panel
++// had no display pipe ("System set to use IOP but no display pipes are present", RTX-11) while NVAccel's pipes sat on
++// the NVIDIA GPU with no framebuffer. NMIntelFBClaim holds the Intel GPU's framebuffer match category (so no
++// IONDRVFramebuffer takes it, as NVRMFBClaim does on the NVIDIA GPU) and publishes an NVRMDisplay nub marked as the
++// Intel panel under NVRM; NMIntelFB starts on that nub, as in nullmoth's virtual build, and drives the Intel GPU from
++// gIfbPCI. nullmoth-intelfb-nvparent=0: no claim, NMIntelFB on the Intel GPU as before.
++class NMIntelFBClaim : public IOService {
++    OSDeclareDefaultStructors(NMIntelFBClaim)
++public:
++    IOService *probe(IOService *provider, SInt32 *score) override;
++    bool start(IOService *provider) override;
++    static void publishThread(void *, wait_result_t);
++};
++OSDefineMetaClassAndStructors(NMIntelFBClaim, IOService)
++
++IOService *NMIntelFBClaim::probe(IOService *provider, SInt32 *score)
++{
++    IOPCIDevice *pci = OSDynamicCast(IOPCIDevice, provider);
++    uint8_t ver = 0;
++    if (!pci || ifb_knob("nullmoth-intelfb-nvparent", 1) == 0 || !ifb_pci_ok(pci, &ver)) return nullptr;
++    return IOService::probe(provider, score);
++}
++
++bool NMIntelFBClaim::start(IOService *provider)
++{
++    IOPCIDevice *pci = OSDynamicCast(IOPCIDevice, provider);
++    if (!pci || !IOService::start(provider)) return false;
++    pci->retain(); gIfbPCI = pci;
++    ifb_trail("claim");
++    thread_t t = nullptr;
++    if (kernel_thread_start(publishThread, nullptr, &t) != KERN_SUCCESS) { ifb_trail("claim-nothread"); return true; }
++    thread_deallocate(t);
++    return true;
++}
++
++// NVRM publishes its NVRMDisplay nubs some seconds into the boot; wait for nub 0 and add the Intel panel's beside it
++void NMIntelFBClaim::publishThread(void *, wait_result_t)
++{
++    IOService *nub0 = nullptr, *nvrm = nullptr;
++    for (int i = 0; i < 120 && !nub0; i++) {
++        if (OSDictionary *m = IOService::serviceMatching("NVRMDisplay")) {
++            if (OSIterator *it = IOService::getMatchingServices(m)) {
++                while (OSObject *o = it->getNextObject()) {
++                    IOService *n = OSDynamicCast(IOService, o);
++                    OSNumber *fi = n ? OSDynamicCast(OSNumber, n->getProperty("fb-index")) : nullptr;
++                    if (fi && fi->unsigned32BitValue() == 0) { nub0 = n; nub0->retain(); break; }
++                }
++                it->release();
++            }
++            m->release();
++        }
++        if (!nub0) IOSleep(1000);
++    }
++    if (nub0) { nvrm = nub0->getProvider(); if (nvrm) nvrm->retain(); }
++    IOService *nub = (nub0 && nvrm) ? OSDynamicCast(IOService, OSMetaClass::allocClassWithName("NVRMDisplay")) : nullptr;
++    bool ok = nub && nub->init();
++    if (ok) {
++        static const char *const kCopy[] = {"nvkms-kapi", "gpu-id", "phys-for-va"};
++        for (const char *k : kCopy) if (OSObject *v = nub0->getProperty(k)) nub->setProperty(k, v);
++        nub->setProperty("fb-index", 4ull, 32);
++        nub->setProperty("nm-intel-panel", kOSBooleanTrue);
++        ok = nub->attach(nvrm);
++        if (ok) nub->registerService();
++    }
++    ifb_trail(ok ? "nub" : nub0 ? "nub-fail" : "nub-no-nvrm");
++    IFBLOG("claim: Intel-panel NVRMDisplay nub %s", ok ? "published under NVRM" : nub0 ? "could not be published" : "not published: no NVRMDisplay 0 after 120 s");
++    OSSafeReleaseNULL(nub); OSSafeReleaseNULL(nub0); OSSafeReleaseNULL(nvrm);
++    thread_terminate(current_thread());
+ }
+ 
+ #ifdef NMINTELFB_VIRTUAL

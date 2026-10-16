@@ -99,4 +99,24 @@ VBL fires whenever registered (`fVblOn` set at registration, `setInterruptState`
 (NVRMFB's `surveyBar1`). Also moved a misplaced 0009 comment. `NMIntelFB c07eb921…`. Note: this also gives the
 software-composited boot (before `enable.sh`) a 144 Hz VBL for the first time.
 
-## RTX-11 — intelfb-0012 (pending)
+## RTX-11 — intelfb-0012 — the VBL fires; CoreDisplay finds no display pipe for the panel
+Boot 19:53; `enable.sh` 19:56:03; after `killall -9` the screen stayed on the console; power-off, boot 19:58:57.
+- [measured, kernel log] `trail: vbl-always`, `vbl1` (19:54:04), `kapi: … VRAM budget 4096 MB of BAR1 8192 MB`;
+  after the restart `rmh`, `vram1`, surfaces; WindowServer still creating surfaces at 19:58:00. No transaction.
+- [measured, WindowServer log] GPUWrangler `gpu 0xd9df (IG) … fb0:0 /NMIntelFB` → `CoreDisplay: Creating FB 1 of 1`
+  on the Intel GPU (IOPresentment errors, a DisplayPipe hash error in `CoreDisplay::Framebuffer::Framebuffer`);
+  `gpu 0xcb26 (DG) … accel /NVAccel` → `GPU: FB: 0 of 0 opened`; then **`System set to use IOP but no display pipes
+  are present`**, `Setting kIOWSAA to 0x3`.
+- [inferred] CoreDisplay pairs a framebuffer with the GPU above it in the registry; NVAccel's pipe is on the NVIDIA
+  GPU, which has no framebuffer. nullmoth's virtual build puts NMIntelFB on an `NVRMDisplay` nub under NVRM for this.
+- [measured, ioreg] on the RTX path GFX0's only framebuffer is NMIntelFB (no IONDRVFramebuffer).
+
+### intelfb-0013
+`NMIntelFBClaim` (IOService, Intel GPU, `IOFramebuffer` category, score 61000, the same checks as NMIntelFB's probe)
+holds GFX0 (no IONDRV) and, from a thread, publishes an `NVRMDisplay` nub under NVRM (`nm-intel-panel`, `fb-index 4`,
+NVRM's `nvkms-kapi`/`gpu-id`/`phys-for-va`) once NVRM's nub 0 exists; personality `NMIntelFBPanel` starts NMIntelFB
+on it (score 60000 > NVRMFB 1000), which drives the Intel GPU through `gIfbPCI`. Knob `nullmoth-intelfb-nvparent=0` =
+no claim, NMIntelFB on GFX0 as before. Log `claim: Intel-panel NVRMDisplay nub published under NVRM`. Claim trail
+tokens are cleared when NMIntelFB starts (read the log). `NMIntelFB b230f46f…`.
+
+## RTX-12 — intelfb-0013 (pending)

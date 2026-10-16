@@ -63,6 +63,11 @@
   `off`): `vbl=0` always, and WindowServer on the RTX sent no display-pipe transaction. NVRMFB ignores
   `setInterruptState` and always fires (intelfb-0012 does the same).
 
+### CoreDisplay pairs a framebuffer with the GPU above it
+- [measured, RTX-11] NMIntelFB under GFX0 → CoreDisplay put it on the Intel GPU and found no display pipe ("System set
+  to use IOP but no display pipes are present"); NVAccel's pipes are on the NVIDIA GPU. A framebuffer composited by
+  NVAccel must sit under the NVIDIA PCI device (intelfb-0013, as nullmoth's virtual build).
+
 ### `getDeviceMemoryWithRegister` is stale for the NVIDIA BAR1
 - [measured, RTX-10] NVRM replaces the device memory list when it places BAR1; the register lookup returned 64 MB of
   8 GB. Take the first range ≥ 256 MB (NVRMFB's `surveyBar1`).
