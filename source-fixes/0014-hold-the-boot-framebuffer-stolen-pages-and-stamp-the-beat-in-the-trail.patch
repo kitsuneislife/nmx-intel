@@ -1,0 +1,187 @@
+diff --git a/gpu-port/xkpi/override/i915/nmx_i915_fb.c b/gpu-port/xkpi/override/i915/nmx_i915_fb.c
+index cebe077..8b24745 100644
+--- a/gpu-port/xkpi/override/i915/nmx_i915_fb.c
++++ b/gpu-port/xkpi/override/i915/nmx_i915_fb.c
+@@ -53,6 +53,70 @@ struct nmx_i915_fb {
+ /* the boot framebuffer's GGTT range, held from init_ggtt until the bridge binds the boot buffer there */
+ static struct drm_mm_node boot_fb_node;
+ 
++/*
++ * And its stolen pages, held in i915's stolen allocator over the same time. Test 13: the takeover failed with
++ * -ENOSPC at stolen 0+0x7e9000, so i915 had placed its own objects (the GT scratch page and the like are allocated
++ * from stolen first) in the pages the firmware's framebuffer occupies, while macOS's console and its
++ * IONDRVFramebuffer keep drawing into those pages through the aperture.
++ */
++static struct drm_mm_node boot_stolen_node;
++
++/* what holds stolen memory in [off, off + size), in the trail as "st<start>+<size>" (up to 3) */
++static void trail_stolen_owners(struct drm_i915_private *i915, u64 off, u64 size)
++{
++    struct drm_mm_node *node;
++    char step[48];
++    int n = 0;
++
++    mutex_lock(&i915->mm.stolen_lock);
++    drm_mm_for_each_node_in_range(node, &i915->mm.stolen, off, off + size) {
++        if (n++ == 3)
++            break;
++        snprintf(step, sizeof(step), "st%llx+%llx", (unsigned long long)node->start,
++                 (unsigned long long)node->size);
++        nmx_xnu_trail(step);
++    }
++    mutex_unlock(&i915->mm.stolen_lock);
++}
++
++static int hold_boot_stolen(struct drm_i915_private *i915, u64 off, u64 size)
++{
++    int err;
++
++    mutex_lock(&i915->mm.stolen_lock);
++    memset(&boot_stolen_node, 0, sizeof(boot_stolen_node));
++    boot_stolen_node.start = off;
++    boot_stolen_node.size = size;
++    err = drm_mm_reserve_node(&i915->mm.stolen, &boot_stolen_node);
++    mutex_unlock(&i915->mm.stolen_lock);
++    return err;
++}
++
++static void release_boot_stolen(struct drm_i915_private *i915)
++{
++    mutex_lock(&i915->mm.stolen_lock);
++    if (drm_mm_node_allocated(&boot_stolen_node))
++        drm_mm_remove_node(&boot_stolen_node);
++    mutex_unlock(&i915->mm.stolen_lock);
++}
++
++/* the stolen offset the GGTT maps base to; false if that page is not in stolen */
++static bool boot_fb_stolen(struct i915_ggtt *ggtt, u32 base, u32 size, u64 *off)
++{
++    struct intel_memory_region *mem = ggtt->vm.i915->mm.stolen_region;
++    gen8_pte_t __iomem *gte = (gen8_pte_t __iomem *)ggtt->gsm + base / I915_GTT_PAGE_SIZE;
++    u64 pte, dma;
++
++    if (mem == NULL)
++        return false;
++    pte = ioread64(gte);
++    dma = pte & GEN12_GGTT_PTE_ADDR_MASK;
++    if (!(pte & GEN8_PAGE_PRESENT) || dma < mem->region.start || dma + size > mem->region.end + 1)
++        return false;
++    *off = dma - mem->region.start;
++    return true;
++}
++
+ /* the boot framebuffer as an offset in the GGTT; false if there is none or it is not in the aperture */
+ static bool boot_fb_ggtt(struct i915_ggtt *ggtt, u32 *base, u32 *size, u32 *width, u32 *height, u32 *pitch)
+ {
+@@ -87,12 +151,26 @@ void nmx_i915_reserve_boot_fb(struct i915_ggtt *ggtt)
+         printf("NullMoth display: holding GGTT 0x%x+0x%x for the boot framebuffer (%ux%u)\n", base, size, w, h);
+         nmx_xnu_trail("hold");
+     }
++
++    struct drm_i915_private *i915 = ggtt->vm.i915;
++    u64 off;
++    if (!drm_mm_initialized(&i915->mm.stolen) || !boot_fb_stolen(ggtt, base, size, &off)) {
++        nmx_xnu_trail("shold-none");
++    } else if (hold_boot_stolen(i915, off, size)) {
++        nmx_xnu_trail("shold-fail");
++        trail_stolen_owners(i915, off, size);
++    } else {
++        printf("NullMoth display: holding stolen 0x%llx+0x%x for the boot framebuffer\n", (unsigned long long)off,
++               size);
++        nmx_xnu_trail("shold");
++    }
+ }
+ 
+ void nmx_i915_release_boot_fb(struct i915_ggtt *ggtt)
+ {
+     if (drm_mm_node_allocated(&boot_fb_node))
+         drm_mm_remove_node(&boot_fb_node);
++    release_boot_stolen(ggtt->vm.i915);
+ }
+ 
+ /* put the hold back after a failed takeover, so nothing is bound under the console */
+@@ -150,6 +228,9 @@ static struct i915_vma *take_boot_fb(struct drm_i915_private *i915, u32 base, u3
+      * worker after an RCU grace period), so reap them first.
+      */
+     i915_gem_drain_freed_objects(i915);
++    /* the stolen hold made in init_ggtt gives way to the object that takes the same pages */
++    bool held = drm_mm_node_allocated(&boot_stolen_node);
++    release_boot_stolen(i915);
+     obj = i915_gem_object_create_region_at(mem, off, size, I915_BO_ALLOC_USER | I915_BO_PREALLOC);
+     if (IS_ERR(obj)) {
+         printf("NullMoth display: stolen 0x%llx+0x%x is taken (%ld)\n", (unsigned long long)off, size,
+@@ -159,6 +240,9 @@ static struct i915_vma *take_boot_fb(struct drm_i915_private *i915, u32 base, u3
+             snprintf(step, sizeof(step), "tk-obj%ld@%llx+%x", PTR_ERR(obj), (unsigned long long)off, size);
+             nmx_xnu_trail(step);
+         }
++        trail_stolen_owners(i915, off, size);
++        if (held && hold_boot_stolen(i915, off, size))
++            nmx_xnu_trail("shold-lost");
+         return NULL;
+     }
+     /* WT ahead of time, as intel_plane_initial.c does, so pinning for display does not change the cache level */
+diff --git a/gpu-port/xkpi/xnu/nmx_kext.cpp b/gpu-port/xkpi/xnu/nmx_kext.cpp
+index 4983e78..fef1dd7 100644
+--- a/gpu-port/xkpi/xnu/nmx_kext.cpp
++++ b/gpu-port/xkpi/xnu/nmx_kext.cpp
+@@ -196,6 +196,8 @@ static void nmx_marker_write(bool on)
+ 
+ static IODTNVRAM *nmx_nvram();
+ 
++static void nmx_trail_commit_locked();
++
+ extern "C" void nmx_xnu_trail(const char *step)
+ {
+     if (gTrailLock == nullptr || step == nullptr)
+@@ -211,10 +213,22 @@ extern "C" void nmx_xnu_trail(const char *step)
+         gTrail[len++] = ' ';
+     memcpy(gTrail + len, step, add + 1);
+     gTrailWrites++;
++    nmx_trail_commit_locked();
++    IOLockUnlock(gTrailLock);
++}
++
++/* the trail plus, at its end, the heartbeat's latest " @<ms since the attach began>" (gTrailBeat) */
++static char gTrailBeat[24];
++
++static void nmx_trail_commit_locked()
++{
++    char out[sizeof(gTrail) + sizeof(gTrailBeat)];
++    strlcpy(out, gTrail, sizeof(out));
++    strlcat(out, gTrailBeat, sizeof(out));
+     IODTNVRAM *n = nmx_nvram();
+     if (n != nullptr) {
+         const OSSymbol *k = OSSymbol::withCString(kTrail);
+-        OSData *d = OSData::withBytes(gTrail, (unsigned)strlen(gTrail));
++        OSData *d = OSData::withBytes(out, (unsigned)strlen(out));
+         if (k != nullptr && d != nullptr)
+             n->setProperty(k, d);
+         if (d)
+@@ -224,7 +238,6 @@ extern "C" void nmx_xnu_trail(const char *step)
+         n->sync();
+         n->release();
+     }
+-    IOLockUnlock(gTrailLock);
+ }
+ 
+ /*
+@@ -278,6 +291,11 @@ static void nmx_beat_thread(void *, wait_result_t)
+         snprintf(s, sizeof(s), "ms=%lld pub=%lld open=%d ioctl=%d in=%d cmd=0x%x", nmx_ms_since(gAttachStart),
+                  nmx_ms_since(gPublished), opens, ioctls, inside, cmd);
+         nmx_beat_write(s);
++        /* the same time at the end of the trail, which test 13 showed does reach NVRAM when the beat did not */
++        IOLockLock(gTrailLock);
++        snprintf(gTrailBeat, sizeof(gTrailBeat), " @%lld", nmx_ms_since(gAttachStart));
++        nmx_trail_commit_locked();
++        IOLockUnlock(gTrailLock);
+     }
+     thread_terminate(current_thread());
+ }
+@@ -302,6 +320,7 @@ void NMXGPU::attachNow()
+     if (gTrailLock == nullptr)
+         gTrailLock = IOLockAlloc();
+     gTrail[0] = 0;
++    gTrailBeat[0] = 0;
+     gTrailWrites = 0;
+     nmx_beat_write(nullptr);
+     gAttachStart = mach_absolute_time();

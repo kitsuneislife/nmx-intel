@@ -643,3 +643,39 @@ Build sem debug: `NMXGPU 6ebb48545fc99fa5359119bd993d9f3d6e4423dd0a5ffbb2be45fd0
 ## Próximo: teste 13 (0013)
 
 O mesmo procedimento, sem boot-args novos. Ler `nvram nullmoth-gpu-trail` e `nvram nullmoth-gpu-beat`.
+
+## 2026-10-16: teste 13, trilha por método do fb (0013)
+
+Binário `6ebb4854…`. Tela preta, Mac congelado. Trilha:
+```
+attach hold attached publish probe i915-fb tk-obj-28@0+7e9000 fallback fb-pin iomap commit lit client-reg hotplug
+registered fb-new fb-start fb-started
+```
+`nullmoth-gpu-attaching = 1` (desta vez o attach não terminou). `nullmoth-gpu-beat` de novo não existe.
+
+- **Para dentro de `NMXGPUFB::start`**, entre `IOFramebuffer::start` e `registerPowerDriver`. Nenhum método do fb foi
+  chamado (nem `fb-con`). O ponto muda a cada teste (10: antes de `client-reg`; 11 e 12: depois de `published`;
+  13: aqui), sempre logo depois de `lit`. Então é algo assíncrono que começa com o modeset, não uma chamada nossa.
+- **`tk-obj-28@0+7e9000`: `-ENOSPC` na stolen.** O fb do GOP ocupa a stolen a partir do offset 0 (8 MB), e quando a
+  ponte tenta pegar essas páginas, **o i915 já pôs objetos dele ali**. O alocador da stolen é first-fit a partir de
+  4 KB, e o i915 cria na stolen, por exemplo, a página de scratch do GT. Enquanto isso, o console do kernel e o
+  `IONDRVFramebuffer` do macOS continuam desenhando nessas mesmas páginas pela aperture (a faixa do GGTT que seguramos
+  ainda aponta para elas). **O macOS escreve pixels por cima de objetos da GPU.** É o suspeito número 1 do congelamento.
+- O batimento não aparece nem com 0,5 s, mesmo com o attach levando segundos. A gravação dele numa variável separada
+  não está chegando à NVRAM (motivo ainda desconhecido).
+
+### 0014: segurar as páginas da stolen do fb do GOP
+
+- No `init_ggtt`, além da faixa do GGTT, a ponte reserva no alocador da stolen as páginas que o GGTT do console aponta
+  (`shold`; `shold-fail` + donos `st<início>+<tamanho>` se alguém já estiver lá; `shold-none` se não achar). O i915
+  passa a alocar os objetos dele fora do fb do GOP.
+- A tomada solta essa reserva logo antes de criar o objeto nas mesmas páginas. Se falhar, a trilha lista os donos e a
+  reserva volta.
+- O batimento agora também vai no fim da própria trilha: ` @<ms desde o início do attach>`.
+
+Build sem debug: `NMXGPU 959844160a2b2645211daa8398766c9e24d3a5e23a14a70f307cf0872f46dd45`, 15.250.256 B.
+
+## Próximo: teste 14 (0014)
+
+O mesmo procedimento. Se a tomada der certo (`took` na trilha), o painel deve mostrar o mesmo conteúdo do console do
+macOS, porque o nosso fb passa a ser o próprio fb do GOP.
