@@ -75,6 +75,10 @@ Até 2026-10-15 o trabalho estava no branch `ccr-918d231a-luzxg0` dos dois outro
 
 ## Onde paramos (2026-10-15, depois do teste 5)
 
+**Mais novo (teste 26, `838aa8d3…`):** o teste 25 parou logo depois de `fb-started`. Causa (IOGraphics da Apple): sem
+`IOFBDependentID`, o `IOFBController` só nasce no `open()`, e o `setPowerState`/`extGetAttribute` caem no NULL (os panics
+`CR2 0x170` do NMIntelFB são isso). 0026 = dependent ID próprio antes do `start` + NMXAccel com padrão 0 (com `NMX_ACCEL`
+o `fFB` nunca é preenchido; o Metal do AMD/Intel do nullmoth é só para apps, o WindowServer desenha sem aceleração).
 **Mais novo (teste 25, `483a5ae5…`):** caminho RTX parado (RTX-7 travou igual mesmo esperando 45 s). De volta ao
 Metal da Intel. O `NMXGPUFB` tinha o mesmo VBL em `thread_call` HIGH que travou o NMIntelFB; 0025 = VBL em thread
 própria só depois do `setInterruptState`. Teste 25 com `fb=1` e o NMIntelFB removido (`tools/intelfb/install.sh remove`).

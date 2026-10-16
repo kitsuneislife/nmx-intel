@@ -1,6 +1,6 @@
 #!/bin/bash
 # apply-fixes.sh: aplica source-fixes/ na árvore de ~/nmx-build (depois de setup.sh) e faz commit em cada clone.
-#   0001, 0004, 0006, 0008 a 0015 e 0017 a 0022, 0024 e 0025 no nullmoth (branch nmx-intel-build), 0002, 0003, 0005, 0007, 0016 e 0023 no drm-kmod (branch nmx-intel).
+#   0001, 0004, 0006, 0008 a 0015 e 0017 a 0022, 0024 a 0026 no nullmoth (branch nmx-intel-build), 0002, 0003, 0005, 0007, 0016 e 0023 no drm-kmod (branch nmx-intel).
 # Pode rodar de novo: um patch que já está aplicado (tag fix-NNNN no clone) é pulado.
 set -euo pipefail
 F=$(cd "$(dirname "$0")/../source-fixes" && pwd)
@@ -51,3 +51,4 @@ apply "$B/nvidia-macos-driver" 0022-heartbeat-every-second-irq-count-io-time.pat
 apply "$S/kpi/drm-kmod" 0023-i915-power-events-in-the-request-log.patch
 apply "$B/nvidia-macos-driver" 0024-no-nmxaccel-claim-without-our-framebuffer.patch
 apply "$B/nvidia-macos-driver" 0025-fb-vbl-on-its-own-thread-only-when-enabled.patch
+apply "$B/nvidia-macos-driver" 0026-fb-own-dependent-id-accel-off-by-default.patch

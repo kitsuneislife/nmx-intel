@@ -1,0 +1,63 @@
+From 0b72b9ee66b70f3f0e3a5e489113c1281153badc Mon Sep 17 00:00:00 2001
+From: kitsuneislife <kitsuneislif3@gmail.com>
+Date: Fri, 16 Oct 2026 16:28:24 -0300
+Subject: [PATCH] nmx-intel 0026: own IOFBDependentID before
+ IOFramebuffer::start; NMXAccel claim off by default
+
+---
+ gpu-port/xkpi/xnu/nmx_fb.cpp   | 20 ++++++++++++++++++++
+ gpu-port/xkpi/xnu/nmx_kext.cpp |  7 +++++--
+ 2 files changed, 25 insertions(+), 2 deletions(-)
+
+diff --git a/gpu-port/xkpi/xnu/nmx_fb.cpp b/gpu-port/xkpi/xnu/nmx_fb.cpp
+index b952dbb..01f9223 100644
+--- a/gpu-port/xkpi/xnu/nmx_fb.cpp
++++ b/gpu-port/xkpi/xnu/nmx_fb.cpp
+@@ -290,6 +290,26 @@ IOService *nmx_fb_publish(IOService *gpu, void *dev)
+         nmx_fb_close(dev);
+         return nullptr;
+     }
++    /*
++     * nmx-intel 0026: a dependent ID of our own (index 0) before IOFramebuffer::start, as NVRMFB does. With one,
++     * IOFramebuffer::start creates the framebuffer's IOFBController (copyController(kDepIDCreate)); without one the
++     * controller only comes in open(). Until then IOFramebuffer::setPowerState (the power driver registered in start)
++     * and WindowServer's extGetAttribute go through __private->controller, which is NULL: a page fault at 0x170 in
++     * extGetAttribute (three panics with NMIntelFB) or a freeze right after fb-started (tests 13 and 25).
++     * nmxfbdep=0 / nullmoth-gpu-fbdep=0 leaves it out.
++     */
++    if (nmx_xnu_knob("nmxfbdep", "nullmoth-gpu-fbdep", 1)) {
++        uint64_t depID = 0x4E4D584900000000ull | (gpu->getRegistryEntryID() & 0xFFFFFFFFull);   /* 'NMXI' */
++        OSNumber *id = OSNumber::withNumber(depID, 64);
++        OSNumber *idx = OSNumber::withNumber(0ull, 32);
++        if (id != nullptr && idx != nullptr) {
++            fb->setProperty("IOFBDependentID", id);
++            fb->setProperty("IOFBDependentIndex", idx);
++            nmx_xnu_trail("fb-dep");
++        }
++        OSSafeReleaseNULL(id);
++        OSSafeReleaseNULL(idx);
++    }
+     nmx_xnu_trail("fb-start");
+     if (!fb->start(gpu)) {
+         fb->detach(gpu);
+diff --git a/gpu-port/xkpi/xnu/nmx_kext.cpp b/gpu-port/xkpi/xnu/nmx_kext.cpp
+index c5bbd48..407fd0c 100644
+--- a/gpu-port/xkpi/xnu/nmx_kext.cpp
++++ b/gpu-port/xkpi/xnu/nmx_kext.cpp
+@@ -475,8 +475,11 @@ void NMXGPU::attachNow()
+        firmware's IONDRVFramebuffer stays on this GPU, so the family pairs the screen with NMXAccel, every display
+        surface fails there ("RM refused 8294400 bytes": no framebuffer has published), WindowServer's main thread
+        retries forever and the userspace watchdog takes the Mac down ~225 s later (tests 21-23).
+-       nmxaccel=1 / nullmoth-gpu-accel=1 claims it anyway, nmxaccel=0 never does */
+-    uint32_t accel = nmx_xnu_knob("nmxaccel", "nullmoth-gpu-accel", pub == 1 ? 1 : 0);
++       nmxaccel=1 / nullmoth-gpu-accel=1 claims it anyway, nmxaccel=0 never does.
++       nmx-intel 0026: off by default with our IOFramebuffer too. NMXAccel (nvrm-accel.cpp built with NMX_ACCEL) never
++       sets its fFB, so nvAccelRmHandles fails for every surface and WindowServer would loop the same way; the
++       framebuffer is proven first, on its own */
++    uint32_t accel = nmx_xnu_knob("nmxaccel", "nullmoth-gpu-accel", 0);
+     if (accel) {
+         pci_->setProperty("nmxgpu-claimed", kOSBooleanTrue);
+         pci_->registerService();
+-- 
+2.39.5 (Apple Git-154)
+

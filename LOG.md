@@ -1215,3 +1215,44 @@ Build `rt kext`: `NMXGPU 483a5ae5384102f3b134af4dcf2ddb3b095db105cde33d0e8add4a7
 
 Com `fb=1` o NMXAccel volta a subir (0024 só o desliga sem o nosso framebuffer). Esperado: o `NMXGPUFB` sem
 congelar. Depois: `nvram nullmoth-gpu-trail`, `nvram nullmoth-gpu-beat` e o probe.
+
+## 2026-10-16: teste 25 (0025, `fb=1`) — **trava logo depois de `fb-started`; a causa é o controlador do IOFramebuffer**
+
+Duas rodadas, as duas travaram (uma sem reinstalar o libdrm, o que não muda o kernel). Trilha:
+```
+attach beat hold shold attached publish probe i915-fb take-pin took fb-pin iomap commit lit client-reg hotplug registered
+fb-new fb-start fb-started @543
+```
+Batimento `ms=564 … irq=107`; `nullmoth-gpu-attaching = 1`. Para dentro do `NMXGPUFB::start`, entre
+`IOFramebuffer::start` e `registerPowerDriver`, menos de 1 s depois do começo do attach. É o mesmo ponto do teste 13.
+Nenhum `fb-vbl-on`: o VBL (0025) não era a causa.
+
+**A causa, lida no IOGraphics da Apple (`IOFramebuffer.cpp`):**
+- `IOFramebuffer::start` já faz `PMinit`, `joinPMtree` e `registerService`. Ele só cria o `IOFBController` do
+  framebuffer (`copyController(kDepIDCreate)`) se houver `IOFBDependentID`. Sem isso, o controlador só nasce no `open()`.
+- Até lá, `__private->controller` é NULL, e quem passa por ele cai: `IOFramebuffer::setPowerState` (`FBGATEGUARD`,
+  disparado pelo nosso `registerPowerDriver`) e o `extGetAttribute` do WindowServer.
+- Os panics salvos das rodadas do NMIntelFB (14:55, 15:03 e 16:00, `uptime` 34–61 s) são exatamente isso: page fault
+  em `CR2 0x170`, `IOFramebuffer::extGetAttribute + 0x111`, task WindowServer. No `kIOFBWSStartAttribute` ele lê
+  `controller->fFbs[0]`, que é NULL quando o índice 0 do controlador não abriu (o NMIntelFB é o índice 4 do grupo do NVRM).
+- Isso explica também o RTX-2/RTX-6b (NMIntelFB sem dependent ID: trava no `registerPowerDriver`) e por que o RTX-3
+  passou do registro de energia (dependent ID antes do `start`, como o NVRMFB faz).
+- Com o i915 carregado, o panic não chega a ser salvo; a máquina só para.
+
+**O NMXAccel nunca liga o framebuffer dele no modo AMD/Intel.** Em `kexts/NVRM/accel/nvrm-accel.cpp`, com `NMX_ACCEL`
+o `fbm` é `nullptr`, então o `fFB` nunca é preenchido e `nvAccelRmHandles` falha para toda superfície ("RM refused",
+o loop do WindowServer dos testes 22/23). Além disso, pelo desenho do nullmoth (`gpu-port/README.md`, `plugin/nvmtl_vk.c`),
+o Metal do AMD/Intel é **só para apps**: o WindowServer desenha no framebuffer sem aceleração.
+
+### 0026: dependent ID próprio antes do `start`; NMXAccel desligado por padrão
+
+- Antes do `IOFramebuffer::start`, o `NMXGPUFB` ganha `IOFBDependentID` = `'NMXI'<<32 | id do NMXGPU` e
+  `IOFBDependentIndex` = 0 (trilha `fb-dep`). Chave `nullmoth-gpu-fbdep=0` desliga.
+- `nullmoth-gpu-accel` passa a ter padrão 0 também com `fb=1` (trilha `noaccel`). Primeiro provar o framebuffer sozinho.
+
+Build `rt kext`: `NMXGPU 838aa8d3b9438482ac7af9a612485a99a957f05b494b93ae8ac269be55519715`, 15.250.880 B.
+
+## Próximo: teste 26 (0026, `fb=1`)
+
+Mesmo procedimento do 25. Esperado: a trilha passar de `fb-started` para `fb-pm fb-reg published`, e o WindowServer
+desenhar no nosso framebuffer (sem aceleração). Depois: `nvram nullmoth-gpu-trail`, `nvram nullmoth-gpu-beat` e o probe.
