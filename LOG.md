@@ -378,3 +378,12 @@ Build: i915 275/275, debug `0x6` conferido. `NMXGPU da43cdbb3cf4cc0e1701f7c29905
 - Anotar se o Mac responde (luz do Caps Lock).
 - Se o Mac estiver vivo, gravar o log **antes** de reiniciar:
   `/usr/bin/log show --last boot --info --debug --predicate 'sender == "NMXGPU"' > ~/n7.txt`
+
+## 2026-10-16: nullmoth 2.0.3 (`20f1974`)
+
+- **Nada mudou em `gpu-port/`** (o fonte do NMXGPU): `git diff d96eaca v2.0.3 -- gpu-port` vem vazio.
+- As mudanças são no NVIDIA (sleep e wake, segurança, log), no plugin Metal e no app (o driver de teste também
+  para Macs só AMD/Intel). As issues #163 e #219 continuam abertas e sem resposta.
+- Nenhuma das nossas correções fica obsoleta. O teste 7 segue igual, e o build continua na base `d96eaca`.
+- Se o app for atualizado, ele pode recolocar o NMXGPU da release em `/Library/NullMoth/kexts/15/`. Depois de
+  atualizar, rodar `sudo bash build/install.sh` de novo. O backup `~/NMXGPU.original` é o da 2.0.2.
