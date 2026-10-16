@@ -1,0 +1,134 @@
+diff --git a/gpu-port/xkpi/override/i915/nmx_i915_fb.c b/gpu-port/xkpi/override/i915/nmx_i915_fb.c
+index 9e6b715..5bce373 100644
+--- a/gpu-port/xkpi/override/i915/nmx_i915_fb.c
++++ b/gpu-port/xkpi/override/i915/nmx_i915_fb.c
+@@ -123,6 +123,7 @@ static struct i915_vma *take_boot_fb(struct drm_i915_private *i915, u32 base, u3
+ 
+     if (mem == NULL) {
+         printf("NullMoth display: i915 has no stolen memory region\n");
++        nmx_xnu_trail("tk-nomem");
+         return NULL;
+     }
+     pte = ioread64(gte);
+@@ -131,11 +132,13 @@ static struct i915_vma *take_boot_fb(struct drm_i915_private *i915, u32 base, u3
+         printf("NullMoth display: GGTT 0x%x maps 0x%llx, not usable stolen memory (0x%llx-0x%llx)\n", base,
+                (unsigned long long)pte, (unsigned long long)mem->region.start,
+                (unsigned long long)mem->region.end);
++        nmx_xnu_trail("tk-pte");
+         return NULL;
+     }
+     for (u32 i = 1; i < size / I915_GTT_PAGE_SIZE; i++)
+         if ((ioread64(gte + i) & GEN12_GGTT_PTE_ADDR_MASK) != dma + (u64)i * I915_GTT_PAGE_SIZE) {
+             printf("NullMoth display: the boot framebuffer is not one run of stolen memory (page %u)\n", i);
++            nmx_xnu_trail("tk-run");
+             return NULL;
+         }
+     off = dma - mem->region.start;
+@@ -144,6 +147,7 @@ static struct i915_vma *take_boot_fb(struct drm_i915_private *i915, u32 base, u3
+     if (IS_ERR(obj)) {
+         printf("NullMoth display: stolen 0x%llx+0x%x is taken (%ld)\n", (unsigned long long)off, size,
+                PTR_ERR(obj));
++        nmx_xnu_trail("tk-obj");
+         return NULL;
+     }
+     /* WT ahead of time, as intel_plane_initial.c does, so pinning for display does not change the cache level */
+@@ -152,6 +156,7 @@ static struct i915_vma *take_boot_fb(struct drm_i915_private *i915, u32 base, u3
+     vma = i915_vma_instance(obj, &ggtt->vm, NULL);
+     if (IS_ERR(vma)) {
+         i915_gem_object_put(obj);
++        nmx_xnu_trail("tk-vma");
+         return NULL;
+     }
+     /* hand the held range to the buffer; the PTEs there already point at these stolen pages */
+@@ -160,6 +165,7 @@ static struct i915_vma *take_boot_fb(struct drm_i915_private *i915, u32 base, u3
+             printf("NullMoth display: the held GGTT range is 0x%llx+0x%llx, not 0x%x+0x%x\n",
+                    (unsigned long long)boot_fb_node.start, (unsigned long long)boot_fb_node.size, base, size);
+             i915_gem_object_put(obj);
++            nmx_xnu_trail("tk-range");
+             return NULL;
+         }
+         mutex_lock(&ggtt->vm.mutex);
+@@ -170,6 +176,7 @@ static struct i915_vma *take_boot_fb(struct drm_i915_private *i915, u32 base, u3
+     err = i915_vma_pin(vma, 0, 0, PIN_GLOBAL | PIN_OFFSET_FIXED | PIN_MAPPABLE | base);
+     if (err) {
+         printf("NullMoth display: GGTT 0x%x+0x%x is taken (%d)\n", base, size, err);
++        nmx_xnu_trail("tk-pin");
+         i915_gem_object_put(obj);
+         rehold_boot_fb(ggtt, base, size);
+         return NULL;
+@@ -211,6 +218,10 @@ int nmx_i915_fb_create(struct drm_device *drm, uint32_t width, uint32_t height,
+     have_boot = boot_fb_ggtt(ggtt, &bbase, &bsize, &bw, &bh, &bpitch);
+     if (have_boot)
+         printf("NullMoth display: boot framebuffer %ux%u, pitch %u, GGTT 0x%x\n", bw, bh, bpitch, bbase);
++    if (!have_boot)
++        nmx_xnu_trail("tk-noboot");
++    else if (bw != width || bh != height || !IS_ALIGNED(bpitch, 64) || bpitch < width * 4)
++        nmx_xnu_trail("tk-geom");
+     if (have_boot && bw == width && bh == height && IS_ALIGNED(bpitch, 64) && bpitch >= width * 4) {
+         boot_vma = take_boot_fb(i915, bbase, bsize);
+         if (boot_vma != NULL) {
+diff --git a/gpu-port/xkpi/override/src/nmx_fb_bridge.c b/gpu-port/xkpi/override/src/nmx_fb_bridge.c
+index 025606a..cf2d6a7 100644
+--- a/gpu-port/xkpi/override/src/nmx_fb_bridge.c
++++ b/gpu-port/xkpi/override/src/nmx_fb_bridge.c
+@@ -80,6 +80,8 @@ static int bridge_hotplug(struct drm_client_dev *client)
+ {
+     struct nmx_fb *fb = container_of(client, struct nmx_fb, client);
+     struct drm_mode_set *ms;
++    static int traced;
++    if (!traced) { traced = 1; nmx_xnu_trail("hotplug"); }
+     if (fb->dfb == NULL)
+         return 0;
+     if (drm_client_modeset_probe(client, fb->info.width, fb->info.height) != 0)
+@@ -254,7 +256,9 @@ lit:
+         printf("NullMoth display: the mode set failed (%d)\n", err);
+         goto fail;
+     }
++    nmx_xnu_trail("client-reg");
+     drm_client_register(&fb->client);       /* from here on hotplug reaches bridge_hotplug */
++    nmx_xnu_trail("registered");
+ 
+     fb->info = *out;
+     fbs[slot].dev = dev;
+diff --git a/gpu-port/xkpi/xnu/nmx_fb.cpp b/gpu-port/xkpi/xnu/nmx_fb.cpp
+index bc9de02..d3cf295 100644
+--- a/gpu-port/xkpi/xnu/nmx_fb.cpp
++++ b/gpu-port/xkpi/xnu/nmx_fb.cpp
+@@ -61,6 +61,7 @@ public:
+ 
+     bool start(IOService *provider) override {
+         if (!IOFramebuffer::start(provider)) return false;
++        nmx_xnu_trail("fb-started");
+         fVblTimer = thread_call_allocate(vblFire, this);
+         if (fVblTimer) {
+             uint64_t d;
+@@ -69,6 +70,7 @@ public:
+             thread_call_enter_delayed(fVblTimer, d);
+         }
+         registerPowerDriver(this, kFbPowerStates, 2);
++        nmx_xnu_trail("fb-pm");
+         FBLOG("framebuffer %ux%u at %u.%02u Hz", fInfo.width, fInfo.height, fRefresh16 >> 16,
+               ((fRefresh16 & 0xFFFF) * 100) >> 16);
+         return true;
+@@ -233,18 +235,21 @@ IOService *nmx_fb_publish(IOService *gpu, void *dev)
+         FBLOG("no framebuffer (%d)", err);
+         return nullptr;
+     }
++    nmx_xnu_trail("fb-new");
+     NMXGPUFB *fb = OSTypeAlloc(NMXGPUFB);
+     if (fb == nullptr || !fb->initWith(dev, info) || !fb->attach(gpu)) {
+         OSSafeReleaseNULL(fb);
+         nmx_fb_close(dev);
+         return nullptr;
+     }
++    nmx_xnu_trail("fb-start");
+     if (!fb->start(gpu)) {
+         fb->detach(gpu);
+         fb->release();
+         nmx_fb_close(dev);
+         return nullptr;
+     }
++    nmx_xnu_trail("fb-reg");
+     fb->registerService();
+     return fb;
+ }

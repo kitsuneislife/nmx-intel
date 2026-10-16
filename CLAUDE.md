@@ -75,12 +75,11 @@ Até 2026-10-15 o trabalho estava no branch `ccr-918d231a-luzxg0` dos dois outro
 
 ## Onde paramos (2026-10-15, depois do teste 5)
 
-**Mais novo (teste 9):** o NMXGPU é compilado no Mac (`build/`), com `source-fixes/0001..0010`. Os testes 6, 7, 8 e
-9 congelam **depois** de o framebuffer ser publicado, na fase do WindowServer. O teste 5, sem framebuffer, ficava
-vivo. No teste 9 a marca `nullmoth-gpu-attaching` não estava na NVRAM, ou seja, o attach retornou. O 0010 grava cada
-etapa em `nullmoth-gpu-trail` na NVRAM, para saber onde para. Já está compilado sem debug (`06f83e7a…`), mas **ainda
-não foi instalado**: é o teste 10 (ver o fim do `LOG.md`). Depois de congelar, boote com `-nvoff` e rode
-`nvram nullmoth-gpu-trail`.
+**Mais novo (teste 10):** o NMXGPU é compilado no Mac (`build/`), com `source-fixes/0001..0011`. A trilha na NVRAM
+(`nvram nullmoth-gpu-trail`) mostrou que **o modeset da ponte funciona** (`lit`) e que o Mac congela entre `lit` e
+`published` (`drm_client_register` ou `IOFramebuffer::start`/`registerService`). A tomada do fb do GOP ainda cai em
+`fallback`. O 0011 detalha a trilha nesses dois pontos. Já está compilado sem debug (`157d5e78…`), mas **ainda não
+foi instalado**: é o teste 11 (ver o fim do `LOG.md`). Depois de congelar, boote com `-nvoff` e leia a trilha.
 - Com o debug ligado, o macOS descarta mensagens do kext, então use `build-all.sh … nodebug kext` quando as linhas
   `NullMoth display:` importarem.
 - O log de um boot que congelou ainda pode ser lido pelo horário. Os vídeos ficam no Google Drive dele

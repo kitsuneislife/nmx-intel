@@ -521,3 +521,38 @@ Build sem debug: `NMXGPU 06f83e7afefaf995673bbdce6d0a3a61b07ee52eaef845c9c89e970
 ## Próximo: teste 10 (0010)
 
 O mesmo procedimento. Depois do congelamento, bootar com `-nvoff` e ler `nvram nullmoth-gpu-trail`.
+
+## 2026-10-16: teste 10, trilha na NVRAM (0010)
+
+Binário `06f83e7a…`. Resultado: tela preta e Mac congelado, de novo sem nenhuma linha de log.
+
+**A trilha funcionou** (`nvram nullmoth-gpu-trail` no boot seguinte, com `-nvoff`):
+```
+attach hold attached publish probe i915-fb fallback fb-pin iomap commit lit
+```
+E `nullmoth-gpu-attaching = 1` continua gravada.
+- `hold`: o `init_ggtt` segurou a faixa do console no GGTT (0009 corrigiu o endereço).
+- `fallback`: **a tomada do fb do GOP falhou mesmo assim**. O motivo só foi para o log, que se perdeu.
+- `commit lit`: **o modeset da ponte deu certo.** O i915 acendeu o painel com o nosso buffer (shmem, zerado,
+  por isso a tela preta).
+- **O congelamento é entre `lit` e `published`.** Nesse trecho rodam:
+  - `drm_client_register`, que chama `bridge_hotplug` na hora (outro probe e commit);
+  - `nmx_fb_publish`: `initWith`, `attach`, `IOFramebuffer::start` (com `isConsoleDevice() = true`, o console do
+    kernel pode passar para este framebuffer), `registerPowerDriver` e `registerService`.
+  - `fb-vram` não aparece, então ninguém pediu a VRAM antes do congelamento.
+- Isso também explica o teste 9 de outro jeito: ali a marca tinha sido apagada. Logo, a ordem ou o momento do
+  congelamento variam, e o teste 9 deve ter passado desse trecho e congelado depois.
+
+### 0011: trilha mais fina
+
+- Entre `lit` e `published`: `client-reg`, `hotplug` (uma vez), `registered`, `fb-new`, `fb-start`,
+  `fb-started` (depois de `IOFramebuffer::start`), `fb-pm` (depois de `registerPowerDriver`) e `fb-reg`.
+- Motivo da falha da tomada: `tk-noboot`, `tk-geom`, `tk-nomem`, `tk-pte`, `tk-run`, `tk-obj` (a faixa da
+  stolen já é de alguém), `tk-vma`, `tk-range` e `tk-pin`.
+
+Build sem debug: `NMXGPU 157d5e784b03a2ca8932f606631341cc2254da100552d92e51538625b59d97d1`, 15.241.160 B. **Não instalado.**
+
+## Próximo: teste 11 (0011)
+
+O mesmo procedimento. Desligar e ligar o driver no app apaga a marca `nullmoth-gpu-attaching`, que ficou gravada.
+Sem isso, o NMXGPU desiste da placa. Depois do congelamento, bootar com `-nvoff` e ler `nvram nullmoth-gpu-trail`.
