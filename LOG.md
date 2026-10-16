@@ -1381,3 +1381,31 @@ Build `rt kext`: `NMXGPU c14455178cc2419e88a7f81fac06cf58ecf2090f0815df96b6ec21a
 
 Mesmo procedimento. Se os glitches sumirem, o próximo passo é um VBL de verdade (a interrupção de vblank do pipe A
 do i915).
+
+## 2026-10-16: teste 31 (0031) — glitches iguais sem VBL; **a memória da tela é lentíssima**
+
+Binário `c1445517…`. Trilha: `… fb-irq fb-novbl … ndrv-term ndrv-gone fb-gam @210349`. Glitches iguais (vídeo
+`HACKINTOSH_GLITCHES_1.mp4` no Drive: o relógio pisca/trava na tela de login, as coisas somem ao digitar a senha, o
+avatar só aparece com o mouse em cima, janelas e animações piscam). Então o VBL não era a causa.
+
+Medido com o Mac rodando (`tools/vram`: abre o `NMXGPUFB`, mapeia a VRAM como o WindowServer):
+- `dump.c`: o conteúdo da VRAM bate com o desktop naquele instante.
+- `watch.c`: **ler 1 quadro (8 MB) da VRAM leva ~3,2 s (~2,6 MB/s).** A VRAM publicada é a aperture do GGTT
+  (`0x4000000000`), sem cache.
+- `top`: **WindowServer a ~260 % de CPU.** O compositor por software lê de volta o que mistura; com essa memória ele
+  nunca termina um quadro, e o painel mostra quadros pela metade. É exatamente o que aparece no vídeo.
+- O Linux faz o mesmo desvio no fbdev das Intel (buffer-sombra em RAM), pela mesma lentidão da aperture.
+
+### 0032: framebuffer-sombra na RAM
+
+- O `NMXGPUFB` aloca 8 MB contínuos de RAM (`IOBufferMemoryDescriptor`) e publica esse endereço físico como VRAM e
+  aperture. O WindowServer e o cursor do kernel desenham em RAM com cache.
+- Uma thread copia, ~60 vezes por segundo, só as linhas que mudaram (compara com uma cópia anterior) para a aperture,
+  mapeada write-combined, e faz `sfence`. Trilha `fb-shadow` e `fb-copy` (primeira cópia); `fb-noshadow` se falhar.
+- Chave `nullmoth-gpu-shadow=0` volta a publicar a aperture.
+
+Build `rt kext`: `NMXGPU 9823079e7d51aae3e8bb7d0819f1bfb68a49af1c5fb43656c3ad2fa1ee797353`, 15.255.472 B.
+
+## Próximo: teste 32 (0032)
+
+Mesmo procedimento. Esperado: o desktop sem as piscadas e o WindowServer com bem menos CPU. Conferir com `top`.

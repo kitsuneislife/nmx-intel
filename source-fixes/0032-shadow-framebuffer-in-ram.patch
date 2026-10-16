@@ -1,0 +1,159 @@
+From c9c5b355741d510d8b0788173bc8d59d86d8e736 Mon Sep 17 00:00:00 2001
+From: kitsuneislife <kitsuneislif3@gmail.com>
+Date: Fri, 16 Oct 2026 17:38:32 -0300
+Subject: [PATCH] nmx-intel 0032: shadow framebuffer in RAM, changed rows
+ copied to the aperture
+
+---
+ gpu-port/xkpi/xnu/nmx_fb.cpp | 102 +++++++++++++++++++++++++++++++++--
+ 1 file changed, 99 insertions(+), 3 deletions(-)
+
+diff --git a/gpu-port/xkpi/xnu/nmx_fb.cpp b/gpu-port/xkpi/xnu/nmx_fb.cpp
+index c4708e5..a5627ae 100644
+--- a/gpu-port/xkpi/xnu/nmx_fb.cpp
++++ b/gpu-port/xkpi/xnu/nmx_fb.cpp
+@@ -10,6 +10,7 @@
+ #include <IOKit/IOLib.h>
+ #include <IOKit/graphics/IOFramebuffer.h>
+ #include <IOKit/IODeviceMemory.h>
++#include <IOKit/IOBufferMemoryDescriptor.h>
+ #include <kern/thread_call.h>
+ #include <kern/sched_prim.h>
+ #include <pexpert/pexpert.h>
+@@ -34,6 +35,86 @@ class NMXGPUFB : public IOFramebuffer {
+     uint64_t fVblNext = 0;
+     volatile bool fStopping = false, fVblOn = false, fVblRunning = false;
+     bool fVblOffered = false;
++
++    /*
++     * nmx-intel 0032: a shadow framebuffer in system RAM. The scan-out buffer is reached only through the GGTT
++     * aperture, mapped uncached, and a read from it ran at ~2.6 MB/s here (test 31: 3 s for one 1920x1080 frame).
++     * WindowServer's software compositor reads back what it blends; it sat at ~260 % CPU and the screen showed half-done
++     * frames: flicker, parts that vanish, parts redrawn only where the cursor passed. WindowServer and the kernel's
++     * cursor now draw into cached RAM, and a thread copies the rows that changed to the aperture (write-combined) at the
++     * panel's refresh rate. nmxshadow=0 / nullmoth-gpu-shadow=0 publishes the aperture as before.
++     */
++    IOBufferMemoryDescriptor *fShadowMD = nullptr;
++    IOMemoryMap *fApertureMap = nullptr;
++    uint8_t *fShadow = nullptr, *fLast = nullptr;
++    volatile uint8_t *fAperture = nullptr;
++    uint64_t fShadowPhys = 0;
++    size_t fFrameBytes = 0;
++    volatile bool fCopyRunning = false;
++    volatile uint32_t fCopyFrames = 0;
++
++    bool shadowSetup() {
++        if (!nmx_xnu_knob("nmxshadow", "nullmoth-gpu-shadow", 1))
++            return false;
++        fFrameBytes = (size_t)fInfo.pitch * fInfo.height;
++        size_t len = round_page(fInfo.size > fFrameBytes ? fInfo.size : fFrameBytes);
++        fShadowMD = IOBufferMemoryDescriptor::inTaskWithPhysicalMask(kernel_task,
++            kIODirectionInOut | kIOMemoryPhysicallyContiguous | kIOMemoryKernelUserShared, len, 0x0000FFFFFFFFF000ull);
++        if (fShadowMD == nullptr)
++            return false;
++        fShadow = (uint8_t *)fShadowMD->getBytesNoCopy();
++        fShadowPhys = fShadowMD->getPhysicalSegment(0, nullptr, kIOMemoryMapperNone);
++        fLast = (uint8_t *)IOMallocAligned(fFrameBytes, PAGE_SIZE);
++        IOMemoryDescriptor *ap = IOMemoryDescriptor::withAddressRange(fInfo.phys, fFrameBytes,
++                                                                       kIODirectionInOut | kIOMemoryMapperNone, nullptr);
++        if (ap != nullptr) {
++            fApertureMap = ap->createMappingInTask(kernel_task, 0, kIOMapAnywhere | kIOMapWriteCombineCache);
++            ap->release();
++        }
++        if (fShadow == nullptr || fShadowPhys == 0 || fLast == nullptr || fApertureMap == nullptr) {
++            shadowFree();
++            return false;
++        }
++        fAperture = (volatile uint8_t *)fApertureMap->getVirtualAddress();
++        bzero(fShadow, len);
++        bzero(fLast, fFrameBytes);
++        for (size_t i = 0; i < fFrameBytes; i += 64)     /* the panel starts black, like the shadow */
++            __builtin_memset((void *)(fAperture + i), 0, 64);
++        __asm__ volatile("sfence" ::: "memory");
++        return true;
++    }
++    void shadowFree() {
++        OSSafeReleaseNULL(fApertureMap);
++        if (fLast != nullptr) { IOFreeAligned(fLast, fFrameBytes); fLast = nullptr; }
++        OSSafeReleaseNULL(fShadowMD);
++        fShadow = nullptr; fAperture = nullptr; fShadowPhys = 0;
++    }
++    static void copyThread(void *p0, wait_result_t) {
++        NMXGPUFB *me = (NMXGPUFB *)p0;
++        const uint32_t ms = 16;            /* ~60 copies a second; each compares 2 x 8 MB of cached RAM */
++        const size_t pitch = me->fInfo.pitch, rows = me->fInfo.height;
++        while (!me->fStopping) {
++            IOSleep(ms);
++            bool any = false;
++            for (size_t y = 0; y < rows; y++) {
++                const uint8_t *src = me->fShadow + y * pitch;
++                uint8_t *last = me->fLast + y * pitch;
++                if (memcmp(src, last, pitch) == 0)
++                    continue;
++                memcpy(last, src, pitch);
++                memcpy((void *)(me->fAperture + y * pitch), last, pitch);
++                any = true;
++            }
++            if (any) {
++                __asm__ volatile("sfence" ::: "memory");
++                if (me->fCopyFrames++ == 0)
++                    nmx_xnu_trail("fb-copy");
++            }
++        }
++        me->fCopyRunning = false;
++        thread_terminate(current_thread());
++    }
++    uint64_t vramPhys() const { return fShadowPhys ? fShadowPhys : fInfo.phys; }
+     /* the first call of each method, in the NVRAM trail: what IOGraphics had asked when the Mac froze */
+     volatile uint32_t fSeen = 0;
+     void once(int bit, const char *step) {
+@@ -84,6 +165,20 @@ public:
+     }
+ 
+     bool start(IOService *provider) override {
++        if (shadowSetup()) {
++            thread_t ct = nullptr;
++            fCopyRunning = true;
++            if (kernel_thread_start(copyThread, this, &ct) == KERN_SUCCESS) {
++                thread_deallocate(ct);
++                nmx_xnu_trail("fb-shadow");
++            } else {
++                fCopyRunning = false;
++                shadowFree();
++                nmx_xnu_trail("fb-noshadow");
++            }
++        } else {
++            nmx_xnu_trail("fb-noshadow");
++        }
+         if (!IOFramebuffer::start(provider)) return false;
+         nmx_xnu_trail("fb-started");
+         thread_t vt = nullptr;
+@@ -104,9 +199,10 @@ public:
+         /* 0025: wake the VBL thread and wait until it has left */
+         fVblOn = false;
+         thread_wakeup((event_t)&fVblNext);
+-        while (fVblRunning)
++        while (fVblRunning || fCopyRunning)
+             IOSleep(5);
+         IOFramebuffer::stop(provider);
++        shadowFree();
+     }
+ 
+     IOReturn enableController() override { once(15, "fb-en"); return kIOReturnSuccess; }
+@@ -119,11 +215,11 @@ public:
+     IODeviceMemory *getApertureRange(IOPixelAperture aperture) override {
+         once(0, "fb-ap");
+         if (aperture != kIOFBSystemAperture) return nullptr;
+-        return IODeviceMemory::withRange(fInfo.phys, (IOPhysicalLength)fInfo.pitch * fInfo.height);
++        return IODeviceMemory::withRange(vramPhys(), (IOPhysicalLength)fInfo.pitch * fInfo.height);
+     }
+     IODeviceMemory *getVRAMRange() override {
+         if (!fTrailVram) { fTrailVram = true; nmx_xnu_trail("fb-vram"); }
+-        return IODeviceMemory::withRange(fInfo.phys, fInfo.size);
++        return IODeviceMemory::withRange(vramPhys(), fShadowPhys ? round_page(fInfo.size > fFrameBytes ? fInfo.size : fFrameBytes) : fInfo.size);
+     }
+     bool fTrailVram = false, fTrailMode = false, fTrailWs = false;
+     const char *getPixelFormats() override { once(14, "fb-fmt"); return IO32BitDirectPixels "\0"; }
+-- 
+2.39.5 (Apple Git-154)
+

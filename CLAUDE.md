@@ -75,6 +75,7 @@ Até 2026-10-15 o trabalho estava no branch `ccr-918d231a-luzxg0` dos dois outro
 
 ## Onde paramos (2026-10-15, depois do teste 5)
 
+**Teste 31:** glitches iguais sem VBL. A VRAM é a aperture sem cache: ler 8 MB leva ~3,2 s, WindowServer a ~260 % de CPU (`tools/vram/{dump,watch}.c`). 0032 = sombra em RAM + thread que copia as linhas mudadas (chave `nullmoth-gpu-shadow`) (teste 32, `9823079e…`).
 **Teste 30:** a tela do firmware sai (`ndrv-gone`), uma tela só, sem travar; glitches iguais. 0031 = sem VBL por padrão (`nullmoth-gpu-vbl=1` liga o de timer) (teste 31, `c1445517…`).
 **Teste 29:** `ndrv-c2-1 … ndrv-term` aos 45 s, panic em `AppleUpstreamUserClientDriver::fbNotificationOccurred` (notificação `kIOFBNotifyTerminated`). 0030 = `s->IOService::terminate()` (teste 30, `52305765…`).
 **Teste 28:** travou no `terminate` do IONDRV ainda fechado (sem controlador = NULL no `IOFramebuffer::terminate`). 0029 = thread que espera o `IODisplayConnect` dele (aberto) e só então dá `terminate` (teste 29, `a954ffc0…`).
