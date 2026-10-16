@@ -1,0 +1,104 @@
+From 68335359e3e2919612a297fab320490b63c17632 Mon Sep 17 00:00:00 2001
+From: kitsuneislife <kitsuneislif3@gmail.com>
+Date: Fri, 16 Oct 2026 16:57:13 -0300
+Subject: [PATCH] nmx-intel 0029: remove the firmware framebuffer only after
+ WindowServer opened it
+
+---
+ gpu-port/xkpi/xnu/nmx_fb.cpp | 62 ++++++++++++++++++++++++++++--------
+ 1 file changed, 48 insertions(+), 14 deletions(-)
+
+diff --git a/gpu-port/xkpi/xnu/nmx_fb.cpp b/gpu-port/xkpi/xnu/nmx_fb.cpp
+index df55dd2..a23ecfc 100644
+--- a/gpu-port/xkpi/xnu/nmx_fb.cpp
++++ b/gpu-port/xkpi/xnu/nmx_fb.cpp
+@@ -277,6 +277,39 @@ public:
+ };
+ OSDefineMetaClassAndStructors(NMXGPUFB, IOFramebuffer)
+ 
++/* nmx-intel 0029: removes the firmware framebuffers in 'p' (an OSArray, released here) once each has been opened */
++static void ndrvDropThread(void *p, wait_result_t)
++{
++    OSArray *drop = (OSArray *)p;
++    nmx_xnu_trail("ndrv-wait");
++    unsigned left = drop->getCount();
++    for (int sec = 0; sec < 600 && left > 0; sec++) {
++        IOSleep(1000);
++        for (unsigned i = 0; i < drop->getCount(); i++) {
++            IOService *s = OSDynamicCast(IOService, drop->getObject(i));
++            if (s == nullptr || s->isInactive())
++                continue;
++            bool opened = false;
++            if (OSIterator *it = s->getChildIterator(gIOServicePlane)) {
++                while (OSObject *c = it->getNextObject())
++                    if (c->metaCast("IODisplayConnect") != nullptr) { opened = true; break; }
++                it->release();
++            }
++            if (!opened)
++                continue;
++            IOSleep(2000);                 /* let WindowServer finish bringing it up */
++            nmx_xnu_trail("ndrv-term");
++            s->terminate();
++            nmx_xnu_trail("ndrv-gone");
++            left--;
++        }
++    }
++    if (left > 0)
++        nmx_xnu_trail("ndrv-timeout");
++    drop->release();
++    thread_terminate(current_thread());
++}
++
+ /* lights the device's outputs and publishes them under 'gpu'; nullptr when there is nothing to show (reason logged) */
+ IOService *nmx_fb_publish(IOService *gpu, void *dev)
+ {
+@@ -334,31 +367,32 @@ IOService *nmx_fb_publish(IOService *gpu, void *dev)
+      */
+     if (nmx_xnu_knob("nmxndrv", "nullmoth-gpu-ndrv", 1)) {
+         /* nmx-intel 0028: the IOFramebuffer children of our PCI device other than ours, walked in the service plane
+-           (getMatchingServices("IONDRVFramebuffer") found none in test 27, though .Display_boot sat under GFX0) */
++           (getMatchingServices("IONDRVFramebuffer") found none in test 27, though .Display_boot sat under GFX0).
++           nmx-intel 0029: not terminated here. IOFramebuffer::terminate takes the framebuffer's controller gate, and an
++           IONDRVFramebuffer that WindowServer has not opened yet has no controller (no IOFBDependentID): NULL, and the
++           Mac froze right after fb-reg (test 28). A thread of its own waits until it has been opened (its
++           IODisplayConnect child appears in open()), then removes it, as an unplugged display. */
+         IOService *pci = gpu->getProvider();
+-        int n = 0, seen = 0;
+-        if (pci != nullptr) {
++        int seen = 0;
++        OSArray *drop = OSArray::withCapacity(2);
++        if (pci != nullptr && drop != nullptr) {
+             if (OSIterator *it = pci->getChildIterator(gIOServicePlane)) {
+-                OSArray *drop = OSArray::withCapacity(2);
+                 while (IOService *s = OSDynamicCast(IOService, it->getNextObject())) {
+                     seen++;
+-                    if (s != gpu && s->metaCast("IOFramebuffer") != nullptr && s->metaCast("NMXGPUFB") == nullptr && drop)
++                    if (s != gpu && s->metaCast("IOFramebuffer") != nullptr && s->metaCast("NMXGPUFB") == nullptr)
+                         drop->setObject(s);
+                 }
+                 it->release();
+-                if (drop != nullptr) {
+-                    for (unsigned i = 0; i < drop->getCount(); i++) {
+-                        ((IOService *)drop->getObject(i))->terminate();
+-                        n++;
+-                    }
+-                    drop->release();
+-                }
+             }
+         }
+         char tok[24];
+-        snprintf(tok, sizeof(tok), "ndrv-c%d", seen);
++        snprintf(tok, sizeof(tok), "ndrv-c%d-%u", seen, drop ? drop->getCount() : 0);
+         nmx_xnu_trail(tok);
+-        nmx_xnu_trail(n ? "ndrv-term" : "ndrv-none");
++        thread_t t = nullptr;
++        if (drop != nullptr && drop->getCount() > 0 && kernel_thread_start(ndrvDropThread, drop, &t) == KERN_SUCCESS)
++            thread_deallocate(t);          /* the thread owns 'drop' now */
++        else
++            OSSafeReleaseNULL(drop);
+     }
+     return fb;
+ }
+-- 
+2.39.5 (Apple Git-154)
+

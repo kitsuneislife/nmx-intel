@@ -75,6 +75,7 @@ Até 2026-10-15 o trabalho estava no branch `ccr-918d231a-luzxg0` dos dois outro
 
 ## Onde paramos (2026-10-15, depois do teste 5)
 
+**Teste 28:** travou no `terminate` do IONDRV ainda fechado (sem controlador = NULL no `IOFramebuffer::terminate`). 0029 = thread que espera o `IODisplayConnect` dele (aberto) e só então dá `terminate` (teste 29, `a954ffc0…`).
 **Teste 27:** VBL ok; `ndrv-none` (a tela do firmware ficou, duas telas nas mesmas páginas = os glitches). 0028 = achar pelos filhos do GFX0 (teste 28, `d002eae8…`).
 **Resultado do teste 26: DESKTOP PELO `NMXGPUFB` (144 Hz), sem travar.** Glitches: duas telas online (a nossa + o
 `IONDRVFramebuffer` `.Display_boot`) e o VBL nunca ligado. 0027 = VBL ligado desde o registro + `terminate` do IONDRV do mesmo PCI (chave `nullmoth-gpu-ndrv`) (teste 27, `3fc8feaf…`).

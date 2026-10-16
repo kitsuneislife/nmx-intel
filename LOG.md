@@ -1310,3 +1310,26 @@ Build `rt kext`: `NMXGPU d002eae8f18c119a2a7c7806d6b73dc87b7d2e3e7d721e20cfead51
 ## Próximo: teste 28 (0028)
 
 Mesmo procedimento. Esperado: `ndrv-term`, uma tela só no `system_profiler` e no log do WindowServer (`FB 1 of 1`).
+
+## 2026-10-16: teste 28 (0028) — trava ao remover a tela do firmware
+
+Binário `d002eae8…`. Trilha: `… fb-started fb-pm fb-ps1 fb-reg @548`, batimento `ms=567`, marca de attach ficou.
+A tela piscou no meio do boot e travou. Sem `ndrv-c…`: parou no `terminate()` do `.Display_boot`.
+
+**Causa:** `IOFramebuffer::terminate` (IOGraphics) faz `FBGATEGUARD(ctrlgated, this)`. O `IONDRVFramebuffer` do
+firmware não tem `IOFBDependentID`, então antes de o WindowServer abri-lo ele não tem controlador: o mesmo NULL do
+teste 25, agora do lado dele.
+
+### 0029: tirar a tela do firmware só depois de aberta
+
+O `nmx_fb_publish` só anota os IOFramebuffers do GFX0 que não são o nosso (trilha `ndrv-c<filhos>-<achados>`). Uma
+thread própria (`ndrv-wait`) espera, até 10 min, o `IODisplayConnect` aparecer embaixo de cada um (criado no `open()`,
+quando já há controlador), espera mais 2 s e dá `terminate()` (`ndrv-term`, `ndrv-gone`; `ndrv-timeout` se nunca abrir).
+Para o WindowServer é como desconectar um monitor. Chave `nullmoth-gpu-ndrv=0` mantém a tela.
+
+Build `rt kext`: `NMXGPU a954ffc00b707a97d52b44e44332f1b0c1457ae3749a441e402374caf6e52b94`, 15.251.200 B.
+
+## Próximo: teste 29 (0029)
+
+Mesmo procedimento. Esperado: desktop como no 27, e alguns segundos depois a segunda tela some (a tela pode piscar uma
+vez). Trilha com `ndrv-term ndrv-gone`.
