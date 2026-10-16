@@ -1,0 +1,43 @@
+diff --git a/drivers/gpu/drm/i915/gt/intel_ggtt.c b/drivers/gpu/drm/i915/gt/intel_ggtt.c
+index f53fd2ca7e..4b4e4bf3a4 100644
+--- a/drivers/gpu/drm/i915/gt/intel_ggtt.c
++++ b/drivers/gpu/drm/i915/gt/intel_ggtt.c
+@@ -16,6 +16,10 @@
+ 
+ #include "intel_context.h"
+ #include "intel_ggtt_gmch.h"
++
++#ifdef NMXKPI
++#include "nmx_i915_fb.h"
++#endif
+ #include "intel_gpu_commands.h"
+ #include "intel_gt.h"
+ #include "intel_gt_regs.h"
+@@ -822,6 +826,9 @@ static void ggtt_release_guc_top(struct i915_ggtt *ggtt)
+ static void cleanup_init_ggtt(struct i915_ggtt *ggtt)
+ {
+ 	ggtt_release_guc_top(ggtt);
++#ifdef NMXKPI
++	nmx_i915_release_boot_fb(ggtt);
++#endif
+ 	if (drm_mm_node_allocated(&ggtt->error_capture))
+ 		drm_mm_remove_node(&ggtt->error_capture);
+ 	mutex_destroy(&ggtt->error_mutex);
+@@ -857,6 +864,17 @@ static int init_ggtt(struct i915_ggtt *ggtt)
+ 		return ret;
+ 
+ 	mutex_init(&ggtt->error_mutex);
++#ifdef NMXKPI
++	/*
++	 * macOS port (NMXGPU): macOS's console keeps drawing into the firmware's
++	 * boot framebuffer through the aperture, and on Gen8+ nothing rewrites
++	 * those GGTT entries. Hold that range before anything else is placed in
++	 * the GGTT (the error capture node below would take offset 0), so no GPU
++	 * object lands under the console's writes and the display bridge can
++	 * take the buffer over in place (override/i915/nmx_i915_fb.c).
++	 */
++	nmx_i915_reserve_boot_fb(ggtt);
++#endif
+ 	if (ggtt->mappable_end) {
+ 		/*
+ 		 * Reserve a mappable slot for our lockless error capture.

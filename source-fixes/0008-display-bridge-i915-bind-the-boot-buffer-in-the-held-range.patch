@@ -1,0 +1,180 @@
+diff --git a/gpu-port/xkpi/override/i915/nmx_i915_fb.c b/gpu-port/xkpi/override/i915/nmx_i915_fb.c
+index 58117a7..c2ea4c7 100644
+--- a/gpu-port/xkpi/override/i915/nmx_i915_fb.c
++++ b/gpu-port/xkpi/override/i915/nmx_i915_fb.c
+@@ -12,11 +12,12 @@
+  * the aperture, and i915 never rewrites those GGTT entries on Gen8+ (clear_range is a no-op there). A new buffer in
+  * stolen memory could land on the very pages the console still writes, which showed on screen as the console text
+  * shifted inside our buffer (test 6); anything else i915 placed at those GGTT offsets would be overwritten the same
+- * way. Taking the boot buffer itself - same stolen pages, same GGTT offset - makes the console, WindowServer and
+- * the display engine agree on one buffer at one address.
++ * way. So init_ggtt holds the boot framebuffer's GGTT range from the start (nmx_i915_reserve_boot_fb; otherwise the
++ * error capture node takes offset 0, as in test 7), and the bridge later binds the boot buffer's own stolen pages
++ * there: the console, WindowServer and the display engine then agree on one buffer at one address.
+  *
+- * Fallback: a buffer like i915's fbdev makes (stolen, else shmem), with the boot framebuffer's GGTT range held
+- * back so no GPU object lands under the console's writes.
++ * Fallback: a buffer like i915's fbdev makes (shmem while a boot framebuffer exists, so it cannot overlap the
++ * console's stolen pages), with the boot framebuffer's GGTT range still held.
+  */
+ #include <drm/drm_framebuffer.h>
+ #include <drm/drm_fourcc.h>
+@@ -39,10 +40,11 @@ struct nmx_i915_fb {
+     struct i915_vma *vma;
+     unsigned long vma_flags;
+     void __iomem *vaddr;
+-    struct drm_mm_node guard;           /* fallback only: the boot framebuffer's GGTT range, kept free */
+-    struct i915_ggtt *ggtt;
+ };
+ 
++/* the boot framebuffer's GGTT range, held from init_ggtt until the bridge binds the boot buffer there */
++static struct drm_mm_node boot_fb_node;
++
+ /* the boot framebuffer as an offset in the GGTT; false if there is none or it is not in the aperture */
+ static bool boot_fb_ggtt(struct i915_ggtt *ggtt, u32 *base, u32 *size, u32 *width, u32 *height, u32 *pitch)
+ {
+@@ -61,6 +63,40 @@ static bool boot_fb_ggtt(struct i915_ggtt *ggtt, u32 *base, u32 *size, u32 *widt
+     return true;
+ }
+ 
++void nmx_i915_reserve_boot_fb(struct i915_ggtt *ggtt)
++{
++    u32 base, size, w, h, pitch;
++    if (drm_mm_node_allocated(&boot_fb_node) || !boot_fb_ggtt(ggtt, &base, &size, &w, &h, &pitch))
++        return;
++    memset(&boot_fb_node, 0, sizeof(boot_fb_node));
++    boot_fb_node.start = base;
++    boot_fb_node.size = size;
++    boot_fb_node.color = I915_COLOR_UNEVICTABLE;
++    if (drm_mm_reserve_node(&ggtt->vm.mm, &boot_fb_node))
++        printf("NullMoth display: could not hold the boot framebuffer's GGTT 0x%x+0x%x\n", base, size);
++    else
++        printf("NullMoth display: holding GGTT 0x%x+0x%x for the boot framebuffer (%ux%u)\n", base, size, w, h);
++}
++
++void nmx_i915_release_boot_fb(struct i915_ggtt *ggtt)
++{
++    if (drm_mm_node_allocated(&boot_fb_node))
++        drm_mm_remove_node(&boot_fb_node);
++}
++
++/* put the hold back after a failed takeover, so nothing is bound under the console */
++static void rehold_boot_fb(struct i915_ggtt *ggtt, u32 base, u32 size)
++{
++    mutex_lock(&ggtt->vm.mutex);
++    memset(&boot_fb_node, 0, sizeof(boot_fb_node));
++    boot_fb_node.start = base;
++    boot_fb_node.size = size;
++    boot_fb_node.color = I915_COLOR_UNEVICTABLE;
++    if (drm_mm_reserve_node(&ggtt->vm.mm, &boot_fb_node))
++        printf("NullMoth display: could not hold the boot framebuffer's GGTT again\n");
++    mutex_unlock(&ggtt->vm.mutex);
++}
++
+ /*
+  * The boot framebuffer's stolen pages, as a preallocated stolen object bound at its own GGTT offset. NULL (and the
+  * reason in the log) if the GGTT does not map it to one contiguous run of stolen memory or the range is taken.
+@@ -108,10 +144,23 @@ static struct i915_vma *take_boot_fb(struct drm_i915_private *i915, u32 base, u3
+         i915_gem_object_put(obj);
+         return NULL;
+     }
++    /* hand the held range to the buffer; the PTEs there already point at these stolen pages */
++    if (drm_mm_node_allocated(&boot_fb_node)) {
++        if (boot_fb_node.start != base || boot_fb_node.size != size) {
++            printf("NullMoth display: the held GGTT range is 0x%llx+0x%llx, not 0x%x+0x%x\n",
++                   (unsigned long long)boot_fb_node.start, (unsigned long long)boot_fb_node.size, base, size);
++            i915_gem_object_put(obj);
++            return NULL;
++        }
++        mutex_lock(&ggtt->vm.mutex);
++        drm_mm_remove_node(&boot_fb_node);
++        mutex_unlock(&ggtt->vm.mutex);
++    }
+     err = i915_vma_pin(vma, 0, 0, PIN_GLOBAL | PIN_OFFSET_FIXED | PIN_MAPPABLE | base);
+     if (err) {
+         printf("NullMoth display: GGTT 0x%x+0x%x is taken (%d)\n", base, size, err);
+         i915_gem_object_put(obj);
++        rehold_boot_fb(ggtt, base, size);
+         return NULL;
+     }
+     printf("NullMoth display: took over the boot framebuffer: stolen 0x%llx, GGTT 0x%x, %u KiB\n",
+@@ -141,7 +190,6 @@ int nmx_i915_fb_create(struct drm_device *drm, uint32_t width, uint32_t height,
+     f = kzalloc(sizeof(*f), GFP_KERNEL);
+     if (f == NULL)
+         return -ENOMEM;
+-    f->ggtt = ggtt;
+ 
+     mode_cmd.width = width;
+     mode_cmd.height = height;
+@@ -164,15 +212,8 @@ int nmx_i915_fb_create(struct drm_device *drm, uint32_t width, uint32_t height,
+     if (boot_vma != NULL) {
+         where = "the boot framebuffer";
+     } else {
+-        if (have_boot) {
+-            /* the console keeps writing there: no GPU object may be bound under it */
+-            mutex_lock(&ggtt->vm.mutex);
+-            ret = i915_gem_gtt_reserve(&ggtt->vm, NULL, &f->guard, bsize, bbase, I915_COLOR_UNEVICTABLE,
+-                                       PIN_NOEVICT);
+-            mutex_unlock(&ggtt->vm.mutex);
+-            if (ret)
+-                printf("NullMoth display: could not hold the boot framebuffer's GGTT range (%d)\n", ret);
+-        }
++        if (have_boot && !drm_mm_node_allocated(&boot_fb_node))
++            printf("NullMoth display: warning: the boot framebuffer's GGTT range is not held\n");
+         /* intel_fbdev_fb_alloc's choice, but never stolen while the console may still write into it */
+         where = "stolen";
+         if (!have_boot && !IS_METEORLAKE(i915) && size * 2 < i915->dsm.usable_size)
+@@ -256,16 +297,13 @@ out_fb:
+     drm_framebuffer_remove(fb);
+ out_boot:
+     if (boot_vma != NULL) {
++        /* the buffer stays bound until its object goes; the console's range is no longer held */
++        printf("NullMoth display: warning: the boot framebuffer's GGTT range is released\n");
+         i915_vma_unpin(boot_vma);
+         i915_gem_object_put(boot_vma->obj);
+     }
+ out_free:
+     intel_runtime_pm_put(&i915->runtime_pm, wakeref);
+-    if (drm_mm_node_allocated(&f->guard)) {
+-        mutex_lock(&ggtt->vm.mutex);
+-        drm_mm_remove_node(&f->guard);
+-        mutex_unlock(&ggtt->vm.mutex);
+-    }
+     kfree(f);
+     memset(out, 0, sizeof(*out));
+     return ret;
+@@ -281,10 +319,5 @@ void nmx_i915_fb_destroy(void *priv)
+     if (f->vma != NULL)
+         intel_fb_unpin_vma(f->vma, f->vma_flags);
+     drm_framebuffer_remove(f->fb);  /* turns off any plane still scanning it out, then drops it */
+-    if (drm_mm_node_allocated(&f->guard)) {
+-        mutex_lock(&f->ggtt->vm.mutex);
+-        drm_mm_remove_node(&f->guard);
+-        mutex_unlock(&f->ggtt->vm.mutex);
+-    }
+     kfree(f);
+ }
+diff --git a/gpu-port/xkpi/override/include/nmx_i915_fb.h b/gpu-port/xkpi/override/include/nmx_i915_fb.h
+index 7814a5a..ab60c09 100644
+--- a/gpu-port/xkpi/override/include/nmx_i915_fb.h
++++ b/gpu-port/xkpi/override/include/nmx_i915_fb.h
+@@ -7,6 +7,7 @@
+ 
+ struct drm_device;
+ struct drm_framebuffer;
++struct i915_ggtt;
+ 
+ struct nmx_i915_fb_out {
+     struct drm_framebuffer *fb;     /* XRGB8888, linear */
+@@ -21,4 +22,11 @@ struct nmx_i915_fb_out {
+ int nmx_i915_fb_create(struct drm_device *drm, uint32_t width, uint32_t height, struct nmx_i915_fb_out *out);
+ void nmx_i915_fb_destroy(void *priv);
+ 
++/*
++ * Called from init_ggtt (gt/intel_ggtt.c) before anything is placed in the GGTT: holds the boot framebuffer's GGTT
++ * range, which macOS's console keeps writing through, until nmx_i915_fb_create takes the buffer over in place.
++ */
++void nmx_i915_reserve_boot_fb(struct i915_ggtt *ggtt);
++void nmx_i915_release_boot_fb(struct i915_ggtt *ggtt);
++
+ #endif

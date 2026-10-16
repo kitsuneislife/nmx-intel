@@ -75,11 +75,13 @@ Até 2026-10-15 o trabalho estava no branch `ccr-918d231a-luzxg0` dos dois outro
 
 ## Onde paramos (2026-10-15, depois do teste 5)
 
-**Mais novo (teste 6):** o NMXGPU compilado no Mac (`build/`) acendeu o painel pela Intel com o nosso buffer, mas
-o buffer novo na stolen caiu por cima do fb do GOP, onde o console do `-v` ainda escreve (imagem deslocada), e o
-Mac congelou sem gravar log. O `source-fixes/0006` toma o próprio fb do GOP (mesma stolen, mesmo offset do GGTT).
-Já está compilado (`da43cdbb…`), mas **ainda não foi instalado**: é o teste 7 (ver o fim do `LOG.md`). Como o log se
-perde quando o Mac congela, as fotos do console são o log. No zsh, use `/usr/bin/log`.
+**Mais novo (teste 7):** o NMXGPU é compilado no Mac (`build/`), com `source-fixes/0001..0008`. No teste 6 o
+painel mostrou o nosso buffer, mas deslocado (ele caiu sobre o fb do GOP, onde o console do `-v` ainda escreve).
+No teste 7 (0006, tomar o fb do GOP) a tomada falhou porque o error capture do i915 ocupa o GGTT 0: tela preta e Mac
+congelado. O 0007 + 0008 seguram a faixa do console no `init_ggtt` e tomam o fb ali. Já está compilado (`8e8a8f8e…`),
+mas **ainda não foi instalado**: é o teste 8 (ver o fim do `LOG.md`). Quando o Mac congela, o log persistido sai
+truncado, então as fotos ou vídeos do console são o log. No zsh, use `/usr/bin/log`. Os vídeos ficam no Google Drive
+dele (`VIDEO_BOOT_HACKINTOSH_N.mp4`).
 O resto desta seção é o estado do teste 5, com os patches binários.
 
 

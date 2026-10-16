@@ -387,3 +387,45 @@ Build: i915 275/275, debug `0x6` conferido. `NMXGPU da43cdbb3cf4cc0e1701f7c29905
 - Nenhuma das nossas correções fica obsoleta. O teste 7 segue igual, e o build continua na base `d96eaca`.
 - Se o app for atualizado, ele pode recolocar o NMXGPU da release em `/Library/NullMoth/kexts/15/`. Depois de
   atualizar, rodar `sudo bash build/install.sh` de novo. O backup `~/NMXGPU.original` é o da 2.0.2.
+
+## 2026-10-15: teste 7, 0006 (tomar o fb do GOP)
+
+Binário `da43cdbb…`. Resultado: **tela preta, sem o glitch**, sem chegar à área de trabalho, e a luz do Caps Lock
+não respondia (Mac congelado). Vídeo no Drive: `VIDEO_BOOT_HACKINTOSH_4.mp4`.
+
+Desta vez houve log (boots das 21:56 e 22:02):
+- O i915 inicializa inteiro, como no teste 5. O primeiro modeset passa e aparece
+  `Initialized i915 1.6.0 for drmn0 on minor 0`.
+- O thread do attach (`0x78b`) para em `intel_didl_outputs: 4 outputs detected` / `disabling PW_B`, às 56,828.
+  Nenhuma linha da ponte foi gravada (`drm_client_*`, `NullMoth display: …`). Depois, outro thread ainda faz o
+  resume do display (DC9, power wells, PPS, CDCLK) e o `PPS 0 turning VDD off` às 59,35, e o log acaba.
+- O log persistido é truncado quando o Mac congela, então a falta das linhas da ponte não prova onde parou.
+
+### Causa da tela preta: o offset 0 do GGTT já era do i915
+
+`init_ggtt` (`gt/intel_ggtt.c`) reserva **GGTT 0..8 KiB** para o error capture (`drm_mm_reserve_node` em 0) e
+aponta essas páginas para a página de rascunho (`scratch_range`). Então:
+1. O `i915_vma_pin(PIN_OFFSET_FIXED | 0)` da 0006 falha porque a faixa está ocupada (unevictable), e a ponte cai
+   no buffer reserva em shmem. Ele é zerado e não está embaixo do console: tela preta, sem glitch.
+2. Ninguém segura o resto da faixa do console (8 KiB a 8 MiB do GGTT). As PTEs ainda apontam para a stolen do GOP,
+   mas o `drm_mm` acha que a faixa está livre. Qualquer objeto da GPU que o i915 põe ali (ring, contexto, GuC, o
+   próprio fb) recebe as escritas do console do `-v`. **Isso pode explicar o congelamento**, aqui e no teste 6.
+   Ainda é hipótese.
+
+### Correção: 0007 (drm-kmod) + 0008 (nullmoth)
+
+- **0007**: o `init_ggtt` chama `nmx_i915_reserve_boot_fb(ggtt)` **antes** do error capture, que então vai para
+  outro lugar. Isso segura a faixa do GGTT do framebuffer de boot como `I915_COLOR_UNEVICTABLE` desde o início,
+  antes de qualquer objeto da GPU. O `cleanup_init_ggtt` solta a faixa.
+- **0008**: na ponte, a tomada solta a reserva e fixa o objeto da stolen exatamente ali (`PIN_OFFSET_FIXED`). Se
+  falhar, a reserva volta. O buffer reserva (shmem) mantém a faixa segura.
+- Mensagens novas: `holding GGTT 0x0+0x7e9000 for the boot framebuffer (1920x1080)` no `init_ggtt`, e depois
+  `took over the boot framebuffer: …`.
+
+Build: `NMXGPU 8e8a8f8e7cd7d4ef238c9d87db6d6ae069b916f18c0fda1f71028d15d08ab860`, 15.240.856 B, com 0001 a 0008 e debug.
+**Não instalado.**
+
+## Próximo: teste 8 (0001 a 0008, debug)
+
+O mesmo procedimento do teste 7. Se a tomada funcionar, o texto do `-v` continua legível depois que o i915
+assume, e a foto mostra as linhas `NullMoth display: …`.
