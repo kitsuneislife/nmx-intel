@@ -862,3 +862,27 @@ Dois bugs a mais no caminho:
 
 Ordem: instalar o kext, desligar/ligar o driver no app (ele recopia o nvmtl), instalar o libdrm e reiniciar. Esperado:
 o ANV com 1 dispositivo no probe.
+
+## 2026-10-16: teste 20, 0019 + libdrm corrigido — **o ANV chega à GPU, e o Mac trava**
+
+Kext `8f2b4b6f…`, libdrm `719cb625…`, `fb=2`. Tela preta e Mac travado. Trilha `… fb-skip no-fb @38735`, batimento
+`ms=38755 pub=38413 open=2 ioctl=1 in=0 cmd=0x40106415`.
+- `0x40106415` = `DRM_IOCTL_GET_PCIINFO` (`_IOR('d', 0x15, 16)`). Ele retornou. **O libdrm achou a GPU e começou a
+  conversar com ela.** Nos testes anteriores, ninguém passava do `open`.
+- O Mac congelou até 0,5 s depois disso (o batimento é de 0,5 em 0,5 s), aos ~38,7 s do attach, quando os processos
+  do macOS (WindowServer, loginwindow…) carregam o ANV. O probe (45 s) não chegou a rodar.
+- A rodada não diz qual pedido trava.
+
+### 0020: registro de cada pedido na NVRAM
+
+- `nullmoth-gpu-io`: cada `open` (`o<pid>`), `close` (`c`) e ioctl (`d<nr>` na entrada; `+` ou `-<errno>` na saída) é
+  gravado na hora, e uma entrada sem saída é o pedido em andamento. Guarda os 470 caracteres mais novos e para
+  depois de 400 tokens.
+- `build/build-all.sh` agora para quando um arquivo não compila. Os scripts do nullmoth só imprimem `FAIL`/`failed: N`
+  e seguem, e um build saiu sem o `nmx_devfs.o` sem avisar (pego antes de instalar).
+
+Build `rt kext`: `NMXGPU 5b738a6066b4840ad50f25490707eeebbae88a076f0e1ace26c7ad00cd2f19d3`, 15.250.680 B.
+
+## Próximo: teste 21 (0020, mesmo libdrm, `fb=2`)
+
+Depois do congelamento: `nvram nullmoth-gpu-io`.

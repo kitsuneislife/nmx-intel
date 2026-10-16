@@ -6,15 +6,22 @@
 export NMX_SRC=$HOME/nmx-build/gpu-src
 cd $NMX_SRC/xkpi || exit 1
 steps=${*:-amd rt i915 xe kext}
+# os scripts do nullmoth seguem quando um arquivo falha (só imprimem "... FAIL nome"); aqui a etapa para o build
+run_step() {
+  local out; out=$(mktemp)
+  "$@" 2>&1 | tee "$out"
+  if grep -qE "FAIL|failed: [1-9]" "$out"; then rm -f "$out"; echo "!! etapa com arquivo que não compilou: parei antes do kext"; exit 1; fi
+  rm -f "$out"
+}
 for s in $steps; do
   echo "== $s"; date
   case $s in
-    amd)  ./all.sh 20 ;;
-    rt)   ./rt.sh
+    amd)  run_step ./all.sh 20 ;;
+    rt)   run_step ./rt.sh
           # rt.sh compila todo xnu/*.cpp; o do NMXNPU não entra no NMXGPU (o kext-npu/build.sh tira ele assim)
           mkdir -p obj-npu-glue && mv -f xnuobj/nmx_npu_kext.o obj-npu-glue/ ;;
-    i915) ./all-i915.sh 20 ;;
-    xe)   ./all-xe.sh 20 ;;
+    i915) run_step ./all-i915.sh 20 ;;
+    xe)   run_step ./all-xe.sh 20 ;;
     debug) ./cc.sh $NMX_SRC/kpi/drm-kmod/drivers/gpu/drm/drm_print.c -DNMX_DRM_DEBUG && echo "drm debug 0x6 ligado" ;;
     nodebug) ./cc.sh $NMX_SRC/kpi/drm-kmod/drivers/gpu/drm/drm_print.c && echo "drm debug desligado" ;;
     kext) mkdir -p $HOME/nmx-build/out && ./kext/build.sh $HOME/nmx-build/out ;;

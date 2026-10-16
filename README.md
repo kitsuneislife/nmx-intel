@@ -38,7 +38,8 @@ O NVIDIA (RTX 3050) já funciona com o driver original e não é afetado por nad
 | Teste 16: **o painel atualiza** (console ao vivo pelo i915) e o Mac fica vivo. O WindowServer sobe, mas não mostra o desktop; o ANV acha 0 GPUs | ✅ testado no teste 17 |
 | Teste 17 (probe): os nós `/dev/dri` existem, mas toda abertura falha com ENODEV. Bug do port: a `struct file` não tem vnode, e o `drm_stub_open` não acha o minor | ✅ testado no teste 18 |
 | Teste 18: **desktop no painel, com o i915 controlando a tela** (`fb=2`). A abertura do DRM agora funciona, mas o port lê o ENXIO do `finit` como erro | ✅ testado no teste 19 |
-| Teste 19: desktop de novo; **o i915 responde ao espaço do usuário** (`drmGetVersion` = i915 1.6.0). O libdrm não acha a GPU (nós clone) e o `GET_PCIINFO` dá ENODEV | 🔧 `0019` + `libdrm-0001` (teste 20) |
+| Teste 19: desktop de novo; **o i915 responde ao espaço do usuário** (`drmGetVersion` = i915 1.6.0). O libdrm não acha a GPU (nós clone) e o `GET_PCIINFO` dá ENODEV | ✅ testado no teste 20 |
+| Teste 20: **o libdrm acha a GPU** (`GET_PCIINFO` responde) e o Mac trava logo depois, quando os processos do macOS carregam o ANV | 🔧 `0020`: cada pedido na NVRAM (teste 21) |
 | Patches 1 a 5 viram correções no fonte (`source-fixes/0001..0003`) | 🔧 compilado, falta testar |
 | Tela preta com o Mac vivo (sem framebuffer, o i915 desliga o pipe, DC6) | ❌ consequência da ponte |
 | Tela acelerada / Metal na Intel | ❌ ainda não |

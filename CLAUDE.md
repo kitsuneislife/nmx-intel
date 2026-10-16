@@ -75,7 +75,9 @@ Até 2026-10-15 o trabalho estava no branch `ccr-918d231a-luzxg0` dos dois outro
 
 ## Onde paramos (2026-10-15, depois do teste 5)
 
-**Mais novo (teste 19):** desktop pelo i915 e o DRM abre (`i915 1.6.0`). Faltavam: o libdrm reconhecer os nós clone
+**Mais novo (teste 20):** com o libdrm corrigido, o ANV acha a GPU (`GET_PCIINFO` ok) e o Mac trava ~0,5 s depois.
+0020 grava cada pedido em `nvram nullmoth-gpu-io` (teste 21, `5b738a60…`). Instalar o libdrm **depois** de ligar o driver no app.
+**Teste 19:** desktop pelo i915 e o DRM abre (`i915 1.6.0`). Faltavam: o libdrm reconhecer os nós clone
 (`source-fixes/libdrm-0001`, `tools/libdrm/{build,install}.sh`) e o `GET_PCIINFO` (0019). Teste 20 (`8f2b4b6f…`).
 **Teste 18:** **desktop no painel pelo i915** (`fb=2`, a tela do macOS é o IONDRV sobre o fb do GOP). A
 abertura do DRM devolve ENXIO (convenção do `finit`), que o port lia como erro; 0018 corrige (teste 19, `7a16c6ad…`).
@@ -92,7 +94,7 @@ depois do attach. 0015 = chaves na NVRAM (`sudo nvram nullmoth-gpu-fb=2` etc.); 
 fb do GOP, que o macOS (console e IONDRVFramebuffer) ainda desenha pela aperture. 0014 reserva essas páginas (teste 14).
 **Teste 12:** congela < 2 s depois do registro do nosso IOFramebuffer; o `IONDRVFramebuffer` do firmware
 continua na Intel (dois fbs "console" na mesma GPU). 0013 = teste 13, com chaves `nmxcon=0`/`nmxfb=2`/`nmxfb=0` (ver LOG).
-**Teste 11:** o NMXGPU é compilado no Mac (`build/`), com `source-fixes/0001..0019`. A trilha na NVRAM
+**Teste 11:** o NMXGPU é compilado no Mac (`build/`), com `source-fixes/0001..0020`. A trilha na NVRAM
 (`nvram nullmoth-gpu-trail`) mostrou que **o attach inteiro termina** (`published`, a marca de attach é apagada) e que o
 Mac congela depois, antes do macOS usar o nosso framebuffer (sem `fb-vram`/`fb-setmode`). A tomada do fb do GOP cai em
 `tk-obj` (a faixa da stolen já tem dono). Próximo: teste 12, com batimento e trilha depois do attach (ver o fim do `LOG.md`).

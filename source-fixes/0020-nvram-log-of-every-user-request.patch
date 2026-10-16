@@ -1,0 +1,135 @@
+diff --git a/gpu-port/xkpi/bsdcompat/include/nmx_xnu.h b/gpu-port/xkpi/bsdcompat/include/nmx_xnu.h
+index cb84dab..dc101e1 100644
+--- a/gpu-port/xkpi/bsdcompat/include/nmx_xnu.h
++++ b/gpu-port/xkpi/bsdcompat/include/nmx_xnu.h
+@@ -172,6 +172,8 @@ int nmx_xnu_boot_fb(uint64_t *phys, uint32_t *width, uint32_t *height, uint32_t
+  * last step reached survives a freeze that loses the log (`nvram nullmoth-gpu-trail` on the next boot)
+  */
+ void nmx_xnu_trail(const char *step);
++/* xnu/nmx_kext.cpp: one token of the user-space request log in NVRAM ("nullmoth-gpu-io") */
++void nmx_xnu_iolog(const char *tok);
+ /* xnu/nmx_kext.cpp: a test switch, from the boot argument, else the NVRAM variable, else def */
+ uint32_t nmx_xnu_knob(const char *bootarg, const char *nvvar, uint32_t def);
+ /* xnu/nmx_devfs.cpp: device node opens, ioctls so far, ioctls running now and the last ioctl command */
+diff --git a/gpu-port/xkpi/xnu/nmx_devfs.cpp b/gpu-port/xkpi/xnu/nmx_devfs.cpp
+index 8c2db46..7173448 100644
+--- a/gpu-port/xkpi/xnu/nmx_devfs.cpp
++++ b/gpu-port/xkpi/xnu/nmx_devfs.cpp
+@@ -101,6 +101,11 @@ static int nmx_open(dev_t dev, int flags, int devtype, struct proc *p)
+     if (cookie == nullptr)
+         return ENXIO;
+     OSIncrementAtomic(&g_opens);
++    {
++        char tok[16];
++        snprintf(tok, sizeof(tok), "o%d", proc_pid(p));
++        nmx_xnu_iolog(tok);
++    }
+     int err = nmx_cdev_open(cookie, m, flags);
+     if (err) {
+         IOLockLock(g_lock);
+@@ -113,6 +118,7 @@ static int nmx_open(dev_t dev, int flags, int devtype, struct proc *p)
+ static int nmx_close(dev_t dev, int flags, int devtype, struct proc *p)
+ {
+     int m = minor(dev);
++    nmx_xnu_iolog("c");
+     int err = nmx_cdev_close(m, flags);
+     IOLockLock(g_lock);
+     if (m >= NODE_MINORS && m < OPEN_MINOR_MAX)
+@@ -126,7 +132,17 @@ static int nmx_ioctl(dev_t dev, u_long cmd, caddr_t data, int fflag, struct proc
+     OSIncrementAtomic(&g_ioctls);
+     OSIncrementAtomic(&g_in_ioctl);
+     g_last_cmd = (UInt32)cmd;
++    char tok[16];
++    char grp = (char)((cmd >> 8) & 0xff);
++    snprintf(tok, sizeof(tok), "%c%x", (grp >= '0' && grp <= 'z') ? grp : '?', (unsigned)(cmd & 0xff));
++    nmx_xnu_iolog(tok);
+     int err = nmx_cdev_ioctl(minor(dev), cmd, data, fflag);
++    if (err == 0)
++        nmx_xnu_iolog("+");
++    else {
++        snprintf(tok, sizeof(tok), "-%d", err);
++        nmx_xnu_iolog(tok);
++    }
+     OSDecrementAtomic(&g_in_ioctl);
+     return err;
+ }
+diff --git a/gpu-port/xkpi/xnu/nmx_kext.cpp b/gpu-port/xkpi/xnu/nmx_kext.cpp
+index 50553d7..f4f533e 100644
+--- a/gpu-port/xkpi/xnu/nmx_kext.cpp
++++ b/gpu-port/xkpi/xnu/nmx_kext.cpp
+@@ -244,6 +244,52 @@ extern "C" void nmx_xnu_trail(const char *step)
+     IOLockUnlock(gTrailLock);
+ }
+ 
++/*
++ * "nullmoth-gpu-io": what user space asks of the GPU, written to NVRAM as it happens, so a boot that freezes shows
++ * the request in flight. Tokens: "o<pid>" an open, "c" a close, "<g><nr>" an ioctl starting (g is the ioctl group
++ * letter: d = DRM, N = the port's mmap), "+" one that returned 0, "-<errno>" one that failed. The newest 470
++ * characters are kept; writing stops after 400 tokens (the start is what matters).
++ */
++static IOLock *gIoLock;
++static char gIo[480];
++static unsigned gIoWrites;
++
++extern "C" void nmx_xnu_iolog(const char *tok)
++{
++    if (gIoLock == nullptr || tok == nullptr)
++        return;
++    IOLockLock(gIoLock);
++    if (gIoWrites >= 400) {
++        IOLockUnlock(gIoLock);
++        return;
++    }
++    gIoWrites++;
++    size_t len = strlen(gIo), add = strlen(tok);
++    while (len + add + 2 > sizeof(gIo) - 10) {       /* drop the oldest token */
++        char *sp = strchr(gIo, ' ');
++        if (sp == nullptr) { gIo[0] = 0; len = 0; break; }
++        memmove(gIo, sp + 1, strlen(sp + 1) + 1);
++        len = strlen(gIo);
++    }
++    if (len)
++        gIo[len++] = ' ';
++    memcpy(gIo + len, tok, add + 1);
++    IODTNVRAM *n = nmx_nvram();
++    if (n != nullptr) {
++        const OSSymbol *k = OSSymbol::withCString("nullmoth-gpu-io");
++        OSData *d = OSData::withBytes(gIo, (unsigned)strlen(gIo));
++        if (k != nullptr && d != nullptr)
++            n->setProperty(k, d);
++        if (d)
++            d->release();
++        if (k)
++            k->release();
++        n->sync();
++        n->release();
++    }
++    IOLockUnlock(gIoLock);
++}
++
+ /* the trail plus, at its end, the heartbeat's latest " @<ms since the attach began>" (gTrailBeat) */
+ static char gTrailBeat[24];
+ 
+@@ -349,6 +395,22 @@ void NMXGPU::attachNow()
+     gTrail[0] = 0;
+     gTrailBeat[0] = 0;
+     gTrailWrites = 0;
++    if (gIoLock == nullptr)
++        gIoLock = IOLockAlloc();
++    gIo[0] = 0;
++    gIoWrites = 0;
++    {
++        IODTNVRAM *n = nmx_nvram();
++        if (n != nullptr) {
++            const OSSymbol *k = OSSymbol::withCString("nullmoth-gpu-io");
++            if (k != nullptr) {
++                n->removeProperty(k);
++                k->release();
++            }
++            n->sync();
++            n->release();
++        }
++    }
+     nmx_beat_write(nullptr);
+     gAttachStart = mach_absolute_time();
+     gPublished = 0;
