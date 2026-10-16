@@ -1,0 +1,280 @@
+diff --git a/gpu-port/xkpi/override/i915/nmx_i915_fb.c b/gpu-port/xkpi/override/i915/nmx_i915_fb.c
+index 38c5b8c..cebe077 100644
+--- a/gpu-port/xkpi/override/i915/nmx_i915_fb.c
++++ b/gpu-port/xkpi/override/i915/nmx_i915_fb.c
+@@ -154,7 +154,11 @@ static struct i915_vma *take_boot_fb(struct drm_i915_private *i915, u32 base, u3
+     if (IS_ERR(obj)) {
+         printf("NullMoth display: stolen 0x%llx+0x%x is taken (%ld)\n", (unsigned long long)off, size,
+                PTR_ERR(obj));
+-        nmx_xnu_trail("tk-obj");
++        {
++            char step[48];
++            snprintf(step, sizeof(step), "tk-obj%ld@%llx+%x", PTR_ERR(obj), (unsigned long long)off, size);
++            nmx_xnu_trail(step);
++        }
+         return NULL;
+     }
+     /* WT ahead of time, as intel_plane_initial.c does, so pinning for display does not change the cache level */
+diff --git a/gpu-port/xkpi/xnu/nmx_fb.cpp b/gpu-port/xkpi/xnu/nmx_fb.cpp
+index d3cf295..01b0faf 100644
+--- a/gpu-port/xkpi/xnu/nmx_fb.cpp
++++ b/gpu-port/xkpi/xnu/nmx_fb.cpp
+@@ -11,6 +11,7 @@
+ #include <IOKit/graphics/IOFramebuffer.h>
+ #include <IOKit/IODeviceMemory.h>
+ #include <kern/thread_call.h>
++#include <pexpert/pexpert.h>
+ #include "nmx_port.h"
+ #include "nmx_xnu.h"
+ 
+@@ -32,11 +33,16 @@ class NMXGPUFB : public IOFramebuffer {
+     thread_call_t fVblTimer = nullptr;
+     uint64_t fVblNext = 0;
+     volatile bool fStopping = false;
++    /* the first call of each method, in the NVRAM trail: what IOGraphics had asked when the Mac froze */
++    volatile uint32_t fSeen = 0;
++    void once(int bit, const char *step) {
++        if (!(fSeen & (1u << bit))) { fSeen |= 1u << bit; nmx_xnu_trail(step); }
++    }
+ 
+     static void vblFire(thread_call_param_t p0, thread_call_param_t) {
+         NMXGPUFB *me = (NMXGPUFB *)p0;
+         if (me->fStopping) return;
+-        if (me->fVbl.proc) me->fVbl.proc(me->fVbl.target, me->fVbl.ref);
++        if (me->fVbl.proc) { me->once(12, "fb-vbl"); me->fVbl.proc(me->fVbl.target, me->fVbl.ref); }
+         uint64_t period;
+         nanoseconds_to_absolutetime(me->fFrameNs, &period);
+         uint64_t now = mach_absolute_time();
+@@ -87,9 +93,16 @@ public:
+         IOFramebuffer::stop(provider);
+     }
+ 
+-    IOReturn enableController() override { return kIOReturnSuccess; }
+-    bool isConsoleDevice() override { return true; }
++    IOReturn enableController() override { once(15, "fb-en"); return kIOReturnSuccess; }
++    /* nmxcon=0: not the console, so the kernel's text console stays on the boot framebuffer */
++    bool isConsoleDevice() override {
++        uint32_t v = 1;
++        PE_parse_boot_argn("nmxcon", &v, sizeof(v));
++        once(19, v ? "fb-con" : "fb-nocon");
++        return v != 0;
++    }
+     IODeviceMemory *getApertureRange(IOPixelAperture aperture) override {
++        once(0, "fb-ap");
+         if (aperture != kIOFBSystemAperture) return nullptr;
+         return IODeviceMemory::withRange(fInfo.phys, (IOPhysicalLength)fInfo.pitch * fInfo.height);
+     }
+@@ -98,10 +111,11 @@ public:
+         return IODeviceMemory::withRange(fInfo.phys, fInfo.size);
+     }
+     bool fTrailVram = false, fTrailMode = false, fTrailWs = false;
+-    const char *getPixelFormats() override { return IO32BitDirectPixels "\0"; }
++    const char *getPixelFormats() override { once(14, "fb-fmt"); return IO32BitDirectPixels "\0"; }
+     IOItemCount getDisplayModeCount() override { return 1; }
+-    IOReturn getDisplayModes(IODisplayModeID *modes) override { modes[0] = 1; return kIOReturnSuccess; }
++    IOReturn getDisplayModes(IODisplayModeID *modes) override { once(13, "fb-modes"); modes[0] = 1; return kIOReturnSuccess; }
+     IOReturn getInformationForDisplayMode(IODisplayModeID mode, IODisplayModeInformation *info) override {
++        once(11, "fb-inf");
+         if (mode != 1 || !info) return kIOReturnBadArgument;
+         bzero(info, sizeof(*info));
+         info->nominalWidth = fInfo.width;
+@@ -113,6 +127,7 @@ public:
+     UInt64 getPixelFormatsForDisplayMode(IODisplayModeID, IOIndex) override { return 0; }
+     IOReturn getPixelInformation(IODisplayModeID mode, IOIndex depth, IOPixelAperture aperture,
+                                  IOPixelInformation *pi) override {
++        once(9, "fb-pix");
+         if (mode != 1 || depth != 0 || aperture != kIOFBSystemAperture || !pi) return kIOReturnUnsupportedMode;
+         bzero(pi, sizeof(*pi));
+         pi->bytesPerRow = fInfo.pitch;
+@@ -129,11 +144,13 @@ public:
+         return kIOReturnSuccess;
+     }
+     IOReturn getCurrentDisplayMode(IODisplayModeID *mode, IOIndex *depth) override {
++        once(1, "fb-cur");
+         *mode = 1; *depth = 0; return kIOReturnSuccess;
+     }
+-    IOReturn getStartupDisplayMode(IODisplayModeID *mode, IOIndex *depth) override { return getCurrentDisplayMode(mode, depth); }
++    IOReturn getStartupDisplayMode(IODisplayModeID *mode, IOIndex *depth) override { once(18, "fb-boot"); return getCurrentDisplayMode(mode, depth); }
+     /* without a timing, WindowServer shows the display at 0.00 Hz (seen with NMIntelFB) */
+     IOReturn getTimingInfoForDisplayMode(IODisplayModeID mode, IOTimingInformation *info) override {
++        once(2, "fb-tim");
+         if (mode != 1 || !info) return kIOReturnUnsupportedMode;
+         bzero(info, sizeof(*info));
+         info->appleTimingID = kIOTimingIDInvalid;
+@@ -159,19 +176,21 @@ public:
+     IOItemCount getConnectionCount() override { return 1; }
+     IOReturn registerForInterruptType(IOSelect type, IOFBInterruptProc proc, OSObject *target, void *ref,
+                                       void **iref) override {
++        once(3, "fb-irq");
+         if (type == kIOFBVBLInterruptType) { fVbl = { proc, target, ref }; if (iref) *iref = &fVbl; return kIOReturnSuccess; }
+         if (type == kIOFBConnectInterruptType) { fConnect = { proc, target, ref }; if (iref) *iref = &fConnect; return kIOReturnSuccess; }
+         return kIOReturnUnsupported;
+     }
+     IOReturn unregisterInterrupt(void *) override { return kIOReturnSuccess; }
+     IOReturn setInterruptState(void *, UInt32) override { return kIOReturnSuccess; }
+-    IOReturn setGammaTable(UInt32, UInt32, UInt32, void *) override { return kIOReturnSuccess; }
+-    IOReturn setGammaTable(UInt32, UInt32, UInt32, void *, bool) override { return kIOReturnSuccess; }
+-    IOReturn setCLUTWithEntries(IOColorEntry *, UInt32, UInt32, IOOptionBits) override { return kIOReturnSuccess; }
++    IOReturn setGammaTable(UInt32, UInt32, UInt32, void *) override { once(10, "fb-gam"); return kIOReturnSuccess; }
++    IOReturn setGammaTable(UInt32, UInt32, UInt32, void *, bool) override { once(10, "fb-gam"); return kIOReturnSuccess; }
++    IOReturn setCLUTWithEntries(IOColorEntry *, UInt32, UInt32, IOOptionBits) override { once(17, "fb-clut"); return kIOReturnSuccess; }
+     IOReturn setApertureEnable(IOPixelAperture, IOOptionBits) override { return kIOReturnSuccess; }
+     IOReturn setStartupDisplayMode(IODisplayModeID, IOIndex) override { return kIOReturnSuccess; }
+     /* power acknowledged at once; left to IOFramebuffer it waits on a shared thread (seen with NVRMFB) */
+     IOReturn setPowerState(unsigned long ordinal, IOService *) override {
++        once(4, ordinal ? "fb-ps1" : "fb-ps0");
+         handleEvent(ordinal ? kIOFBNotifyDidPowerOn : kIOFBNotifyWillPowerOff);
+         return kIOPMAckImplied;
+     }
+@@ -193,9 +212,11 @@ public:
+             IOReturn r = IOFramebuffer::setAttribute(attribute, value);
+             return r == kIOReturnUnsupported ? kIOReturnSuccess : r;
+         }
++        once(8, "fb-sa");
+         return IOFramebuffer::setAttribute(attribute, value);
+     }
+     IOReturn setAttributeForConnection(IOIndex idx, IOSelect attribute, uintptr_t value) override {
++        once(6, "fb-sac");
+         switch (attribute) {
+         case kConnectionPower: case kConnectionColorModesSupported: case kConnectionColorDepthsSupported:
+         case kConnectionControllerColorDepth: case kConnectionControllerDepthsSupported: case kConnectionColorMode:
+@@ -206,14 +227,17 @@ public:
+         }
+     }
+     IOReturn connectFlags(IOIndex, IODisplayModeID, IOOptionBits *flags) override {
++        once(16, "fb-cf");
+         if (flags) *flags = kDisplayModeValidFlag | kDisplayModeSafeFlag | kDisplayModeDefaultFlag;
+         return kIOReturnSuccess;
+     }
+     IOReturn getAttribute(IOSelect attribute, uintptr_t *value) override {
++        once(7, "fb-ga");
+         if (attribute == kIOWindowServerActiveAttribute) { if (value) *value = 1; return kIOReturnSuccess; }
+         return IOFramebuffer::getAttribute(attribute, value);
+     }
+     IOReturn getAttributeForConnection(IOIndex idx, IOSelect attr, uintptr_t *value) override {
++        once(5, "fb-gac");
+         if (idx != 0 || !value) return kIOReturnBadArgument;
+         switch (attr) {
+         case kConnectionEnable: case kConnectionCheckEnable: *value = 1; return kIOReturnSuccess;
+@@ -235,6 +259,12 @@ IOService *nmx_fb_publish(IOService *gpu, void *dev)
+         FBLOG("no framebuffer (%d)", err);
+         return nullptr;
+     }
++    uint32_t mode = 1;
++    PE_parse_boot_argn("nmxfb", &mode, sizeof(mode));
++    if (mode == 2) {
++        nmx_xnu_trail("fb-skip");      /* nmxfb=2: stays lit, with no IOFramebuffer */
++        return nullptr;
++    }
+     nmx_xnu_trail("fb-new");
+     NMXGPUFB *fb = OSTypeAlloc(NMXGPUFB);
+     if (fb == nullptr || !fb->initWith(dev, info) || !fb->attach(gpu)) {
+diff --git a/gpu-port/xkpi/xnu/nmx_kext.cpp b/gpu-port/xkpi/xnu/nmx_kext.cpp
+index affd2f6..4983e78 100644
+--- a/gpu-port/xkpi/xnu/nmx_kext.cpp
++++ b/gpu-port/xkpi/xnu/nmx_kext.cpp
+@@ -21,6 +21,7 @@
+ #include <mach/kmod.h>
+ #include <pexpert/pexpert.h>
+ #include <kern/thread.h>
++#include <kern/clock.h>
+ #include "nmx_port.h"
+ #include "nmx_xnu.h"
+ 
+@@ -144,7 +145,7 @@ static const char *const kAttachMarker = "nullmoth-gpu-attaching";
+  */
+ static const char *const kTrail = "nullmoth-gpu-trail";
+ static IOLock *gTrailLock;
+-static char gTrail[240];
++static char gTrail[480];
+ static unsigned gTrailWrites;
+ 
+ static IODTNVRAM *nmx_nvram()
+@@ -202,7 +203,7 @@ extern "C" void nmx_xnu_trail(const char *step)
+     IOLog("NullMoth trail: %s\n", step);
+     IOLockLock(gTrailLock);
+     size_t len = strlen(gTrail), add = strlen(step);
+-    if (gTrailWrites >= 40 || len + add + 2 > sizeof(gTrail)) {
++    if (gTrailWrites >= 80 || len + add + 2 > sizeof(gTrail)) {
+         IOLockUnlock(gTrailLock);
+         return;
+     }
+@@ -227,10 +228,21 @@ extern "C" void nmx_xnu_trail(const char *step)
+ }
+ 
+ /*
+- * After the attach: every 2 s for 5 min, "nullmoth-gpu-beat" = seconds since the outputs were published, plus what
+- * user space has asked of the GPU (opens, ioctls, ioctls in flight, last command). A boot that freezes leaves the
+- * last beat in NVRAM, so the next boot shows how long the Mac lived and whether Metal was in the GPU at the time.
++ * From the start of the attach: "nullmoth-gpu-beat" = ms since the attach began, ms since the outputs were published
++ * (-1 before), and what user space has asked of the GPU (opens, ioctls, ioctls in flight, last command). Every 0.5 s
++ * for the first minute, then every 5 s until 5 min. A boot that freezes leaves the last beat in NVRAM, so the next
++ * boot shows how long the Mac lived after each step.
+  */
++static uint64_t gAttachStart, gPublished;
++
++static int64_t nmx_ms_since(uint64_t t)
++{
++    if (t == 0)
++        return -1;
++    uint64_t ns;
++    absolutetime_to_nanoseconds(mach_absolute_time() - t, &ns);
++    return (int64_t)(ns / 1000000);
++}
+ static const char *const kBeat = "nullmoth-gpu-beat";
+ 
+ static void nmx_beat_write(const char *s)
+@@ -257,13 +269,14 @@ static void nmx_beat_write(const char *s)
+ 
+ static void nmx_beat_thread(void *, wait_result_t)
+ {
+-    char s[96];
+-    for (int t = 2; t <= 300; t += 2) {
+-        IOSleep(2000);
++    char s[128];
++    for (int i = 0; nmx_ms_since(gAttachStart) < 300000; i++) {
++        IOSleep(i < 120 ? 500 : 5000);
+         int opens, ioctls, inside;
+         uint32_t cmd;
+         nmx_xnu_node_stats(&opens, &ioctls, &inside, &cmd);
+-        snprintf(s, sizeof(s), "t=%d open=%d ioctl=%d in=%d cmd=0x%x", t, opens, ioctls, inside, cmd);
++        snprintf(s, sizeof(s), "ms=%lld pub=%lld open=%d ioctl=%d in=%d cmd=0x%x", nmx_ms_since(gAttachStart),
++                 nmx_ms_since(gPublished), opens, ioctls, inside, cmd);
+         nmx_beat_write(s);
+     }
+     thread_terminate(current_thread());
+@@ -291,6 +304,13 @@ void NMXGPU::attachNow()
+     gTrail[0] = 0;
+     gTrailWrites = 0;
+     nmx_beat_write(nullptr);
++    gAttachStart = mach_absolute_time();
++    gPublished = 0;
++    {
++        thread_t beat;
++        if (kernel_thread_start(nmx_beat_thread, nullptr, &beat) == KERN_SUCCESS)
++            thread_deallocate(beat);
++    }
+     nmx_xnu_trail("attach");
+     dev_ = nmx_port_attach(pci_);
+     nmx_xnu_trail(dev_ ? "attached" : "no-driver");
+@@ -316,13 +336,15 @@ void NMXGPU::attachNow()
+     pci_->setProperty("nmxgpu-claimed", kOSBooleanTrue);
+     pci_->registerService();
+     /* light the outputs and hand them to macOS; without it the device still renders, with no screen of its own */
+-    nmx_xnu_trail("publish");
+-    fb_ = nmx_fb_publish(this, dev_);
++    /* nmxfb=0: no display bridge at all (the outputs go dark); nmxfb=2: the bridge lights the panel, but no
++       IOFramebuffer is published (nmx_fb.cpp). To tell the bridge's modeset, the IOFramebuffer and the rest apart */
++    uint32_t pub = 1;
++    PE_parse_boot_argn("nmxfb", &pub, sizeof(pub));
++    nmx_xnu_trail(pub ? "publish" : "nopub");
++    fb_ = pub ? nmx_fb_publish(this, dev_) : nullptr;
++    gPublished = mach_absolute_time();
+     nmx_xnu_trail(fb_ ? "published" : "no-fb");
+     nmx_marker_write(false);
+-    thread_t beat;
+-    if (kernel_thread_start(nmx_beat_thread, nullptr, &beat) == KERN_SUCCESS)
+-        thread_deallocate(beat);
+     IOLog("NullMoth GPU: driving %04x:%04x\n", pci_->configRead16(kIOPCIConfigVendorID),
+           pci_->configRead16(kIOPCIConfigDeviceID));
+     OSSynchronizeIO();

@@ -604,3 +604,42 @@ Build sem debug: `NMXGPU 821d791cbe95f6ac754870eaee4b6124f440910e4991eafede018e6
 
 O mesmo procedimento. Depois do congelamento, bootar com `-nvoff` e ler `nvram nullmoth-gpu-trail` e
 `nvram nullmoth-gpu-beat`.
+
+## 2026-10-16: teste 12, batimento (0012)
+
+Binário `821d791c…` (conferido em `/Library/Extensions`). Tela preta, Mac congelado, caps lock morto. Nenhum log do
+boot (o boot anterior vai até 08:29:52, o com `-nvoff` começa 08:32:27).
+
+- Trilha igual à do teste 11: `… tk-obj fallback … fb-reg published`.
+- **`nullmoth-gpu-beat` não existe.** Ele é apagado no começo do attach e o primeiro valor vinha 2 s depois de
+  `published`. Logo, **o Mac congela menos de 2 s depois de o IOFramebuffer ser registrado.**
+- `tk-obj` continua, mesmo com o drain: não é objeto liberado à espera. O número do erro e a faixa só iam para o log.
+
+### Pesquisa (2026-10-16)
+
+- nullmoth 2.0.3 e 2.0.4 (02:21 UTC): só app e instalador. Nada em `gpu-port/` desde 2026-10-13.
+- Issues #119/#131/#219: o `NVRMFBClaim` agora só pega NVIDIA (2.0.0), então o **`IONDRVFramebuffer`
+  (`.Display_boot`) fica na Intel (GFX0)**. Confirmado aqui no ioreg. É a tela do firmware do macOS. O NMXGPU não
+  mexe nele. No nosso boot ficam dois IOFramebuffers na mesma GPU, os dois "console": o do firmware (aperture
+  `0x4000000000`) e o nosso. Suspeito forte para o congelamento logo depois do registro.
+- #219 (Tiger Lake, sem MUX): o NMXGPU nem anexa. Sem resposta do autor.
+- NootedGreen (fork willyyypatootieee): só docs/CI e uma checagem de BAR0 nula até 2026-10-10. sgiammori parado desde
+  maio. Nada novo para nós.
+
+### 0013: trilha de cada chamada do IOFramebuffer, batimento mais cedo, chaves de bisseção
+
+- A primeira chamada de cada método do `NMXGPUFB` entra na trilha: `fb-con`, `fb-ap`, `fb-cur`, `fb-boot`,
+  `fb-tim`, `fb-irq`, `fb-ps0/1`, `fb-gac`, `fb-sac`, `fb-ga`, `fb-sa`, `fb-pix`, `fb-gam`, `fb-inf`, `fb-vbl`,
+  `fb-modes`, `fb-fmt`, `fb-en`, `fb-cf`, `fb-clut`. Trilha com 480 caracteres e 80 passos.
+- `tk-obj<erro>@<offset>+<tamanho>`.
+- O batimento começa no início do attach, a cada 0,5 s no primeiro minuto: `ms=… pub=… open=… ioctl=… in=… cmd=…`.
+- Boot-args para os próximos testes, sem recompilar:
+  - `nmxcon=0`: o nosso fb não é o console;
+  - `nmxfb=2`: acende o painel, mas não publica o IOFramebuffer;
+  - `nmxfb=0`: sem ponte de tela.
+
+Build sem debug: `NMXGPU 6ebb48545fc99fa5359119bd993d9f3d6e4423dd0a5ffbb2be45fd05d54ac53e`, 15.245.864 B.
+
+## Próximo: teste 13 (0013)
+
+O mesmo procedimento, sem boot-args novos. Ler `nvram nullmoth-gpu-trail` e `nvram nullmoth-gpu-beat`.

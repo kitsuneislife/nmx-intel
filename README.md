@@ -30,7 +30,8 @@ O NVIDIA (RTX 3050) já funciona com o driver original e não é afetado por nad
 | Teste 8: endereço do fb de boot com flag no bit 0 (tomada não aconteceu); congela ~9 s depois que o WindowServer usa o framebuffer | 🔧 `0009`: máscara e GPU acordada enquanto o fb existe |
 | Teste 9: ainda congela depois de publicar o fb (a marca de boot foi apagada), sem log | 🔧 `0010`: trilha das etapas na NVRAM (`nvram nullmoth-gpu-trail`) |
 | Teste 10: modeset da ponte OK (`lit`); congela entre `lit` e `published` (registro do cliente DRM ou start do IOFramebuffer); a tomada do fb do GOP ainda falha | ✅ testado no teste 11 |
-| Teste 11: **o attach termina** (`published`, marca apagada); congela depois, antes do macOS usar o nosso fb. Tomada do GOP: `tk-obj` (stolen ocupada) | 🔧 `0012`: batimento e drain antes da tomada, compilado (teste 12) |
+| Teste 11: **o attach termina** (`published`, marca apagada); congela depois, antes do macOS usar o nosso fb. Tomada do GOP: `tk-obj` (stolen ocupada) | ✅ testado no teste 12 |
+| Teste 12: sem batimento, então congela < 2 s depois do registro do IOFramebuffer. O `IONDRVFramebuffer` do firmware continua na Intel | 🔧 `0013`: trilha por método do fb, batimento desde o attach, `nmxcon`/`nmxfb` (teste 13) |
 | Patches 1 a 5 viram correções no fonte (`source-fixes/0001..0003`) | 🔧 compilado, falta testar |
 | Tela preta com o Mac vivo (sem framebuffer, o i915 desliga o pipe, DC6) | ❌ consequência da ponte |
 | Tela acelerada / Metal na Intel | ❌ ainda não |
