@@ -1,6 +1,6 @@
 #!/bin/bash
 # apply-fixes.sh: aplica source-fixes/ na árvore de ~/nmx-build (depois de setup.sh) e faz commit em cada clone.
-#   0001, 0004, 0006, 0008 a 0015 e 0017 a 0020 no nullmoth (branch nmx-intel-build), 0002, 0003, 0005, 0007 e 0016 no drm-kmod (branch nmx-intel).
+#   0001, 0004, 0006, 0008 a 0015 e 0017 a 0021 no nullmoth (branch nmx-intel-build), 0002, 0003, 0005, 0007 e 0016 no drm-kmod (branch nmx-intel).
 # Pode rodar de novo: um patch que já está aplicado (tag fix-NNNN no clone) é pulado.
 set -euo pipefail
 F=$(cd "$(dirname "$0")/../source-fixes" && pwd)
@@ -46,3 +46,4 @@ apply "$B/nvidia-macos-driver" 0017-one-vnode-per-device-node-so-drm-opens-work.
 apply "$B/nvidia-macos-driver" 0018-enxio-from-fdopen-is-success.patch
 apply "$B/nvidia-macos-driver" 0019-get-pciinfo-finds-the-pci-function-above-the-drm-child.patch
 apply "$B/nvidia-macos-driver" 0020-nvram-log-of-every-user-request.patch
+apply "$B/nvidia-macos-driver" 0021-rcu-readers-may-block.patch

@@ -886,3 +886,39 @@ Build `rt kext`: `NMXGPU 5b738a6066b4840ad50f25490707eeebbae88a076f0e1ace26c7ad0
 ## Próximo: teste 21 (0020, mesmo libdrm, `fb=2`)
 
 Depois do congelamento: `nvram nullmoth-gpu-io`.
+
+## 2026-10-16: teste 21, 0020 — **a causa do travamento: o RCU do port**
+
+Kext `5b738a60…`, libdrm `719cb625…`, `fb=2`. Parou na tela de texto (NVRM/IOConsoleUsers/AppleKeyStore), sem desktop.
+Batimento `ms=208167 open=56 ioctl=314 in=0 cmd=0xc0186474`: travou aos ~208 s do attach, **fora** de um ioctl.
+- `nullmoth-gpu-io` atingiu o limite de 400 tokens antes do fim, mas mostra o ANV inteiro conversando com o i915:
+  `GETPARAM`, `QUERY`, `GEM_CONTEXT_{GET,SET}PARAM`, `GET_CAP`, `SYNCOBJ_{CREATE,WAIT,DESTROY}`, `GEM_CREATE`,
+  `GEM_CLOSE`, `REG_READ`, `GET_APERTURE`, `GET_TILING`, quase tudo `+`. Falham `GEM_USERPTR` (-22),
+  `PRIME_HANDLE_TO_FD` (-102) e alguns `GETPARAM` (-19/-102). 56 aberturas em processos diferentes.
+- **O panic do teste 20** (`Kernel-2026-10-16-104230.panic`) mostra o travamento:
+  `NMIPI for unresponsive processor: TLB flush timeout`, no SecurityAgent fechando o nó DRM:
+  `nmx_close → nmx_cdev_close → linux_file_close → linux_synchronize_rcu`, com o RIP em
+  `ck_epoch_synchronize_wait` e as interrupções desligadas (RFLAGS 0x93).
+
+**Causa.** O RCU do LinuxKPI fixa o leitor na CPU (`sched_pin`) e usa o registro de época daquela CPU. No xnu o port
+faz `sched_pin` desligando as interrupções, com a contagem por CPU. Um leitor que dorme (todo leitor SRCU pode, e o DRM
+usa SRCU; os spinlocks do port também podem bloquear) volta em outra CPU. Aí a seção termina no registro errado, a
+primeira CPU fica com as interrupções desligadas para quem rodar nela, e `synchronize_rcu` (a cada `close`) espera para
+sempre girando sem interrupções. As outras CPUs não conseguem o TLB shootdown, e o Mac congela.
+
+### 0021: leitores RCU que podem dormir
+
+- `override/src/linux_rcu.c` (substitui o do FreeBSD): o leitor só soma 1 num de dois contadores globais por tipo, sem
+  fixar a CPU nem mexer nas interrupções. `synchronize_rcu` espera o contador antigo zerar, troca o índice e espera o
+  outro (o período de graça clássico do SRCU), dormindo (`mi_switch`/`pause`) em vez de girar.
+- O batimento ganhou `rcu=` (quantos `synchronize_rcu` estão esperando agora).
+- `nullmoth-gpu-io` continua seguindo os pedidos depois de 400 tokens; o batimento grava o final quando muda. Assim o
+  fim antes de um travamento aparece.
+- Upstream: a v2.1.0 do nullmoth (2026-10-16) só acrescenta logs de registro/probe de PCI no NMXGPU. Nada sobre RCU,
+  framebuffer ou i915.
+
+Build `rt kext`: `NMXGPU 9a361f0ebdcd581ed88720192eefc4516d228bb27f1648b22ba7b3328ac75b74`, 15.250.856 B.
+
+## Próximo: teste 22 (0021, mesmo libdrm, `fb=2`)
+
+Esperado: sem o congelamento no `close`. Depois: `nvram nullmoth-gpu-beat`, `nvram nullmoth-gpu-io` e o probe.

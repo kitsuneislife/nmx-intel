@@ -75,7 +75,10 @@ Até 2026-10-15 o trabalho estava no branch `ccr-918d231a-luzxg0` dos dois outro
 
 ## Onde paramos (2026-10-15, depois do teste 5)
 
-**Mais novo (teste 20):** com o libdrm corrigido, o ANV acha a GPU (`GET_PCIINFO` ok) e o Mac trava ~0,5 s depois.
+**Mais novo (teste 21):** o ANV faz centenas de pedidos ao i915. O travamento é o RCU do port: o `sched_pin` desliga as
+interrupções por CPU, um leitor que dorme muda de CPU, e o `synchronize_rcu` do `close` gira para sempre (panic do teste 20).
+0021 = `override/src/linux_rcu.c` com contadores globais (teste 22, `9a361f0e…`). A v2.1.0 do nullmoth só traz logs.
+**Teste 20:** com o libdrm corrigido, o ANV acha a GPU (`GET_PCIINFO` ok) e o Mac trava ~0,5 s depois.
 0020 grava cada pedido em `nvram nullmoth-gpu-io` (teste 21, `5b738a60…`). Instalar o libdrm **depois** de ligar o driver no app.
 **Teste 19:** desktop pelo i915 e o DRM abre (`i915 1.6.0`). Faltavam: o libdrm reconhecer os nós clone
 (`source-fixes/libdrm-0001`, `tools/libdrm/{build,install}.sh`) e o `GET_PCIINFO` (0019). Teste 20 (`8f2b4b6f…`).
