@@ -11,22 +11,22 @@ B works. 60 Hz is not wanted.
 
 ## Where we are
 
-- **i915 path (Intel test driver on):** stable desktop on `NMXGPUFB`, 1920x1080 @ 144 Hz, software compositing
-  (~225 % CPU). Ghost firmware display hidden by `tools/mirror` — which had never run (launchd EX_CONFIG); fixed.
-- **RTX path:** RTX-1..7 froze. Root cause [inferred, strong]: NMIntelFB sat alone at index 4 of NVRM's dependent
-  group (no NVRMFB head starts on this laptop: `heads 0x0`), so IOGraphics' `fFbs[0]` was NULL. intelfb-0009 gives it
-  its own controller. Details: [tests/rtx-8-accelerated-desktop.md](tests/rtx-8-accelerated-desktop.md).
-- **Built, not installed:** `NMIntelFB ca82df9d…`; updated `tools/mirror`. Installed: `NMXGPU 9823079e…`, libdrm
-  `719cb625…`. NVRAM `nullmoth-intelfb-delay=45` kept.
+- **i915 path (Intel test driver on):** stable desktop on `NMXGPUFB`, 144 Hz, software compositing (~225 % CPU).
+  Ghost firmware display hidden by `tools/mirror` (fixed 10-16: it had never run; now `state = running`).
+- **RTX path (Intel test driver off, now installed):** RTX-8 (intelfb-0009, own controller) **ended the freezes**:
+  WindowServer opened NMIntelFB fully, Mac stayed up. But NVAccel only uses head 0 as its framebuffer, so the panel
+  (head 4) was never registered and WindowServer stayed in software. intelfb-0010 publishes it as head 0.
+  Details: [tests/rtx-8-accelerated-desktop.md](tests/rtx-8-accelerated-desktop.md).
+- **Built, not installed:** `NMIntelFB 0d6239e0…`. Installed: `NMIntelFB ca82df9d…` (RTX-8), `NMXGPU 9823079e…`
+  (inactive while the Intel test driver is off). NVRAM `nullmoth-intelfb-delay=45`.
 
 ## Next step
 
-RTX-8: reinstall the mirror, turn the Intel test driver off in the app, `tools/intelfb/install.sh`, reboot; after
-login `tools/intelfb/enable.sh` + WindowServer restart. Read `nullmoth-intelfb-trail`/`-beat` (expect `dep-own`,
-`open-idx0`), `debug.nvaccel_iop_ok_h4` > 0 means frames reach the panel.
+RTX-9: `tools/intelfb/build.sh` output → `tools/intelfb/install.sh`, reboot; after login `enable.sh` (now also
+`nvaccel_iop=1`) + WindowServer restart. Success: `heads_piped` 0x1, `nvaccel_iop_ok_h0` growing, smooth desktop.
 
 ## Open problems
 
-1. RTX-8 result (freeze gone? frames copied? speed of the CPU copy into the aperture at 144 Hz).
-2. Ghost firmware display on the RTX path too (IONDRV stays); mirror now covers `NMIntelFB`.
-3. Proper ghost fix (WindowServer never adopting `.Display_boot`) still open.
+1. RTX-9 result (pipe registered? frames copied? CPU copy cost into the aperture at 144 Hz).
+2. Making it automatic at boot (drop the delay so NVRM's auto-go arms it) once RTX-9 works.
+3. Proper ghost fix (WindowServer never adopting `.Display_boot`) still open; mirror covers both paths.

@@ -23,6 +23,15 @@
   with `fFbs[0..3]` NULL — the RTX-1..7 freezes [inferred].
 - Fix: a group of its own, index 0 at `open()` (intelfb-0009). NVAccel reads the index only at publish.
 
+### NVAccel registers pipes only through head 0 (`fFB`)
+- [measured, RTX-8] `fbPublished` makes only `IOFBDependentIndex 0` the primary `fFB`; `registerFramebufferLocked`
+  needs `fFB`; with no `fFB` after 60 s the headless check withholds WindowServer from the NVIDIA Metal device.
+  NVRM's auto-go arms `nvaccelfb` and `nvaccel_iop` only when heads publish within ~20 s. Fix: NMIntelFB publishes as
+  head 0 (intelfb-0010) and `enable.sh` writes `nvaccel_iop=1`.
+
+### `ioreg -c Class -d1` finds nothing below the root; `log` in zsh is a builtin
+- Use `ioreg -r -c Class -d1`. In scripts run by zsh, call `/usr/bin/log show` (the builtin says "too many arguments").
+
 ### A LaunchAgent for LoginWindow and Aqua must not log to one fixed file
 - [measured, 10-16] `tools/mirror` never ran in the session: the login-window instance (root) created
   `/tmp/nmx-mirror.log`; the user instance could not open it → launchd `last exit code = 78: EX_CONFIG`, 156 respawns.

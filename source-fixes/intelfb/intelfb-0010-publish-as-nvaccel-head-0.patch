@@ -1,0 +1,19 @@
+diff -ruN a/intelfb.cpp src/intelfb.cpp
+--- a/intelfb.cpp	2026-10-16 19:15:08
++++ b/intelfb.cpp	2026-10-16 19:15:08
+@@ -530,8 +530,13 @@
+     if (dep) {
+         fOwnGroup = dep != 2;
+         setProperty("IOFBDependentID", fOwnGroup ? 0x4E4D494E00000001ull : 0x4E56524D00000001ull, 64);
+-        setProperty("IOFBDependentIndex", 4ull, 32);
+-        ifb_trail(fOwnGroup ? "dep-own" : "dep-nvrm");
++        // intelfb-0010: NVAccel makes only head 0 its primary framebuffer (fFB), and registers pipes (debug.nvaccelfb)
++        // only once fFB is set; NVRMFB head 0 never starts here, so as head 4 the panel was never registered and the
++        // 60 s headless check gave WindowServer up (RTX-8). In its own group the panel publishes as head 0
++        // (nullmoth-intelfb-head=4: head 4, as in RTX-8).
++        uint32_t head = fOwnGroup ? ifb_knob("nullmoth-intelfb-head", 0) : 4;
++        setProperty("IOFBDependentIndex", head == 4 ? 4ull : 0ull, 32);
++        ifb_trail(!fOwnGroup ? "dep-nvrm" : head == 4 ? "dep-own-h4" : "dep-own-h0");
+     } else IFBLOG("the surface would not map write-combined, or nullmoth-intelfb-dep=0: NVIDIA rendering stays off for this panel");
+     if (!IOFramebuffer::start(provider)) { ifb_trail("fb-start-failed"); OSSafeReleaseNULL(fSurfMap); OSSafeReleaseNULL(fMMIO); fRegs = nullptr; return false; }
+     ifb_trail("fb-started");
