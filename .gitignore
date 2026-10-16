@@ -1,3 +1,4 @@
 .DS_Store
 *.bin
 NMXGPU.original
+__pycache__/
