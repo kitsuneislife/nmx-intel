@@ -56,6 +56,7 @@ O NVIDIA (RTX 3050) já funciona com o driver original e não é afetado por nad
 | **Teste 26: desktop pelo nosso framebuffer (144 Hz), sem travar**; muito glitch, com duas telas (a nossa e a do firmware) | 🔧 `0027`: VBL ligado desde o registro; a tela do firmware sai (teste 27) |
 | Teste 27: VBL ok; a tela do firmware não foi achada (`ndrv-none`) e as duas telas desenham nas mesmas páginas | 🔧 `0028`: achar a tela do firmware pelos filhos do GFX0 (teste 28) |
 | Teste 28: trava ao dar `terminate` na tela do firmware ainda fechada (sem controlador, o mesmo NULL) | 🔧 `0029`: tirar a tela do firmware só depois de o WindowServer abri-la (teste 29) |
+| Teste 29: a espera funciona, mas o `IOFramebuffer::terminate` dá panic no `AppleUpstreamUserClientDriver` | 🔧 `0030`: `IOService::terminate`, sem a notificação (teste 30) |
 | Patches 1 a 5 viram correções no fonte (`source-fixes/0001..0003`) | 🔧 compilado, falta testar |
 | Tela preta com o Mac vivo (sem framebuffer, o i915 desliga o pipe, DC6) | ❌ consequência da ponte |
 | Tela acelerada / Metal na Intel | ❌ ainda não |

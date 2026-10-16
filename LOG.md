@@ -1333,3 +1333,26 @@ Build `rt kext`: `NMXGPU a954ffc00b707a97d52b44e44332f1b0c1457ae3749a441e402374c
 
 Mesmo procedimento. Esperado: desktop como no 27, e alguns segundos depois a segunda tela some (a tela pode piscar uma
 vez). Trilha com `ndrv-term ndrv-gone`.
+
+## 2026-10-16: teste 29 (0029) — a espera funciona; o `terminate` da tela do firmware dá panic num driver da Apple
+
+Binário `a954ffc0…`. Trilha: `… fb-reg ndrv-c2-1 published ndrv-wait fb-con … fb-setmode fb-ap fb-vram fb-sac
+fb-vbl-off ndrv-term @45316`. O Lukas: travou logo depois de passar para a tela da maçã com a barra de progresso.
+- Achou a tela do firmware (`ndrv-c2-1`: 2 filhos no GFX0, 1 IOFramebuffer que não é o nosso), esperou o WindowServer
+  abri-la e deu `terminate` aos ~45 s.
+- **Panic salvo** (`Kernel-2026-10-16-170517.panic`): page fault `CR2 0` em
+  `AppleUpstreamUserClientDriver::fbNotificationOccurred + 0x1e`, vindo de `IOFramebuffer::terminate` →
+  `deliverFramebufferNotification(kIOFBNotifyTerminated)`, na nossa `ndrvDropThread`. O driver da Apple que fica
+  embaixo do `.Display_boot` não aguenta essa notificação.
+
+### 0030: `IOService::terminate` em vez do `IOFramebuffer::terminate`
+
+A chamada qualificada pula a notificação `kIOFBNotifyTerminated`. A terminação normal do IOKit ainda para o
+framebuffer e os clientes dele, e o `IOFramebuffer::stop` faz a limpeza (com controlador, porque ele já foi aberto).
+
+Build `rt kext`: `NMXGPU 523057651f56331baf7da6982fe82a046a80fcd29b4b3b3f28f9c1da4e4ccfcb`, 15.251.200 B.
+
+## Próximo: teste 30 (0030)
+
+Mesmo procedimento. Esperado: ~45 s depois do boot a segunda tela some (`ndrv-term ndrv-gone`). Se travar de novo:
+`sudo nvram nullmoth-gpu-ndrv=0` volta ao estado do teste 27 (desktop com glitches).
