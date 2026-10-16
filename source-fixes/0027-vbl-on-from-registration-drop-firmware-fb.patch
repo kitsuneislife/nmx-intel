@@ -1,0 +1,63 @@
+From 41f2d70640e9fdbf98d50b6262e74307fc6d02b0 Mon Sep 17 00:00:00 2001
+From: kitsuneislife <kitsuneislif3@gmail.com>
+Date: Fri, 16 Oct 2026 16:38:16 -0300
+Subject: [PATCH] nmx-intel 0027: VBL enabled from registration; the firmware
+ IONDRVFramebuffer goes once NMXGPUFB is up
+
+---
+ gpu-port/xkpi/xnu/nmx_fb.cpp | 32 +++++++++++++++++++++++++++++++-
+ 1 file changed, 31 insertions(+), 1 deletion(-)
+
+diff --git a/gpu-port/xkpi/xnu/nmx_fb.cpp b/gpu-port/xkpi/xnu/nmx_fb.cpp
+index 01f9223..4c86998 100644
+--- a/gpu-port/xkpi/xnu/nmx_fb.cpp
++++ b/gpu-port/xkpi/xnu/nmx_fb.cpp
+@@ -190,7 +190,15 @@ public:
+     IOReturn registerForInterruptType(IOSelect type, IOFBInterruptProc proc, OSObject *target, void *ref,
+                                       void **iref) override {
+         once(3, "fb-irq");
+-        if (type == kIOFBVBLInterruptType) { fVbl = { proc, target, ref }; if (iref) *iref = &fVbl; return kIOReturnSuccess; }
++        /* nmx-intel 0027: a VBL interrupt starts enabled, as IOFramebuffer expects: it only calls setInterruptState when
++           it throttles the VBL (updateVBL/deferredVBLDisable), so with it off WindowServer had no VBL at all (test 26:
++           no fb-vbl-on, parts of the screen redrawn only when the cursor passed) */
++        if (type == kIOFBVBLInterruptType) {
++            fVbl = { proc, target, ref };
++            if (iref) *iref = &fVbl;
++            fVblOn = true;
++            return kIOReturnSuccess;
++        }
+         if (type == kIOFBConnectInterruptType) { fConnect = { proc, target, ref }; if (iref) *iref = &fConnect; return kIOReturnSuccess; }
+         return kIOReturnUnsupported;
+     }
+@@ -319,6 +327,28 @@ IOService *nmx_fb_publish(IOService *gpu, void *dev)
+     }
+     nmx_xnu_trail("fb-reg");
+     fb->registerService();
++    /*
++     * nmx-intel 0027: the firmware's IONDRVFramebuffer (.Display_boot) stays on this GPU and WindowServer showed it as a
++     * second display of the same panel, next to ours (test 26, lots of glitches). It goes once ours is up.
++     * nmxndrv=0 / nullmoth-gpu-ndrv=0 keeps it.
++     */
++    if (nmx_xnu_knob("nmxndrv", "nullmoth-gpu-ndrv", 1)) {
++        IOService *pci = gpu->getProvider();
++        int n = 0;
++        if (OSDictionary *m = IOService::serviceMatching("IONDRVFramebuffer")) {
++            if (OSIterator *it = IOService::getMatchingServices(m)) {
++                while (IOService *s = OSDynamicCast(IOService, it->getNextObject())) {
++                    if (pci != nullptr && s->getProvider() == pci) {
++                        s->terminate();
++                        n++;
++                    }
++                }
++                it->release();
++            }
++            m->release();
++        }
++        nmx_xnu_trail(n ? "ndrv-term" : "ndrv-none");
++    }
+     return fb;
+ }
+ 
+-- 
+2.39.5 (Apple Git-154)
+

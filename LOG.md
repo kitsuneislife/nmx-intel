@@ -1275,6 +1275,17 @@ Batimento `ms=207585 open=30 ioctl=130 in=0 rcu=0`: vivo depois de 3,5 min, e o 
   (partes que só redesenham com o mouse).
 - A causa do travamento era mesmo o controlador do IOFramebuffer (0026).
 
-## Próximo
+### 0027: VBL ligado desde o registro; a tela do firmware sai
 
-Tirar a tela duplicada do firmware quando o `NMXGPUFB` publica, e ver o VBL.
+- **VBL:** no IOGraphics, a interrupção de VBL começa ligada; o `IOFramebuffer` só chama `setInterruptState` para
+  estrangular o VBL (`updateVBL`/`deferredVBLDisable`). Com 0025 ela começava desligada, então o WindowServer nunca teve
+  VBL. Agora `registerForInterruptType` liga (`fVblOn = true`). Continua na thread própria da 0025 (trilha `fb-vbl`).
+- **Tela duplicada:** depois do `registerService` do `NMXGPUFB`, o `IONDRVFramebuffer` do mesmo PCI recebe
+  `terminate()` (trilha `ndrv-term`/`ndrv-none`). Chave `nullmoth-gpu-ndrv=0` mantém.
+
+Build `rt kext`: `NMXGPU 3fc8feaf144b0420ab3b1bce13fad2ed313ef5601143b26da5c97a846c8d1576`, 15.250.960 B.
+
+## Próximo: teste 27 (0027)
+
+Mesmo procedimento. Esperado: uma tela só, `fb-vbl` e `ndrv-term` na trilha, menos glitches. Se a tela do firmware
+saindo der problema: `sudo nvram nullmoth-gpu-ndrv=0`.
