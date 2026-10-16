@@ -1,0 +1,33 @@
+diff --git a/gpu-port/xkpi/override/src/nmx_drm_os.c b/gpu-port/xkpi/override/src/nmx_drm_os.c
+index 6f0f674..1e53383 100644
+--- a/gpu-port/xkpi/override/src/nmx_drm_os.c
++++ b/gpu-port/xkpi/override/src/nmx_drm_os.c
+@@ -289,6 +289,14 @@ void debugfs_remove(struct dentry *dentry)
+  * The port's libdrm uses it to enumerate GPUs (drmGetDevices2), which is how Mesa's RADV and ANV find their device;
+  * drm-kmod leaves it to FreeBSD's own drm code, so the port answers it at the node. Returns -1 for any other ioctl.
+  */
++static bool nmx_dev_on_pci(struct device *dev)
++{
++	for (device_t b = dev != NULL ? dev->bsddev : NULL; b != NULL; b = device_get_parent(b))
++		if (is_pci_device(b))
++			return (true);
++	return (false);
++}
++
+ int nmx_drm_node_ioctl(struct linux_file *filp, unsigned long cmd, void *data)
+ {
+ 	struct drm_file *df;
+@@ -333,7 +341,12 @@ int nmx_drm_node_ioctl(struct linux_file *filp, unsigned long cmd, void *data)
+ 		sg->len = err ? 0 : (uint32_t)len;
+ 		return err;
+ 	}
+-	if (df == NULL || df->minor == NULL || df->minor->dev == NULL || !dev_is_pci(df->minor->dev->dev))
++	/*
++	 * dev_is_pci() asks is_pci_device() of the device's own bsddev, and here that is the DRM child the driver
++	 * attached to, below the PCI function's record (bsdcompat/src/nmx_bus.c): false for every GPU, so this ioctl
++	 * answered ENODEV and libdrm listed no device (test 19). The PCI function is the nearest PCI record above it.
++	 */
++	if (df == NULL || df->minor == NULL || df->minor->dev == NULL || !nmx_dev_on_pci(df->minor->dev->dev))
+ 		return ENODEV;
+ 	pdev = to_pci_dev(df->minor->dev->dev);
+ 	memset(pi, 0, sizeof(*pi));

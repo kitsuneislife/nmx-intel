@@ -831,3 +831,34 @@ drmGetDevices2: 0 device(s); ANV: 0 device(s)
 
 Esperado: `open … driver i915`, `drmGetDevices2: 1`, ANV com 1 dispositivo. Os apps passam a ter o Metal da Intel. O
 WindowServer continua sem ele (`headless GPU`), porque o nosso IOFramebuffer está desligado.
+
+## 2026-10-16: teste 19, ENXIO como sucesso (0018) — desktop de novo; o DRM abre, mas o libdrm não acha a GPU
+
+Binário `7a16c6ad…`, com `fb=2`. Desktop no painel pelo i915, de novo. Batimento `open=2 ioctl=4`: as aberturas
+agora funcionam.
+
+Probe aos 45 s, mais testes ao vivo nesta sessão:
+```
+open /dev/dri/renderD128: driver i915 1.6.0          <- primeira conversa com o i915 vinda do espaço do usuário
+drmGetDevices2: 0 device(s); ANV: 0 device(s)
+```
+Dois bugs a mais no caminho:
+1. **libdrm (userland):** os nós do NMXGPU são clones do devfs, e cada consulta ganha um minor novo
+   (`renderD128` = 30,256, depois 30,356, depois 30,388). O libdrm do nullmoth para Darwin reconhece o nó e o tipo
+   pelo `st_rdev`, e isso nunca bate.
+   - Correção: `source-fixes/libdrm-0001-darwin-node-numbers-from-names.patch`. Dentro do libdrm, `stat`/`fstat` de
+     `/dev/dri/cardN` e `renderDN` devolvem `makedev(226, N)`, com o nome de um fd vindo de `F_GETPATH`.
+   - Testado ao vivo: o `drmGetNodeTypeFromFd` passa de -1 para 2 (render).
+   - `tools/libdrm/build.sh`: clona b97cbde, aplica o patch do nullmoth e o nosso, e compila com meson num venv.
+   - `tools/libdrm/install.sh`: instala com backup (`~/libdrm.2.dylib.nullmoth`).
+   - O NVK não usa o libdrm, então a RTX não é afetada.
+2. **`DRM_IOCTL_GET_PCIINFO` (kernel):** responde ENODEV. `dev_is_pci()` olha o `bsddev` do filho DRM, e o
+   `is_pci_device()` do port só é verdadeiro para o registro da função PCI.
+   - Correção: **0019**, que sobe pelos pais até o registro PCI.
+   - Build `rt kext`: `NMXGPU 8f2b4b6f702220b14d546f627ae8d257a8ed7384317adaf4ace5c51a72b62c52`.
+   - libdrm `719cb625…`.
+
+## Próximo: teste 20 (0019 + libdrm corrigido, `fb=2`)
+
+Ordem: instalar o kext, desligar/ligar o driver no app (ele recopia o nvmtl), instalar o libdrm e reiniciar. Esperado:
+o ANV com 1 dispositivo no probe.

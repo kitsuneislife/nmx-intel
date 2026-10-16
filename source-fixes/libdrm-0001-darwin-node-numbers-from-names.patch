@@ -1,0 +1,55 @@
+diff --git a/xf86drm.c b/xf86drm.c
+index 73e4861c..1cafd7a9 100644
+--- a/xf86drm.c
++++ b/xf86drm.c
+@@ -107,6 +107,50 @@ static drmServerInfoPtr drm_server_info;
+ 
+ static bool drmNodeIsDRM(int maj, int min);
+ #ifdef __APPLE__
++/*
++ * NullMoth's NMXGPU nodes are devfs clone nodes: every lookup and every open of /dev/dri/X gets a minor of its own
++ * (stat of renderD128 gave 30,256 and later 30,356), so st_rdev never names the DRM minor and a node could not be
++ * matched by its device number. Inside libdrm a node's device number is made from its name instead, as Linux numbers
++ * them: makedev(DRM_MAJOR, N) for /dev/dri/cardN and /dev/dri/renderDN. An open node's name comes from F_GETPATH.
++ */
++static int drm_darwin_name_rdev(const char *path, dev_t *rdev)
++{
++    const char *base;
++    int n;
++
++    if (strncmp(path, DRM_DIR_NAME "/", sizeof(DRM_DIR_NAME)) != 0)
++        return -1;
++    base = path + sizeof(DRM_DIR_NAME);
++    if (sscanf(base, "renderD%d", &n) == 1 || sscanf(base, "card%d", &n) == 1) {
++        *rdev = makedev(DRM_MAJOR, n);
++        return 0;
++    }
++    return -1;
++}
++
++static int drm_darwin_stat(const char *path, struct stat *st)
++{
++    dev_t d;
++    int r = stat(path, st);
++
++    if (r == 0 && S_ISCHR(st->st_mode) && drm_darwin_name_rdev(path, &d) == 0)
++        st->st_rdev = d;
++    return r;
++}
++
++static int drm_darwin_fstat(int fd, struct stat *st)
++{
++    char path[PATH_MAX];
++    dev_t d;
++    int r = fstat(fd, st);
++
++    if (r == 0 && S_ISCHR(st->st_mode) && fcntl(fd, F_GETPATH, path) == 0 && drm_darwin_name_rdev(path, &d) == 0)
++        st->st_rdev = d;
++    return r;
++}
++#define stat(path, st) drm_darwin_stat(path, st)
++#define fstat(fd, st) drm_darwin_fstat(fd, st)
++
+ /* Darwin assigns character majors at run time and its devname_r searches only the top level of /dev, so a DRM
+  * node is recognised by finding its device number among the entries of /dev/dri. */
+ static bool drm_darwin_node_exists(int maj, int min)
