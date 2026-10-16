@@ -27,7 +27,8 @@ O NVIDIA (RTX 3050) já funciona com o driver original e não é afetado por nad
 | Ponte de tela: `the scan-out buffer would not map (102)` (GEM do i915 sem `.vmap`, buffer não contínuo) | ✅ teste 6: o i915 mostra o nosso buffer no painel |
 | Buffer novo na stolen caiu por cima do fb do GOP, onde o console ainda escreve (imagem deslocada, Mac congelou sem log) | 🔧 `0006`: tomar o fb do GOP |
 | Teste 7: a tomada falha porque o error capture já está em GGTT 0, e o resto da faixa do console fica sem dono (tela preta, congelou) | 🔧 `0007` + `0008`: segurar a faixa no `init_ggtt` |
-| Teste 8: endereço do fb de boot com flag no bit 0 (tomada não aconteceu); congela ~9 s depois que o WindowServer usa o framebuffer | 🔧 `0009`: máscara e GPU acordada enquanto o fb existe, compilado, falta testar (teste 9) |
+| Teste 8: endereço do fb de boot com flag no bit 0 (tomada não aconteceu); congela ~9 s depois que o WindowServer usa o framebuffer | 🔧 `0009`: máscara e GPU acordada enquanto o fb existe |
+| Teste 9: ainda congela depois de publicar o fb (a marca de boot foi apagada), sem log | 🔧 `0010`: trilha das etapas na NVRAM (`nvram nullmoth-gpu-trail`), compilado, falta testar (teste 10) |
 | Patches 1 a 5 viram correções no fonte (`source-fixes/0001..0003`) | 🔧 compilado, falta testar |
 | Tela preta com o Mac vivo (sem framebuffer, o i915 desliga o pipe, DC6) | ❌ consequência da ponte |
 | Tela acelerada / Metal na Intel | ❌ ainda não |

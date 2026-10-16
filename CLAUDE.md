@@ -75,11 +75,12 @@ Até 2026-10-15 o trabalho estava no branch `ccr-918d231a-luzxg0` dos dois outro
 
 ## Onde paramos (2026-10-15, depois do teste 5)
 
-**Mais novo (teste 8):** o NMXGPU é compilado no Mac (`build/`), com `source-fixes/0001..0009`. Os testes 6, 7 e 8
-congelam alguns segundos depois de o WindowServer começar a desenhar no nosso framebuffer. O teste 5, sem
-framebuffer, ficava vivo. Hipótese: escrita na aperture com a GPU em runtime suspend. O 0009 segura a GPU acordada
-enquanto o fb existe e corrige o bit de flag do endereço do fb de boot. Já está compilado **sem** o debug do DRM
-(`775e893a…`), mas **ainda não foi instalado**: é o teste 9 (ver o fim do `LOG.md`).
+**Mais novo (teste 9):** o NMXGPU é compilado no Mac (`build/`), com `source-fixes/0001..0010`. Os testes 6, 7, 8 e
+9 congelam **depois** de o framebuffer ser publicado, na fase do WindowServer. O teste 5, sem framebuffer, ficava
+vivo. No teste 9 a marca `nullmoth-gpu-attaching` não estava na NVRAM, ou seja, o attach retornou. O 0010 grava cada
+etapa em `nullmoth-gpu-trail` na NVRAM, para saber onde para. Já está compilado sem debug (`06f83e7a…`), mas **ainda
+não foi instalado**: é o teste 10 (ver o fim do `LOG.md`). Depois de congelar, boote com `-nvoff` e rode
+`nvram nullmoth-gpu-trail`.
 - Com o debug ligado, o macOS descarta mensagens do kext, então use `build-all.sh … nodebug kext` quando as linhas
   `NullMoth display:` importarem.
 - O log de um boot que congelou ainda pode ser lido pelo horário. Os vídeos ficam no Google Drive dele

@@ -490,3 +490,34 @@ escrita na aperture com a GPU suspensa pode travar a máquina sem log.
 
 O mesmo procedimento. Agora o log deve guardar as linhas `NullMoth display: …`, com `holding GGTT 0x0+0x7e9000`,
 `took over the boot framebuffer` e `GPU kept awake`.
+
+## 2026-10-16: teste 9, 0009 (bit de flag e GPU acordada), sem debug
+
+Binário `775e893a…`. Resultado: **tela preta e Mac congelado**.
+- **Nenhuma linha de log** desse boot. Entre o fim do boot anterior (00:11) e o boot com `-nvoff` (00:13:42) não há
+  nada, como no teste 6. O kext foi instalado às 00:10:50 (`kernelmanagerd`).
+- **A marca `nullmoth-gpu-attaching` não está na NVRAM.** O NMXGPU grava essa marca antes do attach e só apaga
+  depois de publicar o framebuffer. O boot com `-nvoff` não mexe nela. Então, no teste 9, **o attach retornou e o
+  framebuffer foi publicado**, e o congelamento veio depois, na fase do WindowServer, como no teste 8.
+- Logo, segurar a GPU acordada (0009) não bastou. A hipótese do runtime PM fica fraca, mas o wakeref fica, porque é
+  o certo para escritas na aperture.
+- Tela preta: se a tomada tivesse funcionado e o pipe estivesse aceso, o texto do console estaria visível. Ou a
+  tomada falhou de novo, ou alguém desligou o pipe depois. No teste 8, o CoreDisplay marcou o display como
+  "offline" e falhou ao pedir o modo, e isso pode virar um `kIOPowerAttribute` 0, que apaga as saídas pela ponte.
+
+### 0010: trilha de diagnóstico na NVRAM
+
+Como o log se perde quando o Mac congela, cada etapa é acrescentada à variável `nullmoth-gpu-trail` da NVRAM, com
+`sync` na hora. O limite é 40 escritas por boot. A trilha também aparece no log como `NullMoth trail: …`.
+- Etapas: `attach`, `hold`/`hold-fail` (`init_ggtt`), `attached`, `publish`, `probe`, `i915-fb`, `take-pin`,
+  `took`/`fallback`, `fb-pin`, `iomap`, `commit`, `lit`/`commit-fail`, `published`/`no-fb`.
+- Eventos do IOFramebuffer (uma vez cada): `fb-vram` (alguém pediu a VRAM), `fb-setmode`, `ws-on`/`ws-off`
+  (WindowServer), e `fb-pwr-on`/`fb-pwr-off` (toda vez).
+- Para ler depois de um congelamento, no boot seguinte com `-nvoff` (que não mexe na trilha):
+  `nvram nullmoth-gpu-trail`.
+
+Build sem debug: `NMXGPU 06f83e7afefaf995673bbdce6d0a3a61b07ee52eaef845c9c89e97055baaf1f9`, 15.241.120 B. **Não instalado.**
+
+## Próximo: teste 10 (0010)
+
+O mesmo procedimento. Depois do congelamento, bootar com `-nvoff` e ler `nvram nullmoth-gpu-trail`.
