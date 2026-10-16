@@ -1156,3 +1156,15 @@ Tela preta e travamento. Batimento: `ms=21450 vbl=2 calls=18 last=ga:mrdf`. A tr
 Build: `NMIntelFB 2119d10f…`, 70.816 B.
 
 ## Próximo: teste RTX-6
+
+## 2026-10-16: teste RTX-6 (intelfb-0007) — **tela preta; a NVRAM para de registrar antes do fim**
+
+Batimento `ms=18383 vbl=0 calls=1 last=ga:gnps`; trilha até `… ok sp-done ga:gnps`. Mesmo assim a tela ficou preta,
+e isso só acontece no `open` do IOFramebuffer, que vem depois. Então as gravações na NVRAM deixam de chegar ao
+disco ~18–21 s depois do `start` (no RTX-5 o batimento também parou aos 21 s), e o travamento de verdade vem depois.
+A trilha e o batimento não mostram mais nada útil a partir daí.
+
+## Próximo: teste RTX-6b (A/B sem build): `nullmoth-intelfb-dep=0`
+
+Framebuffer simples, sem entrar no grupo de telas do NVRM (`IOFBDependentID`). Se chegar ao desktop, o travamento vem
+do grupo do NVRM (sem nenhum NVRMFB publicado); se travar igual, vem do próprio framebuffer.
