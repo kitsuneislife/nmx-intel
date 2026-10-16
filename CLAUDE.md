@@ -7,6 +7,20 @@
    `docs/tests/index.md` → one phase file, or `grep` the archive for a specific term.
 3. Prefer `grep -n` and targeted `Read` ranges over whole files. Each doc starts with a `> **Summary.**` block.
 
+## Skills (global, installed by `tools/agent/install-skills.sh`)
+
+- **graphify** — the docs knowledge graph. If `graphify-out/graph.json` exists, answer "what/why/did we" questions
+  with `graphify query "<question>"` (or `/graphify query`) **before** opening docs. If it is missing or stale (docs
+  changed since `graphify-out/GRAPH_REPORT.md`), run `/graphify docs --update` (first time: `/graphify docs --wiki`).
+  The CLI lives in `~/.local/bin` (uv tool, Python bundled).
+- **ponytail** (full) — every code change here (nullmoth clone, drm-kmod clone, scripts, tools): the smallest change
+  that fully works, reusing what the port already has. It never cuts error handling or safety, and it matches our
+  "one variable per test" rule. Run `/ponytail-review` on the clone diff before building a test binary.
+- **caveman** — chat replies to Lukas: Portuguese, caveman voice (answer first, no filler, commands verbatim). Install
+  steps, warnings and anything before a reboot stay in plain full sentences, one command per block. Never use it for
+  docs, commits or code comments (plain English).
+- If a skill is missing (new machine): `bash tools/agent/install-skills.sh`.
+
 ## Working with Lukas
 
 - Lukas writes in Portuguese and wants **short, simple answers**: what to do, one command per block, what to expect.

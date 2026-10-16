@@ -2,3 +2,5 @@
 *.bin
 NMXGPU.original
 __pycache__/
+graphify-out/cache/
+graphify-out/graph.html

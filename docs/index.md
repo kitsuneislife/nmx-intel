@@ -45,6 +45,6 @@ archive/LOG-pt.md                 original diary (Portuguese, verbatim)
 
 ## Graphify
 
-When Graphify is installed (`pipx install graphifyy && graphify install`), build the graph from this folder:
+Installed by `tools/agent/install-skills.sh` (CLI via uv). Build the graph from this folder:
 `/graphify docs --wiki` (the archive duplicates the rest; exclude or ignore its nodes). Query instead of reading:
 `/graphify query "why did NMXGPUFB freeze after fb-started?"`.

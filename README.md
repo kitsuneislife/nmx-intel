@@ -29,6 +29,7 @@ tools/
   vram/         reads framebuffer memory, lists WindowServer displays
   intelfb/      nullmoth's NMIntelFB (RTX path, parked)
   binpatch/     legacy byte patches and restoring the original binary
+  agent/        installs the Claude Code skills used here (graphify, ponytail, caveman)
 docs/           status, test index and phase logs, knowledge articles, archived original log
 ```
 
