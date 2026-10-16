@@ -708,3 +708,36 @@ Build sem debug: `NMXGPU ff044b86b58ef59b4028edd50d015795952e20ec417ded095049cae
 ## Próximo: teste 15 (0015, com `nullmoth-gpu-fb=2`)
 
 Se o Mac chegar ao desktop, quem trava é o nosso IOFramebuffer. Se congelar igual, é o i915 (ou o NMXAccel/Metal).
+
+## 2026-10-16: teste 15, sem o nosso IOFramebuffer (`nullmoth-gpu-fb=2`) — **o Mac não congela**
+
+Binário `ff044b86…`. Trilha e batimento:
+```
+attach beat hold shold attached publish-nofb probe i915-fb take-pin took fb-pin iomap commit lit client-reg hotplug
+registered fb-skip no-fb @91637
+nullmoth-gpu-beat: ms=91658 pub=91278 open=0 ioctl=0 in=0 cmd=0x0
+```
+- **O Mac viveu 91 s depois do attach** (o attach todo leva ~0,4 s) e **ficou log do boot**: o WindowServer subiu às
+  09:12:51, o loginwindow também. O log acaba às 09:13:30 com `PMRD: sleep reason Software Sleep`, provavelmente o
+  toque no botão de ligar para desligar.
+- Então **o congelamento dos testes 10-14 vem do nosso IOFramebuffer** (`NMXGPUFB`). Sem ele, o i915 com o fb do GOP
+  roda normal.
+- **Tela parada:** a última linha visível na foto (`ALUC:clientDied … pid 229`) é das 09:12:11.9, logo antes do
+  attach (09:12:13). Depois do modeset da ponte, o painel ficou no quadro daquele instante, e nem o console nem o
+  WindowServer aparecem. Causa provável: **FBC e/ou PSR**. O macOS escreve no buffer pela aperture, com a CPU, e o
+  rastreio de frontbuffer do i915 não vê isso. Com FBC, o plano mostra a cópia comprimida. Com PSR, o painel mostra
+  a cópia dele.
+- `open=0 ioctl=0`: nada abriu o nó DRM, então o Metal (NMXAccel + ANV) não chegou a usar a GPU.
+- O WindowServer abriu o `IONDRVFramebuffer` de GFX0 ("Creating FB 1 of 1", "Failed to obtain mode info").
+
+### 0016 (drm-kmod): sem FBC e sem PSR no xnu
+
+`intel_display_params.h`: `enable_fbc` e `enable_psr` passam a ter o padrão 0 com `NMXKPI`.
+
+Build sem debug: `NMXGPU 8ce69ba8d0d879b21b5622c49b4741cad5efbd2818dd293a98d4d5a5deba58dc`, 15.250.296 B.
+
+## Próximo: teste 16 (0016, ainda com `nullmoth-gpu-fb=2`)
+
+Esperado: o painel continua atualizando depois do attach (texto do console e, depois, o desktop do macOS sem
+aceleração, pelo `IONDRVFramebuffer`, só que agora com o i915 no controle da tela). Depois disso, voltar ao nosso
+IOFramebuffer (`fb=1`) para achar o congelamento.

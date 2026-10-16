@@ -33,7 +33,8 @@ O NVIDIA (RTX 3050) já funciona com o driver original e não é afetado por nad
 | Teste 11: **o attach termina** (`published`, marca apagada); congela depois, antes do macOS usar o nosso fb. Tomada do GOP: `tk-obj` (stolen ocupada) | ✅ testado no teste 12 |
 | Teste 12: sem batimento, então congela < 2 s depois do registro do IOFramebuffer. O `IONDRVFramebuffer` do firmware continua na Intel | ✅ testado no teste 13 |
 | Teste 13: congela dentro de `NMXGPUFB::start`, logo depois do modeset; a tomada falha com `-ENOSPC` porque o i915 pôs objetos dele nas páginas da stolen do fb do GOP, onde o macOS ainda desenha | ✅ testado no teste 14 |
-| Teste 14: **a tomada do fb do GOP funciona** (`took`): o painel mostra o console do macOS pelo i915. Ainda congela depois do attach | 🔧 `0015`: chaves na NVRAM; teste 15 com `nullmoth-gpu-fb=2` (sem o nosso IOFramebuffer) |
+| Teste 14: **a tomada do fb do GOP funciona** (`took`): o painel mostra o console do macOS pelo i915. Ainda congela depois do attach | ✅ testado no teste 15 |
+| Teste 15 (`fb=2`, sem o nosso IOFramebuffer): **o Mac não congela** (viveu 91 s, WindowServer subiu). O congelamento vem do `NMXGPUFB`. O painel fica parado no quadro do modeset (FBC/PSR) | 🔧 `0016`: sem FBC e PSR (teste 16, ainda `fb=2`) |
 | Patches 1 a 5 viram correções no fonte (`source-fixes/0001..0003`) | 🔧 compilado, falta testar |
 | Tela preta com o Mac vivo (sem framebuffer, o i915 desliga o pipe, DC6) | ❌ consequência da ponte |
 | Tela acelerada / Metal na Intel | ❌ ainda não |

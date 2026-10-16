@@ -1,0 +1,34 @@
+diff --git a/drivers/gpu/drm/i915/display/intel_display_params.h b/drivers/gpu/drm/i915/display/intel_display_params.h
+index 5317138e60..84e0b2bc48 100644
+--- a/drivers/gpu/drm/i915/display/intel_display_params.h
++++ b/drivers/gpu/drm/i915/display/intel_display_params.h
+@@ -22,6 +22,18 @@ struct drm_printer;
+  * mode: debugfs file permissions, one of {0400, 0600, 0}, use 0 to not create
+  *       debugfs file
+  */
++/*
++ * NMXKPI: no FBC and no PSR. macOS draws the scan-out buffer with plain CPU stores through the GGTT aperture
++ * (the console, IONDRVFramebuffer, WindowServer), which i915's frontbuffer tracking never sees: with FBC the plane
++ * keeps showing the compressed copy, and with PSR the panel keeps showing its own copy. Test 15: after the bridge's
++ * modeset the panel froze on the frame of that moment while the Mac ran on.
++ */
++#ifdef NMXKPI
++#define NMX_FBC_PSR_DEFAULT 0
++#else
++#define NMX_FBC_PSR_DEFAULT -1
++#endif
++
+ #define INTEL_DISPLAY_PARAMS_FOR_EACH(param) \
+ 	param(char *, dmc_firmware_path, NULL, 0400) \
+ 	param(char *, vbt_firmware, NULL, 0400) \
+@@ -43,8 +55,8 @@ struct drm_printer;
+ 	param(bool, verbose_state_checks, true, 0400) \
+ 	param(bool, nuclear_pageflip, false, 0400) \
+ 	param(bool, enable_dp_mst, true, 0600) \
+-	param(int, enable_fbc, -1, 0600) \
+-	param(int, enable_psr, -1, 0600) \
++	param(int, enable_fbc, NMX_FBC_PSR_DEFAULT, 0600) \
++	param(int, enable_psr, NMX_FBC_PSR_DEFAULT, 0600) \
+ 	param(bool, psr_safest_params, false, 0400) \
+ 	param(bool, enable_psr2_sel_fetch, true, 0400) \
+ 	param(int, enable_dmc_wl, -1, 0400) \
