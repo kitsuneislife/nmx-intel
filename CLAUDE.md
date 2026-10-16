@@ -75,7 +75,10 @@ Até 2026-10-15 o trabalho estava no branch `ccr-918d231a-luzxg0` dos dois outro
 
 ## Onde paramos (2026-10-15, depois do teste 5)
 
-**Mais novo (teste 15):** com `nullmoth-gpu-fb=2` (sem o nosso IOFramebuffer) o Mac **não congela**; o congelamento
+**Mais novo (teste 16):** com 0016 e `fb=2`, o painel atualiza (console ao vivo pelo i915) e o Mac fica vivo. O
+WindowServer sobe, mas o desktop não aparece; o ANV (Metal da Intel) acha 0 GPUs e ninguém abre o nó DRM.
+`tools/probe` grava o diagnóstico em `/Users/Shared/nmx-probe.txt` no boot (teste 17).
+**Teste 15:** com `nullmoth-gpu-fb=2` (sem o nosso IOFramebuffer) o Mac **não congela**; o congelamento
 vem do `NMXGPUFB`. O painel fica parado no quadro do modeset (FBC/PSR); 0016 desliga os dois (teste 16).
 **Teste 14:** a tomada funciona (`shold took`): o i915 mostra o console do macOS no painel. Ainda congela
 depois do attach. 0015 = chaves na NVRAM (`sudo nvram nullmoth-gpu-fb=2` etc.); teste 15 com `fb=2`.

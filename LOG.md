@@ -741,3 +741,33 @@ Build sem debug: `NMXGPU 8ce69ba8d0d879b21b5622c49b4741cad5efbd2818dd293a98d4d5a
 Esperado: o painel continua atualizando depois do attach (texto do console e, depois, o desktop do macOS sem
 aceleração, pelo `IONDRVFramebuffer`, só que agora com o i915 no controle da tela). Depois disso, voltar ao nosso
 IOFramebuffer (`fb=1`) para achar o congelamento.
+
+## 2026-10-16: teste 16, sem FBC e PSR (0016, `fb=2`) — **o painel atualiza e o Mac fica vivo**
+
+Binário `8ce69ba8…`. Trilha igual à do teste 15 com `@141014`. Batimento: `ms=141042 pub=140735 open=0 ioctl=0`.
+- **O Mac viveu 141 s** e o caps lock funcionava. Ficou log do boot.
+- **O painel continuou atualizando depois do modeset.** O console aparece até 09:41:18 (`NVRM-xnu: boot hold
+  RELEASED`, `AppleActuatorDeviceUserClient::start Entered`), 36 s depois de `lit` (09:40:42). O 0016 resolveu a tela
+  parada: era FBC/PSR.
+- O console para quando o WindowServer sobe (09:41:18), e o desktop não aparece.
+  - O WindowServer abre o `IONDRVFramebuffer` de GFX0, como num boot normal.
+  - O NVMTL diz `GPU vendor 8086 (Intel, ANV)` / `headless GPU: no device for WindowServer`, porque o NMXAccel está na
+    Intel e não há um IOFramebuffer do NMXGPU.
+  - SecurityAgent, Installer Progress, loginwindow e CursorUIViewService abrem o ANV (`libvulkan_intel.dylib`), e
+    `vkEnumeratePhysicalDevices` dá **0 dispositivos**.
+  - Nenhum processo chegou a abrir o nó DRM (`open=0`). O ANV/libdrm não acha a GPU antes mesmo de abrir o nó.
+
+### `tools/probe`: diagnóstico no boot
+
+Um LaunchDaemon (`com.kitsune.nmxprobe`) roda aos 45 s e aos 120 s e grava em `/Users/Shared/nmx-probe.txt`:
+- `/dev/dri`;
+- o `drmGetDevices2` do libdrm do nullmoth;
+- a abertura de `renderD128`/`card0` com `drmGetVersion`;
+- uma instância Vulkan direto no ANV, com a contagem de dispositivos;
+- IOAccelerator, IOFramebuffer e o WindowServer.
+
+Instalar: `sudo bash tools/probe/install.sh`. Tirar: `... install.sh remove`.
+
+## Próximo: teste 17 (mesmo binário, `fb=2`, com o probe)
+
+Descobrir por que o ANV não vê a Intel. Em paralelo, o congelamento com o nosso IOFramebuffer (`fb=1`) continua aberto.
