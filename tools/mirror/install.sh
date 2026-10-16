@@ -10,6 +10,7 @@ if [ "$1" = remove ]; then
     exit 0
 fi
 [ "$(id -u)" = 0 ] || { echo "rode com sudo"; exit 1; }
+rm -f /tmp/nmx-mirror.log  # old versions logged here; a root-owned copy blocks the user-session agent
 mkdir -p /usr/local/libexec
 clang -O2 -o "$BIN" nmx-mirror.c -framework CoreGraphics -framework IOKit -framework CoreFoundation
 cp com.nmxintel.mirror.plist "$PL"

@@ -17,9 +17,5 @@
 	<true/>
 	<key>KeepAlive</key>
 	<true/>
-	<key>StandardOutPath</key>
-	<string>/tmp/nmx-mirror.log</string>
-	<key>StandardErrorPath</key>
-	<string>/tmp/nmx-mirror.log</string>
 </dict>
 </plist>

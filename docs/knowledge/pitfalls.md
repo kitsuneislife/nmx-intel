@@ -15,6 +15,19 @@
 - Fix: set `IOFBDependentID` (unique) + `IOFBDependentIndex 0` **before** `IOFramebuffer::start` (0026). Tests 13, 25,
   RTX-2/6b, the three NMIntelFB panics.
 
+### A dependent group is walked from index 0 to the first NULL
+- [measured, `IOFramebuffer.cpp`] `open()` stores `controller->fFbs[IOFBDependentIndex] = this` (the only read of the
+  index); `FOREACH_FRAMEBUFFER` loops `fFbs[i]` until a NULL; `kIOFBWSStartAttribute` dereferences `fFbs[0]`.
+- [measured, ioreg, 10-16] On this laptop NVRMFB never starts: NVRM `nvrm-display = heads 0x0`, the four
+  `NVRMDisplay` nubs have no framebuffer (`connected-displays = 0`). So NMIntelFB at index 4 of NVRM's group was alone
+  with `fFbs[0..3]` NULL — the RTX-1..7 freezes [inferred].
+- Fix: a group of its own, index 0 at `open()` (intelfb-0009). NVAccel reads the index only at publish.
+
+### A LaunchAgent for LoginWindow and Aqua must not log to one fixed file
+- [measured, 10-16] `tools/mirror` never ran in the session: the login-window instance (root) created
+  `/tmp/nmx-mirror.log`; the user instance could not open it → launchd `last exit code = 78: EX_CONFIG`, 156 respawns.
+  Fix: no `StandardOutPath`; log with `syslog`.
+
 ### Never `terminate` a foreign IOFramebuffer that is not open yet
 - Same NULL controller (test 28). Wait for its `IODisplayConnect` child (created in `open()`) first (0029).
 

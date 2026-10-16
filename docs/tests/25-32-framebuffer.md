@@ -105,3 +105,8 @@ square**; the Dock missing. WindowServer still ~225 % CPU (main ~85 % + 6 compos
 
 State after test 32: stable desktop through i915 on `NMXGPUFB`, 1920x1080 @ 144 Hz, no glitches with the mirror;
 **no acceleration** (software compositing, ~225 % CPU). Next: [../status.md](../status.md).
+
+> **Note (2026-10-16, later).** `tools/mirror` had never run in the user session: launchd `EX_CONFIG` (78) because the
+> login-window instance (root) owned `/tmp/nmx-mirror.log`. Fixed (syslog, no log file); Lukas' report "the mirror
+> did not run" matches. Manual run then mirrored `5b81c5c0` onto `5b81c5c1`. See
+> [rtx-8-accelerated-desktop.md](rtx-8-accelerated-desktop.md).

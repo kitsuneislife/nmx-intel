@@ -25,6 +25,7 @@ tests/06-14-display-bridge.md     own build, display bridge, GOP takeover, NVRAM
 tests/15-24-drm-userspace.md      fb=2: FBC/PSR, DRM opens, libdrm, RCU, watchdog → stable desktop
 tests/rtx-1-7-nmintelfb.md        RTX composites, Intel panel shows (parked)
 tests/25-32-framebuffer.md        NMXGPUFB on the desktop, controller fix, ghost display, mirror
+tests/rtx-8-accelerated-desktop.md RTX path resumed: own controller for NMIntelFB → accelerated desktop (current)
 knowledge/architecture.md         components and the path of a frame
 knowledge/pitfalls.md             symptom → cause → fix, by area           (highest-value file)
 knowledge/diagnostics.md          trail/beat/io tokens, knobs, tools, recovery

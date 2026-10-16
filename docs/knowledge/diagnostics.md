@@ -59,7 +59,7 @@ Lukas cannot type `|`: when he runs commands, write to a file and `grep`/`tail` 
 | `nullmoth-gpu-ndrv` (`nmxndrv`) | 1 | remove the firmware IONDRV after it opens |
 | `nullmoth-gpu-vbl` (`nmxvbl`) | 0 | 1 offers the timer VBL |
 | `nullmoth-gpu-shadow` (`nmxshadow`) | 1 | shadow framebuffer in RAM |
-| `nullmoth-intelfb*` | — | NMIntelFB only: `=0`, `-dep`, `-pm`, `-delay` |
+| `nullmoth-intelfb*` | — | NMIntelFB only: `=0`, `-dep` (1 own controller, 2 NVRM's group, 0 plain), `-pm`, `-delay` |
 
 ## Tools
 
@@ -69,7 +69,7 @@ Lukas cannot type `|`: when he runs commands, write to a file and `grep`/`tail` 
 | `tools/vram/dump.c` | maps `NMXGPUFB` VRAM like WindowServer (shared client type 1, memory type 110), writes a PPM |
 | `tools/vram/watch.c` | samples VRAM tiles over time (flip-flopping regions); slow on the aperture |
 | `tools/vram/displays.c` | CoreGraphics online/active displays, bounds, mirroring, cursor position |
-| `tools/mirror` | LaunchAgent mirroring the ghost firmware display; log `/tmp/nmx-mirror.log` |
+| `tools/mirror` | LaunchAgent mirroring the ghost firmware display (with `NMXGPUFB` or `NMIntelFB`); log: `log show --last 1h --predicate 'process == "nmx-mirror"'` |
 | `top -o cpu`, `ps -M <pid>` | WindowServer CPU and per-thread load (`sample` needs root) |
 
 ## Recovering
