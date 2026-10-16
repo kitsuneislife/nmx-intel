@@ -556,3 +556,34 @@ Build sem debug: `NMXGPU 157d5e784b03a2ca8932f606631341cc2254da100552d92e5153862
 
 O mesmo procedimento. Desligar e ligar o driver no app apaga a marca `nullmoth-gpu-attaching`, que ficou gravada.
 Sem isso, o NMXGPU desiste da placa. Depois do congelamento, bootar com `-nvoff` e ler `nvram nullmoth-gpu-trail`.
+
+## 2026-10-16: teste 11, trilha mais fina (0011)
+
+Binário `157d5e78…`. Resultado: tela preta e Mac congelado. Nenhuma linha de log do boot que congelou (o log
+pula de 00:33:01, o desligamento do boot anterior, para 00:35:08, o boot com `-nvoff`).
+
+Trilha:
+```
+attach hold attached publish probe i915-fb tk-obj fallback fb-pin iomap commit lit client-reg hotplug registered
+fb-new fb-start fb-started fb-pm fb-reg published
+```
+E `nullmoth-gpu-attaching` **foi apagada**.
+- **O attach inteiro termina.** O registro do cliente DRM (com o hotplug), `IOFramebuffer::start`,
+  `registerPowerDriver` e `registerService` passam. O teste 10 congelou nesse trecho, e este passou: o momento
+  do congelamento varia, então não é um passo fixo do attach. É algo que roda depois, ou em paralelo.
+- Depois de `published`, nada: nem `fb-vram`, nem `fb-setmode`, nem `ws-on`. **O macOS ainda não tinha usado o
+  nosso framebuffer** quando congelou.
+- `tk-obj`: a tomada do fb do GOP falha porque a faixa da stolen já tem dono. Suspeita: o objeto que o
+  `intel_plane_initial` criou para o fb da BIOS. O pin dele falha na nossa faixa segurada, mas a liberação do
+  objeto é adiada (worker/RCU), então a faixa ainda está ocupada quando a ponte tenta.
+
+Suspeitos para o congelamento, depois do attach e antes do WindowServer:
+- o NMXAccel atendendo Metal no i915 (`NMXAccel: ... 8086:a7a8 ... claiming` aparece nos boots);
+- workers do i915 (hotplug, power wells, DC states), com o buffer aceso;
+- o console do kernel (`-v`) ainda escrevendo pela aperture em `0x4000000000`.
+
+## Próximo: teste 12
+
+Trilha depois de `published`: um batimento numa variável separada (para saber quanto tempo o Mac vive depois do
+attach) e passos no NMXAccel e nos workers do i915. E, para a tomada, esvaziar os objetos liberados
+(`i915_gem_drain_freed_objects`) antes de criar o objeto na stolen.
