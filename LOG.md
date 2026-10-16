@@ -1187,3 +1187,31 @@ a pilha da NVIDIA no começo do boot, ele muda; se não, pelo menos o log mostra
 Build: `NMIntelFB e2c417e7…`, 70.832 B.
 
 ## Próximo: teste RTX-7 (`dep=1`, `delay=45`)
+
+## 2026-10-16: teste RTX-7 (`delay=45`) — **o NMIntelFB sobe depois da NVIDIA e trava igual**; caminho RTX parado
+
+Trilha: `start wait go mmio mode-A-1920x1080-s0 surf dep fb-started ga:gnps vbl pm power sp1 sp-done ok`. O log do
+boot chegou ao disco até ~24 s (`NMIntelFB: waiting 45 s…`, o NVAccel subindo e vigiando o NMIntelFB, `auto-go`).
+Depois da espera o `start` terminou, e de novo tela preta e travamento. Então não é corrida com a pilha da NVIDIA.
+
+**Decisão (com o Lukas): parar o caminho RTX e voltar ao Metal da Intel.** O NMIntelFB fica nas ferramentas
+(`tools/intelfb`, patches intelfb-0001..0008); ninguém o roda num notebook de verdade, e aqui ele trava de dois jeitos
+(no registro de energia fora do grupo do NVRM, e depois do `open` dentro dele).
+
+### O que a investigação do NMIntelFB ensinou para o i915
+
+O `NMXGPUFB` (o IOFramebuffer do NMXGPU, `fb=1`) usa **o mesmo VBL** que travou o NMIntelFB no RTX-5: um
+`thread_call_allocate` (grupo HIGH do kernel, uma thread) que chama o IOFramebuffer a 60 Hz desde o `start`, antes do
+`open` ligar o VBL. Nos testes 10–14, o Mac congelava < 2 s depois de o `NMXGPUFB` registrar, o mesmo padrão.
+
+### 0025: o VBL do `NMXGPUFB` numa thread própria, só depois de ligado
+
+Igual ao intelfb-0007: thread do kernel própria, chama o IOFramebuffer só com o VBL ligado (`setInterruptState`,
+trilha `fb-vbl-on`/`fb-vbl-off`), e o `stop` espera a thread sair.
+
+Build `rt kext`: `NMXGPU 483a5ae5384102f3b134af4dcf2ddb3b095db105cde33d0e8add4a7176a83a66`, 15.250.792 B.
+
+## Próximo: teste 25 (0025, `fb=1`, NMIntelFB removido)
+
+Com `fb=1` o NMXAccel volta a subir (0024 só o desliga sem o nosso framebuffer). Esperado: o `NMXGPUFB` sem
+congelar. Depois: `nvram nullmoth-gpu-trail`, `nvram nullmoth-gpu-beat` e o probe.

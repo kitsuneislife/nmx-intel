@@ -75,7 +75,10 @@ Até 2026-10-15 o trabalho estava no branch `ccr-918d231a-luzxg0` dos dois outro
 
 ## Onde paramos (2026-10-15, depois do teste 5)
 
-**Caminho RTX (em teste):** o NMIntelFB do nullmoth (`kexts/NMIntelFB`, fora do pacote) publica o painel da Intel
+**Mais novo (teste 25, `483a5ae5…`):** caminho RTX parado (RTX-7 travou igual mesmo esperando 45 s). De volta ao
+Metal da Intel. O `NMXGPUFB` tinha o mesmo VBL em `thread_call` HIGH que travou o NMIntelFB; 0025 = VBL em thread
+própria só depois do `setInterruptState`. Teste 25 com `fb=1` e o NMIntelFB removido (`tools/intelfb/install.sh remove`).
+**Caminho RTX (parado):** o NMIntelFB do nullmoth (`kexts/NMIntelFB`, fora do pacote) publica o painel da Intel
 como cabeça 4 do NVAccel; com `debug.nvaccel_igpu=1` + `debug.nvaccelfb=3` + reiniciar o WindowServer, a RTX compõe o
 desktop e copia cada quadro para o painel. `tools/intelfb/{build,install,enable}.sh`. Precisa do driver de teste da
 Intel **desligado**. O NMIntelFB não sobe com `-nvoff` (patch nosso). RTX-1 travou o boot sem log; intelfb-0002 =

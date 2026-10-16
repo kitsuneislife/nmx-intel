@@ -1,0 +1,125 @@
+From 250e8346a771bfa68c420eae6d1b0dd97a96bcb7 Mon Sep 17 00:00:00 2001
+From: kitsuneislife <kitsuneislif3@gmail.com>
+Date: Fri, 16 Oct 2026 16:04:08 -0300
+Subject: [PATCH] 0025-fb-vbl-on-its-own-thread-only-when-enabled.patch
+
+---
+ gpu-port/xkpi/xnu/nmx_fb.cpp | 64 +++++++++++++++++++++++-------------
+ 1 file changed, 42 insertions(+), 22 deletions(-)
+
+diff --git a/gpu-port/xkpi/xnu/nmx_fb.cpp b/gpu-port/xkpi/xnu/nmx_fb.cpp
+index 488d637..b952dbb 100644
+--- a/gpu-port/xkpi/xnu/nmx_fb.cpp
++++ b/gpu-port/xkpi/xnu/nmx_fb.cpp
+@@ -11,6 +11,7 @@
+ #include <IOKit/graphics/IOFramebuffer.h>
+ #include <IOKit/IODeviceMemory.h>
+ #include <kern/thread_call.h>
++#include <kern/sched_prim.h>
+ #include <pexpert/pexpert.h>
+ #include "nmx_port.h"
+ #include "nmx_xnu.h"
+@@ -30,24 +31,39 @@ class NMXGPUFB : public IOFramebuffer {
+     uint64_t fFrameNs = 16666667ull;
+     struct Irq { IOFBInterruptProc proc = nullptr; OSObject *target = nullptr; void *ref = nullptr; };
+     Irq fVbl, fConnect;
+-    thread_call_t fVblTimer = nullptr;
+     uint64_t fVblNext = 0;
+-    volatile bool fStopping = false;
++    volatile bool fStopping = false, fVblOn = false, fVblRunning = false;
+     /* the first call of each method, in the NVRAM trail: what IOGraphics had asked when the Mac froze */
+     volatile uint32_t fSeen = 0;
+     void once(int bit, const char *step) {
+         if (!(fSeen & (1u << bit))) { fSeen |= 1u << bit; nmx_xnu_trail(step); }
+     }
+ 
+-    static void vblFire(thread_call_param_t p0, thread_call_param_t) {
++    /*
++     * nmx-intel 0025: the VBL runs on a kernel thread of its own, and calls IOFramebuffer only while it has the VBL
++     * interrupt enabled (setInterruptState). As a thread_call it ran in the kernel's HIGH group, which has one thread:
++     * a VBL callback that blocks inside IOFramebuffer (one came before open() enabled it) stops every HIGH thread_call
++     * in the kernel, and the Mac freezes. Measured on NMIntelFB (RTX-5: two VBLs, then the heartbeat stopped); the same
++     * timer here is the likely cause of the freeze < 2 s after this framebuffer registered (tests 10-14).
++     */
++    static void vblThread(void *p0, wait_result_t) {
+         NMXGPUFB *me = (NMXGPUFB *)p0;
+-        if (me->fStopping) return;
+-        if (me->fVbl.proc) { me->once(12, "fb-vbl"); me->fVbl.proc(me->fVbl.target, me->fVbl.ref); }
+         uint64_t period;
+         nanoseconds_to_absolutetime(me->fFrameNs, &period);
+-        uint64_t now = mach_absolute_time();
+-        me->fVblNext = (me->fVblNext && me->fVblNext + period > now) ? me->fVblNext + period : now + period;
+-        thread_call_enter_delayed(me->fVblTimer, me->fVblNext);
++        uint64_t next = mach_absolute_time() + period;
++        while (!me->fStopping) {
++            assert_wait_deadline((event_t)&me->fVblNext, THREAD_UNINT, next);
++            thread_block(THREAD_CONTINUE_NULL);
++            if (me->fStopping)
++                break;
++            if (me->fVblOn && me->fVbl.proc) { me->once(12, "fb-vbl"); me->fVbl.proc(me->fVbl.target, me->fVbl.ref); }
++            uint64_t now = mach_absolute_time();
++            next += period;
++            if (next <= now)
++                next = now + period;
++        }
++        me->fVblRunning = false;
++        thread_terminate(current_thread());
+     }
+ 
+ public:
+@@ -68,13 +84,12 @@ public:
+     bool start(IOService *provider) override {
+         if (!IOFramebuffer::start(provider)) return false;
+         nmx_xnu_trail("fb-started");
+-        fVblTimer = thread_call_allocate(vblFire, this);
+-        if (fVblTimer) {
+-            uint64_t d;
+-            clock_interval_to_deadline((uint32_t)(fFrameNs / 1000), kMicrosecondScale, &d);
+-            fVblNext = d;
+-            thread_call_enter_delayed(fVblTimer, d);
+-        }
++        thread_t vt = nullptr;
++        fVblRunning = true;
++        if (kernel_thread_start(vblThread, this, &vt) == KERN_SUCCESS)
++            thread_deallocate(vt);
++        else
++            fVblRunning = false;
+         registerPowerDriver(this, kFbPowerStates, 2);
+         nmx_xnu_trail("fb-pm");
+         FBLOG("framebuffer %ux%u at %u.%02u Hz", fInfo.width, fInfo.height, fRefresh16 >> 16,
+@@ -84,12 +99,11 @@ public:
+ 
+     void stop(IOService *provider) override {
+         fStopping = true;
+-        /* thread_call_cancel_wait is not exported to kexts: cancel and retry the free until the callback is out */
+-        if (fVblTimer) {
+-            thread_call_cancel(fVblTimer);
+-            while (!thread_call_free(fVblTimer)) { thread_call_cancel(fVblTimer); IOSleep(5); }
+-            fVblTimer = nullptr;
+-        }
++        /* 0025: wake the VBL thread and wait until it has left */
++        fVblOn = false;
++        thread_wakeup((event_t)&fVblNext);
++        while (fVblRunning)
++            IOSleep(5);
+         IOFramebuffer::stop(provider);
+     }
+ 
+@@ -181,7 +195,13 @@ public:
+         return kIOReturnUnsupported;
+     }
+     IOReturn unregisterInterrupt(void *) override { return kIOReturnSuccess; }
+-    IOReturn setInterruptState(void *, UInt32) override { return kIOReturnSuccess; }
++    IOReturn setInterruptState(void *ref, UInt32 state) override {
++        if (ref == &fVbl) {
++            fVblOn = state != 0;
++            once(state ? 20 : 21, state ? "fb-vbl-on" : "fb-vbl-off");
++        }
++        return kIOReturnSuccess;
++    }
+     IOReturn setGammaTable(UInt32, UInt32, UInt32, void *) override { once(10, "fb-gam"); return kIOReturnSuccess; }
+     IOReturn setGammaTable(UInt32, UInt32, UInt32, void *, bool) override { once(10, "fb-gam"); return kIOReturnSuccess; }
+     IOReturn setCLUTWithEntries(IOColorEntry *, UInt32, UInt32, IOOptionBits) override { once(17, "fb-clut"); return kIOReturnSuccess; }
+-- 
+2.39.5 (Apple Git-154)
+
