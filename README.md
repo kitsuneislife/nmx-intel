@@ -46,6 +46,7 @@ O NVIDIA (RTX 3050) já funciona com o driver original e não é afetado por nad
 | Teste 24: **desktop pelo i915, sem travar**; o ANV (Vulkan da Intel) enxerga `Intel(R) Graphics (RPL-P)`, Vulkan 1.4 | ✅ Próximo: o `NMXGPUFB` (fb=1) para ter o Metal da Intel |
 | Caminho RTX: o NMIntelFB do nullmoth (fora do pacote) põe o painel da Intel como cabeça 4 do NVAccel, e a RTX compõe o desktop | 🔧 `tools/intelfb` (build, install, enable); teste RTX-1 |
 | RTX-1: o boot trava quando o NMIntelFB entra, sem log | 🔧 intelfb-0002: trilha na NVRAM e trava de boot (RTX-2) |
+| RTX-2: o NMIntelFB acha o painel (pipe A, 1920x1080) e trava no registro de energia | 🔧 intelfb-0003: dependent ID antes do start, como o NVRMFB (RTX-3) |
 | Patches 1 a 5 viram correções no fonte (`source-fixes/0001..0003`) | 🔧 compilado, falta testar |
 | Tela preta com o Mac vivo (sem framebuffer, o i915 desliga o pipe, DC6) | ❌ consequência da ponte |
 | Tela acelerada / Metal na Intel | ❌ ainda não |

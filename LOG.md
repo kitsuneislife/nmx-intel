@@ -1069,3 +1069,24 @@ Build: `NMIntelFB 9dbd6128…`, 64.416 B.
 ## Próximo: teste RTX-2 (intelfb-0002)
 
 Se travar: boot com "Start once without NVIDIA driver", e `nvram nullmoth-intelfb-trail`.
+
+## 2026-10-16: teste RTX-2 (intelfb-0002) — **o NMIntelFB acha o painel e trava no `registerPowerDriver`**
+
+Trilha: `start mmio mode-A-1920x1080-s0 fb-started surf dep vbl`. A trava de boot ficou gravada
+(`nullmoth-intelfb-attaching 1`).
+- A leitura do modo do firmware funciona: pipe A, 1920x1080, superfície no offset 0 do GGTT (o fb do GOP).
+- O `IOFramebuffer::start` volta, a superfície mapeia e o timer de VBL arma. O travamento é dentro de
+  `registerPowerDriver(this, kPowerStates, 2)`.
+- Diferença para o NVRMFB, que funciona: ele põe `IOFBDependentID`/`IOFBDependentIndex` **antes** do `super::start`
+  (o IOFramebuffer monta o controlador pelo dependent ID no start). O NMIntelFB põe **depois**.
+
+### intelfb-0003
+
+- `IOFBDependentID`/`Index` antes do `IOFramebuffer::start`, como o NVRMFB.
+- Trilha em volta do PM: `pm` → `sp1`/`sp0` → `sp-done` (no `setPowerState`) → `power`.
+- Chave `sudo nvram nullmoth-intelfb-pm=0`: pula o `registerPowerDriver`.
+- `install.sh` agora limpa a trava de boot e a trilha (um build novo ganha outra tentativa).
+
+Build: `NMIntelFB 261eca1c…`.
+
+## Próximo: teste RTX-3

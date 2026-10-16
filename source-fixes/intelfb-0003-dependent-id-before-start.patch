@@ -1,0 +1,52 @@
+--- a/intelfb.cpp
++++ b/intelfb.cpp
+@@ -248,7 +248,9 @@
+     // NVRMFB acknowledges at once and answers the power attributes itself. With NMIntelFB under NVRM the
+     // first WindowServer restart froze every display.
+     IOReturn setPowerState(unsigned long ordinal, IOService *) override {
++        ifb_trail(ordinal ? "sp1" : "sp0");
+         handleEvent(ordinal ? kIOFBNotifyDidPowerOn : kIOFBNotifyWillPowerOff);
++        ifb_trail("sp-done");
+         return kIOPMAckImplied;
+     }
+     IOReturn setAttribute(IOSelect attribute, uintptr_t value) override {
+@@ -415,27 +417,33 @@
+     fApertureBase = ap->getPhysicalAddress(); fApertureLen = ap->getLength();
+     if (!adoptFirmwareMode()) { OSSafeReleaseNULL(fMMIO); fRegs = nullptr; return false; }
+     { char t[64]; snprintf(t, sizeof t, "mode-%c-%ux%u-s%x", 'A' + fPipe, fWidth, fHeight, fSurf); ifb_trail(t); }
+-    if (!IOFramebuffer::start(provider)) { ifb_trail("fb-start-failed"); OSSafeReleaseNULL(fMMIO); fRegs = nullptr; return false; }
+-    ifb_trail("fb-started");
+     // Head 4 of the NVIDIA accelerator (NVAccel): WindowServer composites this panel on the NVIDIA card and the
+     // display pipe copies each frame into fSurfMap. Without NVAccel the panel stays a plain framebuffer.
+     if (IODeviceMemory *sm = IODeviceMemory::withRange(fApertureBase + fSurf, (IOPhysicalLength)fRowBytes * fHeight)) {
+         fSurfMap = sm->map(kIOMapWriteCombineCache); sm->release();
+     }
+     ifb_trail(fSurfMap ? "surf" : "surf-fail");
+-    // nmx-intel: nullmoth-intelfb-dep=0 publishes a plain framebuffer, without joining NVAccel as head 4
++    // nmx-intel (RTX-2 hung in registerPowerDriver with these set after IOFramebuffer::start): the dependent ID decides
++    // the controller IOFramebuffer::start builds, so it goes in before, as NVRMFB does. nullmoth-intelfb-dep=0
++    // publishes a plain framebuffer, without joining NVAccel as head 4
+     if (fSurfMap && ifb_knob("nullmoth-intelfb-dep", 1)) {
+         setProperty("IOFBDependentID", 0x4E56524D00000001ull, 64);
+         setProperty("IOFBDependentIndex", 4ull, 32);
+         ifb_trail("dep");
+-    } else IFBLOG("the surface would not map write-combined: NVIDIA rendering stays off for this panel");
++    } else IFBLOG("the surface would not map write-combined, or nullmoth-intelfb-dep=0: NVIDIA rendering stays off for this panel");
++    if (!IOFramebuffer::start(provider)) { ifb_trail("fb-start-failed"); OSSafeReleaseNULL(fSurfMap); OSSafeReleaseNULL(fMMIO); fRegs = nullptr; return false; }
++    ifb_trail("fb-started");
+     setProperty("NMIntelFBPipe", fPipe, 32);
+     setProperty("NMIntelFBDisplayVersion", fVer, 32);
+     setProperty("built-in", kOSBooleanTrue);   // the panel is the laptop's own (kConnectionFlags says so too)
+     armVbl();
+     ifb_trail("vbl");
+-    registerPowerDriver(this, kPowerStates, 2);
+-    ifb_trail("power");
++    // nmx-intel: nullmoth-intelfb-pm=0 leaves power management out (RTX-2 hung inside this call)
++    if (ifb_knob("nullmoth-intelfb-pm", 1)) {
++        ifb_trail("pm");
++        registerPowerDriver(this, kPowerStates, 2);
++        ifb_trail("power");
++    } else ifb_trail("no-pm");
+     IFBLOG("built-in panel published (%ux%u)", fWidth, fHeight);
+     return true;
+ }

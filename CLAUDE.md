@@ -80,6 +80,8 @@ como cabeça 4 do NVAccel; com `debug.nvaccel_igpu=1` + `debug.nvaccelfb=3` + re
 desktop e copia cada quadro para o painel. `tools/intelfb/{build,install,enable}.sh`. Precisa do driver de teste da
 Intel **desligado**. O NMIntelFB não sobe com `-nvoff` (patch nosso). RTX-1 travou o boot sem log; intelfb-0002 =
 trilha `nvram nullmoth-intelfb-trail`, trava de boot (`nullmoth-intelfb-attaching`) e chaves `nullmoth-intelfb{,-dep}` (RTX-2, `9dbd6128…`).
+RTX-2: acha o painel (pipe A 1920x1080, surf 0) e trava no `registerPowerDriver`; intelfb-0003 = dependent ID antes do
+`IOFramebuffer::start` (como o NVRMFB), trilha `pm/sp1/sp-done/power`, chave `nullmoth-intelfb-pm=0` (RTX-3, `261eca1c…`).
 **Teste 24:** **desktop pelo i915 e sem travar** (passou de 330 s), e o ANV enxerga `Intel(R) Graphics
 (RPL-P)`, Vulkan 1.4. Sem Metal da Intel ainda (NMXAccel desligado por 0024). Próximo: o `NMXGPUFB` (fb=1) sem
 congelar. WhateverXe (b00t0x) conferido: só Big Sur e TGL/ADL-N por enquanto.

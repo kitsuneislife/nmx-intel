@@ -37,4 +37,7 @@ done
 if [ "${1:-}" != remove ]; then
   printf '%s\n' "$INS" | grep -q "com.nullmoth.NMIntelFB" || { tail -20 "$T/kmutil.log"; echo "o kmutil recusou o NMIntelFB"; rm -f "$NEWKC"; exit 1; }
 fi
-mv -f "$NEWKC" "$KC" && rm -rf "$T" && echo "pronto. Reinicie."
+mv -f "$NEWKC" "$KC" && rm -rf "$T" || { echo "não consegui trocar a coleção"; exit 1; }
+# um build novo merece outra tentativa: limpa a trava de boot e a trilha do NMIntelFB (intelfb-0002)
+nvram -d nullmoth-intelfb-attaching 2>/dev/null; nvram -d nullmoth-intelfb-trail 2>/dev/null
+echo "pronto. Reinicie."
