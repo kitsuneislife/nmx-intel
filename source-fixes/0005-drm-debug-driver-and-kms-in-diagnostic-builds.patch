@@ -1,0 +1,19 @@
+diff --git a/drivers/gpu/drm/drm_print.c b/drivers/gpu/drm/drm_print.c
+index 9ab30fd03a..eddedddefe 100644
+--- a/drivers/gpu/drm/drm_print.c
++++ b/drivers/gpu/drm/drm_print.c
+@@ -39,7 +39,13 @@
+  * __drm_debug: Enable debug output.
+  * Bitmask of DRM_UT_x. See include/drm/drm_print.h for details.
+  */
+-#ifdef __linux__
++#if defined(NMXKPI) && defined(NMX_DRM_DEBUG)
++/*
++ * macOS port (NMXGPU), diagnostic build: there is no drm.debug boot parameter on macOS, so the categories are
++ * fixed here. DRIVER and KMS (0x6) are what i915's display bring-up logs with drm_dbg/drm_dbg_kms.
++ */
++unsigned long __drm_debug = BIT(DRM_UT_DRIVER) | BIT(DRM_UT_KMS);	/* DRM_UT_x are bit numbers */
++#elif defined(__linux__)
+ unsigned long __drm_debug;
+ #elif defined(__FreeBSD__)
+ #if defined(DRM_DEBUG_LOG_ALL) || defined(INVARIANTS)

@@ -301,3 +301,15 @@ Os únicos avisos nos arquivos novos são de conversão de sinal, como o resto d
   desligar e ligar o driver de teste no app, e reiniciar. Confirmar com o Lukas antes.
 - Procurar no log: `i915 buffer in stolen`, `NullMoth display: 1920x1080, pitch 7680, phys 0x40…`, e se a tela
   acende.
+
+## 2026-10-15: build de diagnóstico para o teste 6
+
+- `source-fixes/0005` (drm-kmod, `drm_print.c`): com `-DNMX_DRM_DEBUG`, o `__drm_debug` começa em
+  `BIT(DRM_UT_DRIVER) | BIT(DRM_UT_KMS)` = `0x6`, o mesmo efeito do patch 3. Sem a flag, nada muda.
+  - Cuidado: no 6.14 os `DRM_UT_*` são **números de bit**, não máscaras. A primeira tentativa,
+    `DRM_UT_DRIVER | DRM_UT_KMS`, deu `3` (CORE + DRIVER). Conferido no `__data` do binário: agora é `6`.
+- `build/build-all.sh debug kext` recompila só o `drm_print.c` com a flag e linka.
+- Binário do teste 6: `NMXGPU df90b1b5e3a938b614f02115157e90d7264f504434af7d6ac05e7784758fa083`, 15.236.328 B.
+  Tem 0001 a 0005.
+- `build/install.sh` copia o binário para `/Library/NullMoth/kexts/15/…`. Antes, confere o backup do original.
+  Para voltar: `sudo bash patches/apply.sh restore`.
