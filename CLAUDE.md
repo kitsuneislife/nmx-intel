@@ -86,6 +86,8 @@ RTX-3: o `start` termina (`… power sp1 ok sp-done`), tela preta e trava depois
 chamada de cada método na trilha; 0005 = trava de boot até 2 min vivo (`alive`) (RTX-4, `65901097…`).
 RTX-4: o `IOFramebuffer::open` vai inteiro; último método novo `is` (`setInterruptState`), tela preta e trava.
 intelfb-0006 = batimento `nvram nullmoth-intelfb-beat` (ms, vbl, calls, last) (RTX-5, `bf5091eb…`).
+RTX-5: `vbl=2`, o batimento parou aos 21 s: o VBL (thread_call HIGH, uma thread) travou dentro do IOFramebuffer e
+parou o grupo inteiro. intelfb-0007 = VBL e batimento em threads próprias, VBL só depois do `setInterruptState` (RTX-6, `2119d10f…`).
 **Teste 24:** **desktop pelo i915 e sem travar** (passou de 330 s), e o ANV enxerga `Intel(R) Graphics
 (RPL-P)`, Vulkan 1.4. Sem Metal da Intel ainda (NMXAccel desligado por 0024). Próximo: o `NMXGPUFB` (fb=1) sem
 congelar. WhateverXe (b00t0x) conferido: só Big Sur e TGL/ADL-N por enquanto.

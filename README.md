@@ -49,6 +49,7 @@ O NVIDIA (RTX 3050) já funciona com o driver original e não é afetado por nad
 | RTX-2: o NMIntelFB acha o painel (pipe A, 1920x1080) e trava no registro de energia | 🔧 intelfb-0003: dependent ID antes do start, como o NVRMFB (RTX-3) |
 | RTX-3: o NMIntelFB sobe inteiro; tela preta e trava depois | 🔧 intelfb-0004/0005: trilha de cada chamada e trava de boot de 2 min (RTX-4) |
 | RTX-4: o macOS abre a tela inteira (modo, gamma, VRAM) e trava depois de ligar o VBL | 🔧 intelfb-0006: batimento com a última chamada (RTX-5) |
+| RTX-5: o VBL travou o grupo de `thread_call` do kernel (`vbl=2`) | 🔧 intelfb-0007: VBL em thread própria e só depois de ligado (RTX-6) |
 | Patches 1 a 5 viram correções no fonte (`source-fixes/0001..0003`) | 🔧 compilado, falta testar |
 | Tela preta com o Mac vivo (sem framebuffer, o i915 desliga o pipe, DC6) | ❌ consequência da ponte |
 | Tela acelerada / Metal na Intel | ❌ ainda não |

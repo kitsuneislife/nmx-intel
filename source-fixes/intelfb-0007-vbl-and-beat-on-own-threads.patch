@@ -1,0 +1,141 @@
+--- a/intelfb.cpp
++++ b/intelfb.cpp
+@@ -19,6 +19,7 @@
+ #include <IOKit/IOTimerEventSource.h>
+ #include <IOKit/IOWorkLoop.h>
+ #include <kern/thread_call.h>
++#include <kern/sched_prim.h>
+ #include <sys/sysctl.h>
+ 
+ #define IFBLOG(fmt, ...) IOLog("NMIntelFB: " fmt "\n", ##__VA_ARGS__)
+@@ -104,18 +105,26 @@
+ 
+ // intelfb-0006: heartbeat every second for three minutes after start(): "nullmoth-intelfb-beat" = ms since start, VBL
+ // calls, framebuffer calls and the last call made. A freeze leaves the last beat: whether VBLs still ran, and the call
+-static thread_call_t gIfbBeat;
++// intelfb-0007: a kernel thread of its own. As a thread_call it shared the HIGH group (one thread) with the VBL timer
++// and stopped when the VBL callback blocked (RTX-5: ms=21450 vbl=2). At two minutes it also disarms the boot guard.
+ static uint64_t gIfbT0;
+-static void ifb_beat(thread_call_param_t, thread_call_param_t)
++static void ifb_beat(void *, wait_result_t)
+ {
+-    uint64_t ns; absolutetime_to_nanoseconds(mach_absolute_time() - gIfbT0, &ns);
+-    char b[96];
+-    snprintf(b, sizeof b, "ms=%llu vbl=%d calls=%d last=%s", ns / 1000000ull, (int)gIfbVbl, (int)gIfbCalls, (const char *)gIfbLast);
+-    ifb_nv_set("nullmoth-intelfb-beat", b);
+-    if (ns < 180ull * 1000000000ull) {
+-        uint64_t d; clock_interval_to_deadline(1, kSecondScale, &d);
+-        thread_call_enter_delayed(gIfbBeat, d);
++    for (;;) {
++        IOSleep(1000);
++        uint64_t ns; absolutetime_to_nanoseconds(mach_absolute_time() - gIfbT0, &ns);
++        char b[96];
++        snprintf(b, sizeof b, "ms=%llu vbl=%d calls=%d last=%s", ns / 1000000ull, (int)gIfbVbl, (int)gIfbCalls, (const char *)gIfbLast);
++        ifb_nv_set("nullmoth-intelfb-beat", b);
++        static bool alive;
++        if (!alive && ns >= 120ull * 1000000000ull) {
++            alive = true;
++            ifb_trail("alive");
++            ifb_nv_set("nullmoth-intelfb-attaching", nullptr);
++        }
++        if (ns >= 180ull * 1000000000ull) break;
+     }
++    thread_terminate(current_thread());
+ }
+ static void ifb_attr(const char *pfx, uint32_t a)
+ {
+@@ -183,22 +192,36 @@
+     // virtual panel froze the Mac). A 60 Hz timer is the VBL, as NVRMFB's fallback is.
+     struct Irq { IOFBInterruptProc proc = nullptr; OSObject *target = nullptr; void *ref = nullptr; };
+     Irq fVbl, fConnect;
+-    thread_call_t fVblTimer = nullptr;
++    // intelfb-0007: the VBL runs on a kernel thread of its own, and only while IOFramebuffer has the VBL interrupt
++    // enabled (setInterruptState). As a thread_call it ran in the HIGH group, which has one thread: the second VBL
++    // callback blocked there (called before open() enabled it) and every HIGH thread_call in the kernel stopped behind
++    // it (RTX-5: vbl=2, the heartbeat stopped at 21 s, then the Mac froze)
+     uint64_t fVblNext = 0, fVblCalls = 0;
+-    volatile bool fStopping = false;
+-    static void vblFire(thread_call_param_t p0, thread_call_param_t) {
++    volatile bool fStopping = false, fVblOn = false, fVblRunning = false;
++    static void vblThread(void *p0, wait_result_t) {
+         NMIntelFB *me = (NMIntelFB *)p0;
+-        if (me->fStopping) return;
+-        if (me->fVbl.proc) { OSIncrementAtomic(&gIfbVbl); static bool _v1; if (!_v1) { _v1 = true; ifb_trail("vbl1"); } me->fVbl.proc(me->fVbl.target, me->fVbl.ref); me->fVblCalls++; }
+         uint64_t period; nanoseconds_to_absolutetime(me->fFrameNs, &period);
+-        uint64_t now = mach_absolute_time();
+-        me->fVblNext = (me->fVblNext && me->fVblNext + period > now) ? me->fVblNext + period : now + period;
+-        thread_call_enter_delayed(me->fVblTimer, me->fVblNext);
++        uint64_t next = mach_absolute_time() + period;
++        while (!me->fStopping) {
++            assert_wait_deadline((event_t)&me->fVblNext, THREAD_UNINT, next);
++            thread_block(THREAD_CONTINUE_NULL);
++            if (me->fStopping) break;
++            if (me->fVblOn && me->fVbl.proc) {
++                OSIncrementAtomic(&gIfbVbl);
++                static bool _v1; if (!_v1) { _v1 = true; ifb_trail("vbl1"); }
++                me->fVbl.proc(me->fVbl.target, me->fVbl.ref); me->fVblCalls++;
++            }
++            uint64_t now = mach_absolute_time();
++            next += period; if (next <= now) next = now + period;
++        }
++        me->fVblRunning = false;
++        thread_terminate(current_thread());
+     }
+     void armVbl() {
+-        fVblTimer = thread_call_allocate(vblFire, this);
+-        if (fVblTimer) { uint64_t d; clock_interval_to_deadline((uint32_t)(fFrameNs / 1000), kMicrosecondScale, &d); fVblNext = d; thread_call_enter_delayed(fVblTimer, d); }
+-        IFBLOG("vbl timer %s", fVblTimer ? "armed (60 Hz)" : "ALLOCATE FAILED");
++        thread_t t = nullptr;
++        fVblRunning = true;
++        if (kernel_thread_start(vblThread, this, &t) == KERN_SUCCESS) thread_deallocate(t); else fVblRunning = false;
++        IFBLOG("vbl thread %s", fVblRunning ? "started (runs while the VBL interrupt is enabled)" : "FAILED");
+     }
+ #ifdef NMINTELFB_VIRTUAL
+     IOBufferMemoryDescriptor *fVBuf = nullptr;
+@@ -277,7 +300,11 @@
+         return kIOReturnUnsupported;
+     }
+     IOReturn unregisterInterrupt(void *) override { return kIOReturnSuccess; }
+-    IOReturn setInterruptState(void *, UInt32) override { IFB_ONCE("is"); return kIOReturnSuccess; }
++    IOReturn setInterruptState(void *ref, UInt32 state) override {
++        IFB_ONCE("is");
++        if (ref == &fVbl) { fVblOn = state != 0; static int n; if (n++ < 4) ifb_trail(state ? "vbl-on" : "vbl-off"); }
++        return kIOReturnSuccess;
++    }
+     IOReturn setGammaTable(UInt32, UInt32, UInt32, void *) override { IFB_ONCE("gam"); return kIOReturnSuccess; }
+     IOReturn setGammaTable(UInt32, UInt32, UInt32, void *, bool) override { IFB_ONCE("gam2"); return kIOReturnSuccess; }
+     IOReturn setCLUTWithEntries(IOColorEntry *, UInt32, UInt32, IOOptionBits) override { IFB_ONCE("clut"); return kIOReturnSuccess; }
+@@ -449,17 +476,9 @@
+     // minutes with this framebuffer; a freeze before that leaves the panel to the firmware on the next boot
+     if (ok) {
+         gIfbT0 = mach_absolute_time();
+-        if ((gIfbBeat = thread_call_allocate(ifb_beat, nullptr)) != nullptr) {
+-            uint64_t d; clock_interval_to_deadline(1, kSecondScale, &d);
+-            thread_call_enter_delayed(gIfbBeat, d);
+-        }
+-        if (thread_call_t alive = thread_call_allocate([](thread_call_param_t, thread_call_param_t) {
+-                ifb_trail("alive");
+-                ifb_nv_set("nullmoth-intelfb-attaching", nullptr);
+-            }, nullptr)) {
+-            uint64_t d; clock_interval_to_deadline(120, kSecondScale, &d);
+-            thread_call_enter_delayed(alive, d);
+-        } else ifb_nv_set("nullmoth-intelfb-attaching", nullptr);
++        thread_t bt = nullptr;
++        if (kernel_thread_start(ifb_beat, nullptr, &bt) == KERN_SUCCESS) thread_deallocate(bt);
++        else ifb_nv_set("nullmoth-intelfb-attaching", nullptr);
+     } else ifb_nv_set("nullmoth-intelfb-attaching", nullptr);
+     return ok;
+ }
+@@ -514,8 +533,10 @@
+ #ifdef NMINTELFB_VIRTUAL
+     if (gVirt == this) { sysctl_unregister_oid(&sysctl__debug_nmintelfb_sample); gVirt = nullptr; }
+ #endif
+-    // thread_call_cancel_wait is not exported to kexts: cancel and retry the free until the callback is out (as NVRMFB)
+-    if (fVblTimer) { thread_call_cancel(fVblTimer); while (!thread_call_free(fVblTimer)) { thread_call_cancel(fVblTimer); IOSleep(5); } fVblTimer = nullptr; }
++    // intelfb-0007: wake the VBL thread and wait until it has left
++    fVblOn = false;
++    thread_wakeup((event_t)&fVblNext);
++    while (fVblRunning) IOSleep(5);
+     OSSafeReleaseNULL(fSurfMap); OSSafeReleaseNULL(fMMIO); fRegs = nullptr;
+     IOFramebuffer::stop(provider);
+ }

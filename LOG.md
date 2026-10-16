@@ -1134,3 +1134,25 @@ travamento é no VBL; o `last` diz a chamada em andamento.
 Build: `NMIntelFB bf5091eb…`, 70.800 B.
 
 ## Próximo: teste RTX-5
+
+## 2026-10-16: teste RTX-5 (intelfb-0006) — **o VBL trava o grupo de `thread_call` do kernel**
+
+Tela preta e travamento. Batimento: `ms=21450 vbl=2 calls=18 last=ga:mrdf`. A trilha continuou depois disso até o
+`is` (igual ao RTX-4).
+- O timer de VBL rodou **só 2 vezes**, e o batimento parou aos 21 s, mas o `open` seguiu chamando o framebuffer.
+- Os dois eram `thread_call_allocate`, que cai no grupo HIGH do kernel, que tem **uma thread só**. A segunda chamada
+  do VBL do IOFramebuffer ficou presa (ela vinha antes do `open` ligar o VBL com `setInterruptState`). Tudo o que usa
+  `thread_call` HIGH no kernel ficou parado atrás dela, e o Mac congelou aos poucos. A tela preta é o `open`
+  limpando o framebuffer.
+- O NVRMFB tem o mesmo padrão; aqui ele trava porque o VBL é chamado durante o `open` do IOFramebuffer.
+
+### intelfb-0007
+
+- O VBL roda numa thread do kernel só dele e só chama o IOFramebuffer quando o VBL está ligado
+  (`setInterruptState` com o `ref` do VBL; trilha `vbl-on`/`vbl-off`).
+- O batimento também virou thread própria, e aos 2 min marca `alive` e desarma a trava de boot.
+- `stop()` acorda a thread do VBL e espera ela sair.
+
+Build: `NMIntelFB 2119d10f…`, 70.816 B.
+
+## Próximo: teste RTX-6
