@@ -1,0 +1,45 @@
+From 9a86650587be227e50e58ec040e81db67ab6b6c0 Mon Sep 17 00:00:00 2001
+From: kitsuneislife <kitsuneislif3@gmail.com>
+Date: Fri, 16 Oct 2026 14:04:24 -0300
+Subject: [PATCH] 0024-no-nmxaccel-claim-without-our-framebuffer.patch
+
+---
+ gpu-port/xkpi/xnu/nmx_kext.cpp | 18 ++++++++++++++----
+ 1 file changed, 14 insertions(+), 4 deletions(-)
+
+diff --git a/gpu-port/xkpi/xnu/nmx_kext.cpp b/gpu-port/xkpi/xnu/nmx_kext.cpp
+index 5d9d9c7..c5bbd48 100644
+--- a/gpu-port/xkpi/xnu/nmx_kext.cpp
++++ b/gpu-port/xkpi/xnu/nmx_kext.cpp
+@@ -465,14 +465,24 @@ void NMXGPU::attachNow()
+     registerPowerDriver(this, states, 2);
+     pm_ = true;
+     registerService();
+-    /* NMXAccel (the Metal accelerator for this GPU) starts only on a device this driver has claimed; it declined while
+-       the claim was pending, so matching on the device runs again now that it is set */
+-    pci_->setProperty("nmxgpu-claimed", kOSBooleanTrue);
+-    pci_->registerService();
+     /* light the outputs and hand them to macOS; without it the device still renders, with no screen of its own */
+     /* nmxfb=0: no display bridge at all (the outputs go dark); nmxfb=2: the bridge lights the panel, but no
+        IOFramebuffer is published (nmx_fb.cpp). To tell the bridge's modeset, the IOFramebuffer and the rest apart */
+     uint32_t pub = nmx_xnu_knob("nmxfb", "nullmoth-gpu-fb", 1);
++    /* NMXAccel (the Metal accelerator for this GPU) starts only on a device this driver has claimed; it declined while
++       the claim was pending, so matching on the device runs again now that it is set.
++       nmx-intel 0024: with no IOFramebuffer of ours (nmxfb=0/2) the GPU is not claimed for NMXAccel by default. The
++       firmware's IONDRVFramebuffer stays on this GPU, so the family pairs the screen with NMXAccel, every display
++       surface fails there ("RM refused 8294400 bytes": no framebuffer has published), WindowServer's main thread
++       retries forever and the userspace watchdog takes the Mac down ~225 s later (tests 21-23).
++       nmxaccel=1 / nullmoth-gpu-accel=1 claims it anyway, nmxaccel=0 never does */
++    uint32_t accel = nmx_xnu_knob("nmxaccel", "nullmoth-gpu-accel", pub == 1 ? 1 : 0);
++    if (accel) {
++        pci_->setProperty("nmxgpu-claimed", kOSBooleanTrue);
++        pci_->registerService();
++    } else {
++        nmx_xnu_trail("noaccel");
++    }
+     nmx_xnu_trail(pub == 0 ? "nopub" : pub == 2 ? "publish-nofb" : "publish");
+     fb_ = pub ? nmx_fb_publish(this, dev_) : nullptr;
+     gPublished = mach_absolute_time();
+-- 
+2.39.5 (Apple Git-154)
+

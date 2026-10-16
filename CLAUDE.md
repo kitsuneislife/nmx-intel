@@ -75,7 +75,10 @@ Até 2026-10-15 o trabalho estava no branch `ccr-918d231a-luzxg0` dos dois outro
 
 ## Onde paramos (2026-10-15, depois do teste 5)
 
-**Mais novo (teste 22):** com 0021, trava aos ~4 min, sem panic e sem RCU esperando, longe dos pedidos do ANV. O
+**Mais novo (teste 23):** a GPU estava parada (`iot` 140 s antes, `irq` baixo). O travamento é o watchdog do macOS: a
+thread principal do WindowServer fica em loop no NMXAccel (`RM refused 8294400`, sem framebuffer nosso com `fb=2`). 0024 =
+não pôr `nmxgpu-claimed` sem o nosso IOFramebuffer (chave `nullmoth-gpu-accel`) (teste 24, `7fd87526…`).
+**Teste 22:** com 0021, trava aos ~4 min, sem panic e sem RCU esperando, longe dos pedidos do ANV. O
 desktop não aparece porque o NMXAccel da Intel recusa toda superfície do WindowServer (`RM refused 8294400`). 0022/0023 =
 batimento de 1 s com `irq=`/`iot=` e `Gu`/`Gp`/`Rs`/`Rr`/`D…` no registro (teste 23, `2f1e7630…`).
 **Teste 21:** o ANV faz centenas de pedidos ao i915. O travamento é o RCU do port: o `sched_pin` desliga as

@@ -951,3 +951,34 @@ Build `rt i915 kext`: `NMXGPU 2f1e76300c88d4b1e6d673076eb53b3fabdc811d02fe273800
 
 Depois do travamento: `nvram nullmoth-gpu-beat` e `nvram nullmoth-gpu-io`. Comparar `iot` com `ms` (a GPU estava sendo
 usada na hora?), `irq` (subiu de repente?) e os últimos `Gu`/`Gp`/`D…`.
+
+## 2026-10-16: teste 23, 0022 + 0023 — **a causa: o WindowServer preso e o watchdog do macOS**
+
+Kext `2f1e7630…`, libdrm `719cb625…`, `fb=2`. Travou de novo sem desktop, com a tela de texto parada (não ficou preta).
+Batimento `ms=267714 open=46 ioctl=251 in=0 rcu=0 irq=109 iot=127647`:
+- O último pedido à GPU foi aos 127,6 s, e o travamento aos 267,7 s: **a GPU estava parada havia 140 s**.
+- `irq=109`: nenhuma tempestade de interrupções. Nenhum `Gu`/`Gp`/`D…` no fim do registro: a GPU não acordou nem
+  mudou de estado de energia nesse tempo.
+- O travamento vem sempre ~225 s depois de o WindowServer se inscrever no watchdog
+  (`enrolling watchdog endpoints in monitoring`): teste 22 às 11:08:05 → ~11:11:50; teste 23 às 13:56:57 → ~14:00:43.
+- A thread principal do WindowServer (`[891:d9b]`) passa esse tempo todo num loop: `NVTask::allocate: RM refused 8294400
+  bytes` / `IOAccelLegacySurface::surface_flush: failed to prepare buffers`, ~19 por segundo (3.296 no boot). O
+  NMXAccel recusa porque `nvAccelRmHandles: no framebuffer has published yet`: com `fb=2` o nosso IOFramebuffer
+  não existe, mas o IONDRVFramebuffer do firmware fica na Intel e o IOAccel o junta ao NMXAccel do mesmo PCI.
+- O WindowServer não responde ao watchdog, e o `watchdogd` derruba o kernel. O panic não chega a ser salvo (não há
+  relatório), e a máquina fica parada.
+
+### 0024: sem NMXAccel na Intel quando não há o nosso IOFramebuffer
+
+- `nmx_kext.cpp`: o `nmxgpu-claimed` (que deixa o NMXAccel subir) só é posto quando o nosso IOFramebuffer é publicado
+  (`fb=1`). Com `fb=0`/`fb=2`, a trilha ganha `noaccel` e o WindowServer desenha como nos testes 18 e 19. O DRM
+  (`/dev/dri`) continua, e o probe ainda testa o ANV. Chave: `nmxaccel=1`/`nullmoth-gpu-accel=1` força o NMXAccel,
+  `nmxaccel=0` nunca.
+- Fica sem o Metal da Intel por enquanto. Ele volta quando o `NMXGPUFB` (fb=1) parar de congelar.
+
+Build `rt kext`: `NMXGPU 7fd87526d8ef26cc9db34ae4ebb0f81e489792fb67f761423ebf6716a6a9826f`, 15.250.936 B.
+
+## Próximo: teste 24 (0024, mesmo libdrm, `fb=2`)
+
+Esperado: desktop e sem travar depois de 5 min. Conferir `nvram nullmoth-gpu-trail` (`noaccel`) e o probe (o ANV deve
+achar 1 GPU).
