@@ -1,0 +1,230 @@
+diff --git a/gpu-port/xkpi/bsdcompat/include/nmx_xnu.h b/gpu-port/xkpi/bsdcompat/include/nmx_xnu.h
+index ace979f..394e4b3 100644
+--- a/gpu-port/xkpi/bsdcompat/include/nmx_xnu.h
++++ b/gpu-port/xkpi/bsdcompat/include/nmx_xnu.h
+@@ -167,6 +167,11 @@ int nmx_xnu_map_user(const uint64_t *pages, size_t npages, int cache, int writab
+ void nmx_xnu_unmap_user(void *handle);
+ /* the boot framebuffer (GOP): physical base and geometry; 0 when there is none (xnu/nmx_platform.cpp) */
+ int nmx_xnu_boot_fb(uint64_t *phys, uint32_t *width, uint32_t *height, uint32_t *pitch);
++/*
++ * diagnostic trail (xnu/nmx_kext.cpp): appends 'step' to the NVRAM variable nullmoth-gpu-trail and syncs it, so the
++ * last step reached survives a freeze that loses the log (`nvram nullmoth-gpu-trail` on the next boot)
++ */
++void nmx_xnu_trail(const char *step);
+ 
+ /* implemented on the LinuxKPI side (override/src/nmx_linux_cdev.c), called by the device-node glue */
+ int nmx_cdev_open(void *cookie, int open_id, int fflags);
+diff --git a/gpu-port/xkpi/override/i915/nmx_i915_fb.c b/gpu-port/xkpi/override/i915/nmx_i915_fb.c
+index 531b31f..9e6b715 100644
+--- a/gpu-port/xkpi/override/i915/nmx_i915_fb.c
++++ b/gpu-port/xkpi/override/i915/nmx_i915_fb.c
+@@ -79,10 +79,13 @@ void nmx_i915_reserve_boot_fb(struct i915_ggtt *ggtt)
+     boot_fb_node.start = base;
+     boot_fb_node.size = size;
+     boot_fb_node.color = I915_COLOR_UNEVICTABLE;
+-    if (drm_mm_reserve_node(&ggtt->vm.mm, &boot_fb_node))
++    if (drm_mm_reserve_node(&ggtt->vm.mm, &boot_fb_node)) {
+         printf("NullMoth display: could not hold the boot framebuffer's GGTT 0x%x+0x%x\n", base, size);
+-    else
++        nmx_xnu_trail("hold-fail");
++    } else {
+         printf("NullMoth display: holding GGTT 0x%x+0x%x for the boot framebuffer (%ux%u)\n", base, size, w, h);
++        nmx_xnu_trail("hold");
++    }
+ }
+ 
+ void nmx_i915_release_boot_fb(struct i915_ggtt *ggtt)
+@@ -163,6 +166,7 @@ static struct i915_vma *take_boot_fb(struct drm_i915_private *i915, u32 base, u3
+         drm_mm_remove_node(&boot_fb_node);
+         mutex_unlock(&ggtt->vm.mutex);
+     }
++    nmx_xnu_trail("take-pin");
+     err = i915_vma_pin(vma, 0, 0, PIN_GLOBAL | PIN_OFFSET_FIXED | PIN_MAPPABLE | base);
+     if (err) {
+         printf("NullMoth display: GGTT 0x%x+0x%x is taken (%d)\n", base, size, err);
+@@ -236,6 +240,7 @@ int nmx_i915_fb_create(struct drm_device *drm, uint32_t width, uint32_t height,
+         }
+     }
+ 
++    nmx_xnu_trail(boot_vma != NULL ? "took" : "fallback");
+     fb = intel_framebuffer_create(intel_bo_to_drm_bo(obj), &mode_cmd);
+     if (boot_vma == NULL)
+         i915_gem_object_put(obj);       /* the framebuffer holds its own reference */
+@@ -247,6 +252,7 @@ int nmx_i915_fb_create(struct drm_device *drm, uint32_t width, uint32_t height,
+     f->fb = fb;
+ 
+     /* the display pins in the mappable part of the GGTT first; the boot buffer's own binding already is there */
++    nmx_xnu_trail("fb-pin");
+     vma = intel_fb_pin_to_ggtt(fb, &view, to_intel_framebuffer(fb)->min_alignment, 0, false, &f->vma_flags);
+     if (IS_ERR(vma)) {
+         ret = PTR_ERR(vma);
+@@ -268,6 +274,7 @@ int nmx_i915_fb_create(struct drm_device *drm, uint32_t width, uint32_t height,
+         goto out_unpin;
+     }
+ 
++    nmx_xnu_trail("iomap");
+     for_i915_gem_ww(&ww, ret, false) {
+         ret = i915_gem_object_lock(vma->obj, &ww);
+         if (ret)
+diff --git a/gpu-port/xkpi/override/src/nmx_fb_bridge.c b/gpu-port/xkpi/override/src/nmx_fb_bridge.c
+index b165c91..025606a 100644
+--- a/gpu-port/xkpi/override/src/nmx_fb_bridge.c
++++ b/gpu-port/xkpi/override/src/nmx_fb_bridge.c
+@@ -159,6 +159,7 @@ int nmx_fb_open(void *devp, struct nmx_fb_info *out)
+         kfree(fb);
+         return err;
+     }
++    nmx_xnu_trail("probe");
+     err = -drm_client_modeset_probe(&fb->client, 0, 0);
+     if (err) {
+         printf("NullMoth display: probing the outputs failed (%d)\n", err);
+@@ -190,6 +191,7 @@ int nmx_fb_open(void *devp, struct nmx_fb_info *out)
+ 
+     if (strcmp(drm->driver->name, "i915") == 0) {
+         struct nmx_i915_fb_out ib;
++        nmx_xnu_trail("i915-fb");
+         err = -nmx_i915_fb_create(drm, out->width, out->height, &ib);
+         if (err)
+             goto fail;
+@@ -245,7 +247,9 @@ lit:
+         if (ms->mode != NULL)
+             ms->fb = fb->dfb;
+     mutex_unlock(&fb->client.modeset_mutex);
++    nmx_xnu_trail("commit");
+     err = -drm_client_modeset_commit(&fb->client);
++    nmx_xnu_trail(err ? "commit-fail" : "lit");
+     if (err) {
+         printf("NullMoth display: the mode set failed (%d)\n", err);
+         goto fail;
+diff --git a/gpu-port/xkpi/xnu/nmx_fb.cpp b/gpu-port/xkpi/xnu/nmx_fb.cpp
+index 64ca853..bc9de02 100644
+--- a/gpu-port/xkpi/xnu/nmx_fb.cpp
++++ b/gpu-port/xkpi/xnu/nmx_fb.cpp
+@@ -12,6 +12,7 @@
+ #include <IOKit/IODeviceMemory.h>
+ #include <kern/thread_call.h>
+ #include "nmx_port.h"
++#include "nmx_xnu.h"
+ 
+ #define FBLOG(fmt, ...) IOLog("NullMoth display: " fmt "\n", ##__VA_ARGS__)
+ 
+@@ -90,7 +91,11 @@ public:
+         if (aperture != kIOFBSystemAperture) return nullptr;
+         return IODeviceMemory::withRange(fInfo.phys, (IOPhysicalLength)fInfo.pitch * fInfo.height);
+     }
+-    IODeviceMemory *getVRAMRange() override { return IODeviceMemory::withRange(fInfo.phys, fInfo.size); }
++    IODeviceMemory *getVRAMRange() override {
++        if (!fTrailVram) { fTrailVram = true; nmx_xnu_trail("fb-vram"); }
++        return IODeviceMemory::withRange(fInfo.phys, fInfo.size);
++    }
++    bool fTrailVram = false, fTrailMode = false, fTrailWs = false;
+     const char *getPixelFormats() override { return IO32BitDirectPixels "\0"; }
+     IOItemCount getDisplayModeCount() override { return 1; }
+     IOReturn getDisplayModes(IODisplayModeID *modes) override { modes[0] = 1; return kIOReturnSuccess; }
+@@ -146,6 +151,7 @@ public:
+         return kIOReturnSuccess;
+     }
+     IOReturn setDisplayMode(IODisplayModeID mode, IOIndex depth) override {
++        if (!fTrailMode) { fTrailMode = true; nmx_xnu_trail("fb-setmode"); }
+         return (mode == 1 && depth == 0) ? kIOReturnSuccess : kIOReturnUnsupported;
+     }
+     IOItemCount getConnectionCount() override { return 1; }
+@@ -168,8 +174,12 @@ public:
+         return kIOPMAckImplied;
+     }
+     IOReturn setAttribute(IOSelect attribute, uintptr_t value) override {
+-        if (attribute == kIOWindowServerActiveAttribute) return kIOReturnSuccess;
++        if (attribute == kIOWindowServerActiveAttribute) {
++            if (!fTrailWs) { fTrailWs = true; nmx_xnu_trail(value ? "ws-on" : "ws-off"); }
++            return kIOReturnSuccess;
++        }
+         if (attribute == kIOPowerAttribute) {
++            nmx_xnu_trail(value ? "fb-pwr-on" : "fb-pwr-off");
+             /* display sleep turns the outputs off; wake lights them again with the same buffer */
+             if (fDev) nmx_fb_power(fDev, value != 0);
+             if (value) {
+diff --git a/gpu-port/xkpi/xnu/nmx_kext.cpp b/gpu-port/xkpi/xnu/nmx_kext.cpp
+index 64ed032..e9ef2d2 100644
+--- a/gpu-port/xkpi/xnu/nmx_kext.cpp
++++ b/gpu-port/xkpi/xnu/nmx_kext.cpp
+@@ -137,6 +137,16 @@ void NMXGPU::attachThread(void *arg, wait_result_t)
+  */
+ static const char *const kAttachMarker = "nullmoth-gpu-attaching";
+ 
++/*
++ * Diagnostic trail: each step of the bring-up is appended to an NVRAM variable and synced at once, so a freeze that
++ * takes the unflushed log with it (tests 6 and 9 left no line at all) still shows how far the Mac got. Bounded, so
++ * a long session cannot keep writing NVRAM.
++ */
++static const char *const kTrail = "nullmoth-gpu-trail";
++static IOLock *gTrailLock;
++static char gTrail[240];
++static unsigned gTrailWrites;
++
+ static IODTNVRAM *nmx_nvram()
+ {
+     IORegistryEntry *e = IORegistryEntry::fromPath("/options", gIODTPlane);
+@@ -183,6 +193,39 @@ static void nmx_marker_write(bool on)
+     n->release();
+ }
+ 
++static IODTNVRAM *nmx_nvram();
++
++extern "C" void nmx_xnu_trail(const char *step)
++{
++    if (gTrailLock == nullptr || step == nullptr)
++        return;
++    IOLog("NullMoth trail: %s\n", step);
++    IOLockLock(gTrailLock);
++    size_t len = strlen(gTrail), add = strlen(step);
++    if (gTrailWrites >= 40 || len + add + 2 > sizeof(gTrail)) {
++        IOLockUnlock(gTrailLock);
++        return;
++    }
++    if (len)
++        gTrail[len++] = ' ';
++    memcpy(gTrail + len, step, add + 1);
++    gTrailWrites++;
++    IODTNVRAM *n = nmx_nvram();
++    if (n != nullptr) {
++        const OSSymbol *k = OSSymbol::withCString(kTrail);
++        OSData *d = OSData::withBytes(gTrail, (unsigned)strlen(gTrail));
++        if (k != nullptr && d != nullptr)
++            n->setProperty(k, d);
++        if (d)
++            d->release();
++        if (k)
++            k->release();
++        n->sync();
++        n->release();
++    }
++    IOLockUnlock(gTrailLock);
++}
++
+ void NMXGPU::attachNow()
+ {
+     int err = nmx_xnu_wait_firmware_root(300);
+@@ -200,7 +243,13 @@ void NMXGPU::attachNow()
+         return;
+     }
+     nmx_marker_write(true);
++    if (gTrailLock == nullptr)
++        gTrailLock = IOLockAlloc();
++    gTrail[0] = 0;
++    gTrailWrites = 0;
++    nmx_xnu_trail("attach");
+     dev_ = nmx_port_attach(pci_);
++    nmx_xnu_trail(dev_ ? "attached" : "no-driver");
+     if (dev_ == nullptr) {
+         nmx_marker_write(false);
+         IOLog("NullMoth GPU: no driver took %04x:%04x\n", pci_->configRead16(kIOPCIConfigVendorID),
+@@ -223,7 +272,9 @@ void NMXGPU::attachNow()
+     pci_->setProperty("nmxgpu-claimed", kOSBooleanTrue);
+     pci_->registerService();
+     /* light the outputs and hand them to macOS; without it the device still renders, with no screen of its own */
++    nmx_xnu_trail("publish");
+     fb_ = nmx_fb_publish(this, dev_);
++    nmx_xnu_trail(fb_ ? "published" : "no-fb");
+     nmx_marker_write(false);
+     IOLog("NullMoth GPU: driving %04x:%04x\n", pci_->configRead16(kIOPCIConfigVendorID),
+           pci_->configRead16(kIOPCIConfigDeviceID));
