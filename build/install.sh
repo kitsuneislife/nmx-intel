@@ -2,7 +2,7 @@
 # install.sh: põe o NMXGPU compilado (~/nmx-build/out) no lugar do binário que o app 1401 usa para o driver de teste.
 #   sudo bash build/install.sh
 # Depois: no app, desligar e ligar o driver de teste "AMD / Intel", e reiniciar.
-# Para voltar ao original da release: sudo bash patches/apply.sh restore (e desligar/ligar no app de novo).
+# Para voltar ao original da release: sudo bash tools/binpatch/apply.sh restore (e desligar/ligar no app de novo).
 set -u
 BIN=${NMX_BIN:-/Library/NullMoth/kexts/15/NMXGPU.kext/Contents/MacOS/NMXGPU}
 UH=$(eval echo "~${SUDO_USER:-$(id -un)}")

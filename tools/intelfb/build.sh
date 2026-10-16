@@ -1,6 +1,6 @@
 #!/bin/bash
 # Compila o NMIntelFB do nullmoth (kexts/NMIntelFB, framebuffer do painel interno ligado na Intel) com os nossos
-# patches (source-fixes/intelfb-*.patch). Fonte: o clone em ~/nmx-build/nvidia-macos-driver, na revisão $REV.
+# patches (source-fixes/intelfb/*.patch). Fonte: o clone em ~/nmx-build/nvidia-macos-driver, na revisão $REV.
 # Saída: ~/nmx-build/intelfb/out/NMIntelFB.kext. Não versionamos o binário (licença PolyForm Noncommercial).
 set -euo pipefail
 HERE=$(cd "$(dirname "$0")/../.." && pwd)
@@ -9,7 +9,7 @@ REV=${REV:-v2.1.0}
 W=$HOME/nmx-build/intelfb
 rm -rf "$W/src" "$W/out" && mkdir -p "$W/src" "$W/out/NMIntelFB.kext/Contents/MacOS"
 git -C "$NM" archive "$REV" kexts/NMIntelFB | tar -x -C "$W/src" --strip-components 2
-for p in "$HERE"/source-fixes/intelfb-*.patch; do
+for p in "$HERE"/source-fixes/intelfb/intelfb-*.patch; do
   [ -f "$p" ] || continue
   patch -s -d "$W/src" -p1 < "$p"
   echo "patch: $(basename "$p")"

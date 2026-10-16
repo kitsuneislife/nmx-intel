@@ -2,7 +2,7 @@
 """find-offsets.py NMXGPU - locate the three patch sites in an NMXGPU binary (any nullmoth release).
 
 Needs `nm` (macOS) or `llvm-nm` (Linux) for the symbol table. Prints, for each patch, the file offset, the bytes
-there now and the bytes the patch writes, in the form patches/apply.sh uses. Prints NOT FOUND when the code no longer
+there now and the bytes the patch writes, in the form tools/binpatch/apply.sh uses. Prints NOT FOUND when the code no longer
 looks the way the patch expects (the driver changed: re-read the function before patching anything).
 Run with python3 -I.
 """
