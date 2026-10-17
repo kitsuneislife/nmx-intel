@@ -113,3 +113,9 @@ Steps, each one test with a live knob (sysctl, no reboot to undo):
 
 Then stage 5 (real vblank) paces the flips. Sleep/wake: the firmware may rewrite the GGTT on wake, so NMIntelFB
 re-applies the PTEs on `kIOFBNotifyDidPowerOn` (checked in RTX-20 by sleeping once).
+
+## Stage 4a result (RTX-20)
+
+Works: the copy engine writes straight into the panel's RAM scanout, 2.78 → 1.44 ms per frame and kernel_task per
+frame −46 % [measured], no visible artefacts. The rest is the copy engine's own ~1.4 ms, spent spinning in NVRM (4c).
+Test numbers shifted by one: RTX-21 is `auto.sh` at boot, the flip is RTX-22, the NVRM wait RTX-23.

@@ -284,3 +284,25 @@ until switched on at runtime:
 - Test: `sudo bash tools/accel/ab.sh ram` (70 s direct=1, then 70 s direct=2 + RAM scanout; ends with the RAM scanout on).
 - [unverified] whether the copy engine's writes reach RAM before the display reads them (snooped PCIe writes vs a
   display that does not snoop): stale stripes or flicker on screen would say no.
+
+## RTX-20 — stage 4a: panel scans out of RAM, the copy engine writes it — **works**
+Installed NMIntelFB `6145a549` + NVAccel `a4d13738`, rebooted, `sudo bash tools/accel/ab.sh ram` with a YouTube video
+full screen. `~/nmx-ab-20261017-094317.txt` [measured]:
+
+| setting | frames/s | µs per copied frame | kernel_task | kernel_task per frame/s | WindowServer |
+| --- | --- | --- | --- | --- | --- |
+| direct=1 (staging + CPU copy) | 38 | 2780 | 15 % | 0.39 | 27 % |
+| direct=2 + RAM scanout | 52 | 1436 | 11 % | 0.21 | 38 % |
+
+- [measured, log] 09:44:28.71 `ram scanout: 2025 pages at 0x1a7959000 in 1 run(s)`; 09:44:28.76 `ram scanout on: GGTT
+  0x0..0x7e9000 now RAM (firmware PTE[0] was 0x3e800001)` (the switch, picture copy included, took ~52 ms); from
+  09:44:28.80 every frame logged `copy engine into the panel's RAM`.
+- [measured, sysctl after the test] `nmintelfb_ram 1`, `iop_direct 2`, `iop_ram_frames 6478`, `iop_fail 0`,
+  `iop_blank 102` (all from boot, as in RTX-19). Lukas: no stripes, no stale picture, nothing wrong on screen; so the
+  copy engine's writes reach RAM before the display reads them [measured on screen].
+- [inferred] what is left per frame (~1.4 ms) is the copy engine itself, during which NVRM spins (`IODelay`) under its
+  locks: the remaining kernel_task share. That is RTX-23 (4c). WindowServer rose with the frame rate (more frames
+  composited per second), not per frame.
+- Firmware PTE format confirmed: `phys | 1` (stolen memory at 0x3e800000).
+- Numbering from here: RTX-21 = `auto.sh` turns the RAM scanout on at boot (`nullmoth-accel-ram=0` keeps it off),
+  RTX-22 = flip (4b), RTX-23 = the copy-engine wait without spinning (4c).

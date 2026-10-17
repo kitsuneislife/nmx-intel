@@ -6,6 +6,7 @@
 #   sudo bash tools/intelfb/auto.sh remove     remove
 #   sudo nvram nullmoth-intelfb-auto=0          desliga sem remover (apagar a variável religa)
 #   sudo nvram nullmoth-accel-fast=0            liga o desktop mas sem a cópia rápida do RTX-18
+#   sudo nvram nullmoth-accel-ram=0             mantém a cópia rápida mas sem a tela na RAM do RTX-20
 # Log: /usr/bin/log show --last 10m --predicate 'eventMessage CONTAINS "nmx-intelfb-auto"'
 LABEL=com.nmxintel.intelfb-auto
 BIN=/usr/local/libexec/nmx-intelfb-auto.sh
@@ -65,6 +66,12 @@ run)
     # RTX-18: our NVAccel (accel-0001) copies frames to the panel straight from the copy engine's staging buffer
     if sysctl -n debug.nvaccel_iop_direct >/dev/null 2>&1 && [ "$(nvram nullmoth-accel-fast 2>/dev/null | awk '{print $2}')" != 0 ]; then
         sysctl -w debug.nvaccel_iop_memcpy=1 debug.nvaccel_iop_direct=1 >/dev/null && say "fast copy on (memcpy 1, direct 1)"
+        # RTX-20: the panel scans out of RAM (intelfb-0017) and the copy engine writes it (accel-0002, direct=2)
+        if sysctl -n debug.nmintelfb_ram >/dev/null 2>&1 && [ "$(nvram nullmoth-accel-ram 2>/dev/null | awk '{print $2}')" != 0 ]; then
+            if sysctl -w debug.nmintelfb_ram=1 >/dev/null 2>&1; then
+                sysctl -w debug.nvaccel_iop_direct=2 >/dev/null && say "ram scanout on (direct 2)"
+            else say "ram scanout refused ($(sysctl -n debug.nmintelfb_ram)); staying on direct 1"; fi
+        fi
     fi
     # RTX-16: the running WindowServer took the accelerated panel by itself ~45 s after enabling (no restart). Restart
     # it only if no frame arrived in 90 s and nobody is logged in yet (the login window's console owner is
