@@ -50,7 +50,7 @@ running publish to finish, and cancels again. `kmutil libraries` now needs only 
 
 ## WIFI-1 result (2026-10-17) — driver loads, firmware patch never finishes [measured]
 - wifi-0002 fixed the link: `kmutil` built the collection, `kextstat` shows `com.laobamac.SimpleMtkWlan` loaded
-  (diag `0ddf79f9`… reinstalled build). No `SimpleMtkWlan` object stays on `PXSX`, no new interface, no network.
+. No `SimpleMtkWlan` object stays on `PXSX`, no new interface, no network.
 - Driver log (`log show --last boot`, `MtkLog`): probe matches `14c3:7961`, MSI, `chip id=0x7961 hwrev=0x10`,
   `WFSYS reset ok`, rings allocated (FWDL ring 16 entries), firmware blobs found (`mt7961_patch_mcu_1_2_hdr`
   92192 B, build `20231109190918a`; `mt7961_ram_code_1` 797300 B). The patch semaphore answers (`status=0x2`: download
