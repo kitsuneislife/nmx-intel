@@ -7,19 +7,20 @@
 set -uo pipefail
 [ "$(id -u)" = 0 ] || { echo "rode com sudo"; exit 1; }
 HOMEU=$(eval echo "~${SUDO_USER:-root}")
-SRC=${SRC:-$HOMEU/nmx-build/accel/out/NVAccel.kext}; ORIG=$HOMEU/NVAccel.kext.original
+KX=${KX:-NVAccel}; case "$KX" in NVAccel) D=accel;; NVRM) D=nvrm;; *) echo "KX=NVAccel ou KX=NVRM"; exit 1;; esac   # tools/nvrm/install.sh sets KX=NVRM
+SRC=${SRC:-$HOMEU/nmx-build/$D/out/$KX.kext}; ORIG=$HOMEU/$KX.kext.original
 EXT=/Library/Extensions; KC=/Library/KernelCollections/AuxiliaryKernelExtensions.kc
 KB=/System/Library/KernelCollections/BootKernelExtensions.kc; KS=/System/Library/KernelCollections/SystemKernelExtensions.kc
 K=/System/Library/Kernels/kernel; KARG=(--allow-missing-kdk); [ -f "$K" ] && KARG+=(--kernel "$K")
 T=$(mktemp -d)
 
-[ -d "$ORIG" ] || { ditto "$EXT/NVAccel.kext" "$ORIG" && echo "original guardado em $ORIG"; } || { echo "não consegui guardar o original"; exit 1; }
+[ -d "$ORIG" ] || { ditto "$EXT/$KX.kext" "$ORIG" && echo "original guardado em $ORIG"; } || { echo "não consegui guardar o original"; exit 1; }
 if [ "${1:-}" = restore ]; then FROM=$ORIG; else FROM=$SRC; fi
-[ -f "$FROM/Contents/MacOS/NVAccel" ] || { echo "falta $FROM (bash tools/accel/build.sh)"; exit 1; }
+[ -f "$FROM/Contents/MacOS/$KX" ] || { echo "falta $FROM (bash tools/$D/build.sh)"; exit 1; }
 [ -f "$HOMEU/AuxiliaryKernelExtensions.kc.antes-accel" ] || cp -p "$KC" "$HOMEU/AuxiliaryKernelExtensions.kc.antes-accel"
-rm -rf "$EXT/NVAccel.kext" && ditto "$FROM" "$EXT/NVAccel.kext" || { echo "cópia falhou; rode de novo com restore"; exit 1; }
-chown -R root:wheel "$EXT/NVAccel.kext" && chmod -R 755 "$EXT/NVAccel.kext"
-echo "NVAccel: $(shasum -a 256 "$EXT/NVAccel.kext/Contents/MacOS/NVAccel" | cut -c1-8)"
+rm -rf "$EXT/$KX.kext" && ditto "$FROM" "$EXT/$KX.kext" || { echo "cópia falhou; rode de novo com restore"; exit 1; }
+chown -R root:wheel "$EXT/$KX.kext" && chmod -R 755 "$EXT/$KX.kext"
+echo "$KX: $(shasum -a 256 "$EXT/$KX.kext/Contents/MacOS/$KX" | cut -c1-8)"
 
 NEWKC="$KC.nmx-accel-new"; rm -f "$NEWKC"
 echo "refazendo a coleção de kexts (1-2 min)..."

@@ -400,3 +400,17 @@ Installed NMIntelFB `59c98103` + NVAccel `659dfa20`, `sudo bash tools/accel/ab.s
 - [measured, logger] 10:43:22.465 `fast copy on (memcpy 1, direct 1)`; 10:43:22.751 `ram scanout on (mode 2, direct
   2)`; 10:44:08.388 `frames reach the panel (iop_ok 8); no restart`.
 - [measured, sysctl] `nmintelfb_ram 2`, `nmintelfb_flips 7840`, `nmintelfb_flip_late 0`, `iop_fail 0`. Lukas: normal.
+
+## RTX-25 prep — stage 4c: NVRM sleeps while the copy engine works
+- Building NVRM from source is not possible as published: nullmoth's README and `kexts/NVRM/patches/README.md` assume
+  an already-built Darwin RM ("the original NVIDIA 610.57.04 Darwin modeset archive and compile commands"), and
+  `make TARGET_OS=Darwin` in `src/nvidia` of open-gpu-kernel-modules fails with 2618 errors (882 `Unsupported target
+  OS`, 807 `PORT_BREAKPOINT` undeclared, the rest the OS-UNIX control types) [measured, `~/nmx-build/ogkm-darwin`].
+- So a binary patch of the installed NVRM (`12fcabf3`), `tools/nvrm/build.sh` → `f5171d7b`: in
+  `nvrm_ce_copy_to_pages`' contiguous-run wait, `osDelayUs(10)` (IODelay, spin) → `os_delay(1)` (IOSleep 1 ms) and
+  the spin limit 200000 → 2000 (timeout stays ~2 s). Only those 9 bytes differ outside the load commands/signature
+  [measured, `cmp`]. RM's GPU lock waiters sleep on a semaphore (`locks.c`), so sleeping with it held is allowed.
+- `tools/nvrm/install.sh` (via `tools/accel/install.sh` with `KX=NVRM`; `restore` puts nullmoth's back from
+  `~/NVRM.kext.original`).
+- Expected: kernel_task per frame/s well under RTX-23's 0.21; µs per frame up a little (1 ms sleep granularity:
+  ~2 ms instead of ~1.4 ms). Test: `sudo bash tools/accel/ab.sh flip` with the same kind of video, compare with RTX-23.

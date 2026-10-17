@@ -123,3 +123,7 @@ Test numbers shifted by one: RTX-21 is `auto.sh` at boot, the flip is RTX-22, th
 ## Sleep and numbering (2026-10-17)
 S3 resets the Intel display engine (RTX-22), so system sleep is off until NMIntelFB can light the panel itself; not
 caused by the RAM scanout. The flip (4b) is RTX-23, the copy-engine wait without spinning (4c) RTX-24.
+
+## Stage 4c route (2026-10-17)
+NVRM cannot be rebuilt from nullmoth's published source (it assumes a Darwin RM build; `make TARGET_OS=Darwin` fails
+with 2618 errors), so 4c is a 9-byte binary patch of the installed NVRM (`tools/nvrm/build.sh`, RTX-25).
