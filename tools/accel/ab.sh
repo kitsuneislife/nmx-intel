@@ -10,7 +10,7 @@ sysctl -n debug.nvaccel_iop_direct >/dev/null 2>&1 || { echo "este NVAccel não 
 OUT=$(eval echo "~${SUDO_USER:-root}")/nmx-ab-$(date +%Y%m%d-%H%M%S).txt
 WS=$(pgrep -x WindowServer | head -1)
 cpu() { top -l 7 -s 10 -stats pid,cpu -pid 0 -pid "$WS" 2>/dev/null \
-        | awk -v ws="$WS" '$1=="0"{k+=$2;nk++} $1==ws{w+=$2;nw++} END{printf "kernel_task %.0f%%  WindowServer %.0f%%", (nk>1?(k-0)/nk:0), (nw>1?w/nw:0)}'; }
+        | awk -v ws="$WS" '$1=="0"{if (sk++) {k+=$2;nk++}} $1==ws{if (sw++) {w+=$2;nw++}} END{printf "kernel_task %.0f%%  WindowServer %.0f%%", (nk?k/nk:0), (nw?w/nw:0)}'; }   # top's first sample is not a rate: skipped
 c() { sysctl -n "debug.nvaccel_$1"; }
 for set in "0 0" "1 0" "1 1"; do
     set -- $set
