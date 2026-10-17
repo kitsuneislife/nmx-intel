@@ -87,3 +87,24 @@ fully fetched. Everything else as WIFI-1.
 interrupt handler itself, and sleeps 2 ms; `mwx_intr()` is now a wrapper with an atomic busy flag, so the real
 interrupt and the poller never run the handler at once. Same idea as OverlordDev's `AIRPORT_WCL poll intr`, written
 for the Ethernet build. Install with the home network this time (WiFiConfig).
+
+## WIFI-3 result (2026-10-17) — **connected**, then RX/TX stopped under load [measured]
+- Join works: scan picks `Nardino` (5 GHz ch 108, RSSI 31), open auth, assoc (`aid=21`), WPA2 4-way handshake with
+  CCMP pairwise + group keys (`port valid`), link up, **DHCP 192.168.1.11** on en2. The MAC-enable timeout of WIFI-2
+  is gone (no MCU timeout this boot).
+- ~3 min of light traffic (Lukas browsing): 2–20 frames/s each way, no errors.
+- Lukas ran `networkQuality`: the AP set up RX BA on TID 2 and 1 (`HB rx ba wtbl … rv=0`, `rx ba sta … rv=0`), the
+  driver moved 140–400 frames/s for 4 s, then at `52930` everything stopped: from then on the 1 s heartbeat shows
+  `rx=0 (bcn 0)` and `tx_enq=0`, rings idle (`txq prod=14 cons=14`), no MCU timeout, no error line. `networkQuality`
+  timed out; later `ping -b en2` to the gateway: 100 % loss, ARP `incomplete`. `netstat -I en2`: 779 in (212 errors),
+  `Obytes 185304`.
+- Reading [inferred]: the driver is alive (watchdog runs every second) but receives nothing at all, not even beacons,
+  so either the device's interrupt stopped coming (MSI lost while the handler had `INT_ENA` cleared) or its DMA
+  stopped. Our VM fork saw a similar stop under load from TX descriptors with more than 4 segments (`dma-short-map`);
+  this fork already bounces those (`dmaseg overflow … -> bounce` seen twice, fine).
+
+## WIFI-4 prep — lost-interrupt rescue and silent-RX dump
+`wifi-0005`: once a second in `mwx_watchdog` (RUN state) read `HOST_INT_STA`; if anything is pending, log it (first 32
+times) and run the guarded interrupt handler; after 3 s with no frame at all, log `INT_STA/ENA`, `GLO_CFG` and the RX
+data and RX MCU ring indices. If the link survives `networkQuality` with `HB rescue` lines, the cause was lost
+interrupts; if it still dies, the dump tells whether the RX DMA stopped (`GLO_CFG`) or the ring is full.

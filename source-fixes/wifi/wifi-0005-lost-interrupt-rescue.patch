@@ -1,0 +1,53 @@
+From 1537dd1cfefd2d638f9b541a53541d92f7e9d4c3 Mon Sep 17 00:00:00 2001
+From: kitsuneislife <kitsuneislife@users.noreply.github.com>
+Date: Sat, 17 Oct 2026 13:06:13 -0300
+Subject: [PATCH] Rescue lost interrupts from the watchdog and dump DMA state
+ when RX goes silent
+
+---
+ SimpleMtkWlan/hal_mwx/MtkMwx.cpp | 29 +++++++++++++++++++++++++++++
+ 1 file changed, 29 insertions(+)
+
+diff --git a/SimpleMtkWlan/hal_mwx/MtkMwx.cpp b/SimpleMtkWlan/hal_mwx/MtkMwx.cpp
+index e32f1fe..af2f9ce 100644
+--- a/SimpleMtkWlan/hal_mwx/MtkMwx.cpp
++++ b/SimpleMtkWlan/hal_mwx/MtkMwx.cpp
+@@ -1116,6 +1116,35 @@ mwx_watchdog(struct ifnet *ifp)
+ 			    g_rxrate_val[4], g_rxrate_cnt[4], g_rxrate_val[5], g_rxrate_cnt[5],
+ 			    g_rxrate_val[6], g_rxrate_cnt[6], g_rxrate_val[7], g_rxrate_cnt[7]);
+ 		}
++		{
++			/*
++			 * Lost-interrupt rescue: under load the MSI can be lost while
++			 * the handler has the interrupt enable cleared, and then no
++			 * interrupt ever comes again (RX, TX done and beacons all stop).
++			 * Once a second, run the handler if the device has status
++			 * pending, and dump the DMA state after 3 s without any frame.
++			 */
++			static int silent;
++			static uint32_t rescue_log;
++			uint32_t sta = mwx_read(wsc, MT_WFDMA0_HOST_INT_STA);
++
++			silent = d_all ? 0 : silent + 1;
++			if ((sta != 0 && rescue_log < 32) || silent == 3) {
++				MWX_DEV_LOG(wsc, "HB rescue int_sta=0x%08x int_ena=0x%08x "
++				    "glo_cfg=0x%08x silent=%d rxq cpu=%u dma=%u prod=%u "
++				    "cons=%u rxmcu cpu=%u dma=%u\n", sta,
++				    mwx_read(wsc, MT_WFDMA0_HOST_INT_ENA),
++				    mwx_read(wsc, MT_WFDMA0_GLO_CFG), silent,
++				    mwx_read(wsc, wsc->sc_rxq.mq_regbase + MT_DMA_CPU_IDX),
++				    mwx_read(wsc, wsc->sc_rxq.mq_regbase + MT_DMA_DMA_IDX),
++				    wsc->sc_rxq.mq_prod, wsc->sc_rxq.mq_cons,
++				    mwx_read(wsc, wsc->sc_rxmcuq.mq_regbase + MT_DMA_CPU_IDX),
++				    mwx_read(wsc, wsc->sc_rxmcuq.mq_regbase + MT_DMA_DMA_IDX));
++				rescue_log++;
++			}
++			if (sta != 0)
++				mwx_intr((void *)wsc);
++		}
+ 		memset(g_rxrate_cnt, 0, sizeof(g_rxrate_cnt));
+ 		memset(g_rate_cnt, 0, sizeof(g_rate_cnt));
+ 		last_all = g_rx_all; last_beacon = g_rx_beacon; last_data = g_rx_data;
+-- 
+2.39.5 (Apple Git-154)
+
