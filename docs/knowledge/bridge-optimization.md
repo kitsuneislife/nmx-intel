@@ -77,6 +77,12 @@ installed binary's strings, symbols and data sections; `__text` differs by 112 B
 swap wait behind `surface_gpu_wait_max_us` ~101 ms is v2.1.0's `nvaccel_surface_gpu` (commit `e75be1e`), so it is in
 reach too. RTX-17 runs the unchanged build on the Mac before any change.
 
+## Stage 2/3 result (RTX-18)
+
+Stage 2 (`memcpy`) gains nothing: the write-combined aperture is the limit [inferred]. Stage 3 (direct staging → panel)
+cuts the composite-to-panel time from ~3.9 ms to ~2.7 ms per frame and kernel_task per frame by ~32 % [measured].
+The rest (CE ~1.4 ms + ~1.3 ms CPU into the aperture) is what stage 4 removes.
+
 ## Order
 
 1 now (config only) → 0 (the gate) → 2 and 3 (small, prove the build works and halve the CPU) → 4 (the real fix) →

@@ -5,6 +5,7 @@
 #   sudo bash tools/intelfb/auto.sh install    instala (vale no próximo boot)
 #   sudo bash tools/intelfb/auto.sh remove     remove
 #   sudo nvram nullmoth-intelfb-auto=0          desliga sem remover (apagar a variável religa)
+#   sudo nvram nullmoth-accel-fast=0            liga o desktop mas sem a cópia rápida do RTX-18
 # Log: /usr/bin/log show --last 10m --predicate 'eventMessage CONTAINS "nmx-intelfb-auto"'
 LABEL=com.nmxintel.intelfb-auto
 BIN=/usr/local/libexec/nmx-intelfb-auto.sh
@@ -61,6 +62,10 @@ run)
     for i in 1 2 3; do bash "$EN" >/dev/null 2>&1 && { ok=1; break; }; sleep 10; done
     [ $ok = 1 ] || { say "enable.sh failed 3 times; WindowServer left alone"; exit 1; }
     say "enabled: agdc $(sysctl -n debug.nmintelfb_agdc) iop $(sysctl -n debug.nvaccel_iop)"
+    # RTX-18: our NVAccel (accel-0001) copies frames to the panel straight from the copy engine's staging buffer
+    if sysctl -n debug.nvaccel_iop_direct >/dev/null 2>&1 && [ "$(nvram nullmoth-accel-fast 2>/dev/null | awk '{print $2}')" != 0 ]; then
+        sysctl -w debug.nvaccel_iop_memcpy=1 debug.nvaccel_iop_direct=1 >/dev/null && say "fast copy on (memcpy 1, direct 1)"
+    fi
     # RTX-16: the running WindowServer took the accelerated panel by itself ~45 s after enabling (no restart). Restart
     # it only if no frame arrived in 90 s and nobody is logged in yet (the login window's console owner is
     # _windowserver, or root early on).

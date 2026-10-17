@@ -241,3 +241,22 @@ Two run-time knobs, both 0 at boot, so the stages are compared in one boot witho
 (stage 2) and `debug.nvaccel_iop_direct` (stage 3); `nvaccel_iop_copy_us` / `nvaccel_iop_ok` = µs per copied frame
 (copy engine + CPU, from after the composite wait). `NVAccel 41260d45`. Plan: 60 s each of 0/0, 1/0, 1/1 with the same
 on-screen load, `top` + counters for each.
+
+## RTX-18 — accel-0001 `41260d45` — **direct path works; memcpy alone gains nothing**
+Boot ~23:52; `tools/accel/ab.sh` 23:55 with a YouTube video playing full width and nothing else touched (Lukas).
+`~/nmx-ab-20261016-235516.txt` [measured]:
+
+| memcpy / direct | frames/s | µs per copied frame | kernel_task | kernel_task per frame/s | WindowServer |
+| --- | --- | --- | --- | --- | --- |
+| 0 / 0 | 42 | 3971 | 21 % | 0.50 | 29 % |
+| 1 / 0 | 49 | 3891 | 22 % | 0.45 | 34 % |
+| 1 / 1 | 44 | 2746 | 15 % | 0.34 | 33 % |
+
+- [measured] 0 failures, 0 blank in all three; `iop_direct_frames` 6515, every direct frame logged "on the panel from
+  staging"; no CE timeout. Lukas saw nothing wrong on screen.
+- [inferred] µs per frame = composite-to-panel time: CE ~1.4 ms + `writeBytes` ~1.2 ms + panel copy ~1.3 ms.
+  `memcpy` does not speed the panel copy: the write-combined aperture limits it, not the loop. The direct path removes
+  the `writeBytes` copy (−1.2 ms, −31 %; kernel_task per frame −32 %). What is left is the CE wait and one CPU copy
+  into the aperture: stage 4 (CASO) removes both.
+- `shutdown_stall` at 23:51:39 (the reboot that installed it): 20 such reports in DiagnosticReports, not new.
+- Next: `auto.sh` turns both knobs on after enabling (`nullmoth-accel-fast=0` keeps them off).

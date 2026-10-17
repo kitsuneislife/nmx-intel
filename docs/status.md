@@ -22,8 +22,8 @@ B works. 60 Hz is not wanted.
 
 ## Next step
 
-Bridge plan: stage 0 done (our NVAccel `29a7f015` = RTX-16, RTX-17). RTX-18: accel-0001 (`41260d45`), A/B of
-`debug.nvaccel_iop_memcpy` and `debug.nvaccel_iop_direct` at run time. Checkpoint before each install.
+Bridge plan: stages 0–3 done. Our NVAccel `41260d45` (accel-0001): the direct copy cuts ~31 % per frame (RTX-18);
+`auto.sh` turns it on at boot (RTX-19). Next: stage 4 (CASO, the copy engine writes the Intel scanout).
 
 ## Open problems
 
