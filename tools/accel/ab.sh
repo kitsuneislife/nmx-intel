@@ -6,6 +6,8 @@
 # copy engine writes straight into the panel's RAM) and ends with the RAM scanout on.
 #   sudo bash tools/accel/ab.sh          results in ~/nmx-ab-<date>.txt
 #   sudo bash tools/accel/ab.sh ram
+# With "flip" (RTX-23, stage 4b) it compares one RAM buffer (ram=1) with two flipped at vblank (ram=2) and ends flipping.
+#   sudo bash tools/accel/ab.sh flip
 set -uo pipefail
 [ "$(id -u)" = 0 ] || { echo "rode com sudo"; exit 1; }
 sysctl -n debug.nvaccel_iop_direct >/dev/null 2>&1 || { echo "este NVAccel não tem accel-0001"; exit 1; }
@@ -20,19 +22,22 @@ if [ "${1:-}" = ram ]; then
     sysctl -n debug.nmintelfb_ram >/dev/null 2>&1 && sysctl -n debug.nvaccel_iop_ram_frames >/dev/null 2>&1 \
         || { echo "falta o NMIntelFB com intelfb-0017 ou o NVAccel com accel-0002"; exit 1; }
     SETS=("1 1 0" "1 2 1")
+elif [ "${1:-}" = flip ]; then
+    sysctl -n debug.nmintelfb_flips >/dev/null 2>&1 || { echo "falta o NMIntelFB com intelfb-0019"; exit 1; }
+    SETS=("1 2 1" "1 2 2")
 fi
 for set in "${SETS[@]}"; do
     set -- $set
     sysctl -w debug.nvaccel_iop_memcpy=$1 debug.nvaccel_iop_direct=$2 >/dev/null
-    if [ "${3:-0}" = 1 ]; then
-        sysctl -w debug.nmintelfb_ram=1 >/dev/null || { echo "a tela na RAM não ligou: $(sysctl -n debug.nmintelfb_ram) (veja o log do NMIntelFB)"; exit 1; }
+    if [ "${3:-0}" != 0 ]; then
+        sysctl -w debug.nmintelfb_ram=$3 >/dev/null || { echo "a tela na RAM não ligou: $(sysctl -n debug.nmintelfb_ram) (veja o log do NMIntelFB)"; exit 1; }
     elif sysctl -n debug.nmintelfb_ram >/dev/null 2>&1; then sysctl -w debug.nmintelfb_ram=0 >/dev/null; fi
     echo "memcpy=$1 direct=$2 ram=${3:-0}: medindo 70 s..."
     sleep 10
-    ok0=$(c iop_ok); us0=$(c iop_copy_us); f0=$(c iop_fail); d0=$(c iop_direct_frames); b0=$(c iop_blank); r0=$(c iop_ram_frames 2>/dev/null || echo 0)
+    ok0=$(c iop_ok); us0=$(c iop_copy_us); f0=$(c iop_fail); d0=$(c iop_direct_frames); b0=$(c iop_blank); r0=$(c iop_ram_frames 2>/dev/null || echo 0); fl0=$(sysctl -n debug.nmintelfb_flips 2>/dev/null || echo 0); w0=$(sysctl -n debug.nmintelfb_flip_waits 2>/dev/null || echo 0); l0=$(sysctl -n debug.nmintelfb_flip_late 2>/dev/null || echo 0)
     load=$(cpu)
     ok=$(( $(c iop_ok) - ok0 )); us=$(( $(c iop_copy_us) - us0 ))
-    line="memcpy=$1 direct=$2 ram=${3:-0}  frames/s $((ok / 60))  us/frame $(( ok ? us / ok : 0 ))  fail $(( $(c iop_fail) - f0 ))  direct $(( $(c iop_direct_frames) - d0 ))  blank $(( $(c iop_blank) - b0 ))  ram $(( $(c iop_ram_frames 2>/dev/null || echo 0) - r0 ))  $load"
+    line="memcpy=$1 direct=$2 ram=${3:-0}  frames/s $((ok / 60))  us/frame $(( ok ? us / ok : 0 ))  fail $(( $(c iop_fail) - f0 ))  direct $(( $(c iop_direct_frames) - d0 ))  blank $(( $(c iop_blank) - b0 ))  ram $(( $(c iop_ram_frames 2>/dev/null || echo 0) - r0 ))  flips $(( $(sysctl -n debug.nmintelfb_flips 2>/dev/null || echo 0) - fl0 )) waits $(( $(sysctl -n debug.nmintelfb_flip_waits 2>/dev/null || echo 0) - w0 )) late $(( $(sysctl -n debug.nmintelfb_flip_late 2>/dev/null || echo 0) - l0 ))  $load"
     echo "$line"; echo "$line" >> "$OUT"
 done
 echo "resultado em $OUT (fica ligado o último ajuste até reiniciar)"

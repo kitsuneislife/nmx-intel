@@ -62,6 +62,8 @@ Other series:
   the scanout repointed, picture copied first; `=0` restores them); page list offered as `nmIntelFBRamPages`.
 - `intelfb-0018` (diag, RTX-22) — display registers (TRANSCONF, PLANE_CTL/SURF, PP_STATUS/CONTROL, BLC PWM 1/2, PTE 0)
   logged at each power change and readable as `sysctl debug.nmintelfb_regs`.
+- `intelfb-0019` (knob, RTX-23) — `debug.nmintelfb_ram=2`: second RAM buffer at GGTT 0x800000, NVAccel writes the one
+  off screen (after `PLANE_SURFLIVE` shows the last flip landed), `nmIntelFBRamFlip` sets `PLANE_SURF` to it.
 - `source-fixes/accel/accel-0001` (knob/diag, RTX-18) — NVAccel (branch `nmx-accel` from nullmoth v2.1.0, worktree
   `~/nmx-build/accel/src`, tag `accel-0001`, built by `tools/accel/build.sh`): `debug.nvaccel_iop_memcpy=1` copies
   frames to a CPU scanout with `memcpy` rows; `debug.nvaccel_iop_direct=1` puts the copy engine's staging buffer on
@@ -69,6 +71,7 @@ Other series:
   `nvaccel_iop_copy_us`. Both off by default.
 - `source-fixes/accel/accel-0002` (knob, RTX-20) — `debug.nvaccel_iop_direct=2`: the copy engine writes into the
   panel's RAM pages from `nmIntelFBRamPages` (no CPU copy); falls back to direct=1. Counter `nvaccel_iop_ram_frames`.
+- `source-fixes/accel/accel-0003` (RTX-23) — after each RAM frame NVAccel calls `nmIntelFBRamFlip` with the pages written.
 - `source-fixes/libdrm/libdrm-0001` — Darwin node numbers from names (clone nodes). Built by `tools/libdrm/build.sh`.
 - `build/nmx-src-paths.patch` — source paths for building on this Mac (applied by `build/setup.sh`).
 

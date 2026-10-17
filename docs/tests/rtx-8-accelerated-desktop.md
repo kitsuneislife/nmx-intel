@@ -360,3 +360,18 @@ NMIntelFB `eaf67fa1`, `nullmoth-accel-ram=0` (RAM scanout off). `pmset sleepnow`
   DDI buffers, eDP link training over AUX, transcoder, pipe, plane, panel power sequence, backlight) — a mode set
   from scratch; (b) hibernate instead of S3 (the firmware boots fully, the GOP lights the panel, NMIntelFB
   re-adopts) — depends on hibernation working on this hackintosh; (c) no system sleep (display sleep only).
+
+## RTX-23 prep — stage 4b: two RAM buffers flipped at vblank
+- `intelfb-0019` (NMIntelFB `59c98103`, on top of 0017/0018): `debug.nmintelfb_ram=2` adds a second RAM buffer at
+  GGTT 0x800000 (2 MiB past buffer 0; linear planes need 256 KiB alignment), filled with the current picture. The page
+  list NVAccel gets is the buffer not on screen, once `PLANE_SURFLIVE` (0x701AC) shows the last flip reached the panel
+  (waits up to 20 ms in 1 ms sleeps). `nmIntelFBRamFlip` writes `PLANE_SURF` = that buffer (latched at the next
+  vblank). Going back to 1 or 0 flips to buffer 0 first, then restores buffer 1's GGTT entries. Counters
+  `nmintelfb_flips`, `nmintelfb_flip_waits`, `nmintelfb_flip_wait_us`, `nmintelfb_flip_late`.
+- `accel-0003` (NVAccel `659dfa20`): after each copy-engine frame into the RAM pages, calls `nmIntelFBRamFlip` with
+  that page list (outside the locks); ignored unless mode 2.
+- Limit: the aperture view (`fSurfMap`, IOFramebuffer's VRAM range) still covers buffer 0 only, so CPU fallback
+  writes while buffer 1 is on screen are not seen until the next flip.
+- Test: `sudo bash tools/accel/ab.sh flip` (ram=1, then ram=2), watching a video with fast horizontal motion for
+  tearing (a horizontal cut line in mode 1 that should vanish in mode 2).
+- Sleep stays off (RTX-22): `pmset` settings given to Lukas.

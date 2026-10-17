@@ -1,0 +1,276 @@
+diff -ruN a/intelfb.cpp src/intelfb.cpp
+--- a/intelfb.cpp
++++ b/intelfb.cpp
+@@ -28,6 +28,8 @@
+ // intelfb-0017: the panel's scan-out pages in RAM, for NVAccel's copy engine (same layout in nmx-accel's nvrm-accel.cpp)
+ #define NMINTELFB_RAM_VERSION 1u
+ #define NMINTELFB_FN_RAM      "nmIntelFBRamPages"
++#define NMINTELFB_FN_RAM_FLIP "nmIntelFBRamFlip"   // intelfb-0019: p1 = the pages NVAccel just wrote
++static volatile SInt64 gIfbFlips, gIfbFlipWaits, gIfbFlipWaitUs, gIfbFlipLate;
+ struct NMIntelFBRamPages { unsigned int version, pitch; const unsigned long long *pages; unsigned long long count, length; volatile void *kva; };
+ #include <IOKit/IOBufferMemoryDescriptor.h>
+ #include <IOKit/IOTimerEventSource.h>
+@@ -229,13 +231,21 @@
+     // intelfb-0017 (stage 4a): the panel scans out of a buffer in RAM instead of stolen memory, so NVAccel's copy engine
+     // can write each frame there (stolen memory is fenced from other devices). Same GGTT offset, PLANE_SURF and
+     // aperture view; only the GGTT entries change. sysctl debug.nmintelfb_ram=1 / 0.
+-    IOBufferMemoryDescriptor *fRam = nullptr;
+-    unsigned long long *fRamPages = nullptr, *fOldPte = nullptr;
++    // intelfb-0019 (stage 4b): mode 2 adds a second buffer at its own GGTT offset; NVAccel writes the one the plane is
++    // not showing and asks for a flip (PLANE_SURF, latched at the next vblank), so a frame is never shown half-written.
++    IOBufferMemoryDescriptor *fRam[2] = {};
++    unsigned long long *fRamPages[2] = {}, *fOldPte[2] = {};
++    uint32_t fRamGgtt[2] = {};
+     unsigned fRamCount = 0;
+-    volatile bool fRamOn = false;
+-    void ramPtes(bool ours);
++    volatile int fRamMode = 0;        // 0 firmware pages, 1 one RAM buffer, 2 two RAM buffers flipped
++    volatile unsigned fFront = 0;     // the buffer PLANE_SURF was last set to
++    uint32_t fSurfLow = 0;            // PLANE_SURF's non-address bits, kept on every flip
++    void ramPtes(unsigned b, bool ours);
++    int ramMap(unsigned b);
++    bool flipLatched(unsigned wantUs);
++    void wr(uint32_t off, uint32_t v) { *(volatile uint32_t *)(fRegs + off) = v; }
+ public:
+-    int ramSet(bool on);
++    int ramSet(int mode);
+     // intelfb-0018: the display registers that say whether the panel is lit (pipe, plane, panel power, PWM backlight,
+     // first scan-out PTE): logged at sleep and wake, and read on demand through sysctl debug.nmintelfb_regs
+     void regsInto(char *b, size_t n) {
+@@ -378,7 +388,7 @@
+     IOReturn setPowerState(unsigned long ordinal, IOService *) override {
+         ifb_trail(ordinal ? "sp1" : "sp0");
+         { char r[200]; regsInto(r, sizeof r); IFBLOG("power %lu: %s", ordinal, r); }
+-        if (ordinal && fRamOn) ramPtes(true);   // intelfb-0017: in case the GGTT was rewritten while asleep
++        for (unsigned b = 0; ordinal && b < (unsigned)fRamMode; b++) ramPtes(b, true);   // intelfb-0017: in case the GGTT was rewritten while asleep
+         handleEvent(ordinal ? kIOFBNotifyDidPowerOn : kIOFBNotifyWillPowerOff);
+         ifb_trail("sp-done");
+         return kIOPMAckImplied;
+@@ -656,11 +666,13 @@
+     while (fVblRunning) IOSleep(5);
+     if (gIfbNubFB == this) { ifb_agdc_register(false); gIfbNubFB = nullptr; }
+     if (gIfbRamFB == this) ifb_ram_register(nullptr);
+-    if (fRamOn) { fRamOn = false; ramPtes(false); }
+-    if (fRam) { fRam->complete(); OSSafeReleaseNULL(fRam); }
+-    if (fRamPages) IODelete(fRamPages, unsigned long long, fRamCount);
+-    if (fOldPte) IODelete(fOldPte, unsigned long long, fRamCount);
+-    fRamPages = fOldPte = nullptr;
++    ramSet(0);
++    for (unsigned b = 0; b < 2; b++) {
++        if (fRam[b]) { fRam[b]->complete(); OSSafeReleaseNULL(fRam[b]); }
++        if (fRamPages[b]) IODelete(fRamPages[b], unsigned long long, fRamCount);
++        if (fOldPte[b]) IODelete(fOldPte[b], unsigned long long, fRamCount);
++        fRamPages[b] = fOldPte[b] = nullptr;
++    }
+     kapiFree();
+     OSSafeReleaseNULL(fSurfMap); OSSafeReleaseNULL(fMMIO); fRegs = nullptr;
+     IOFramebuffer::stop(provider);
+@@ -864,11 +876,24 @@
+     if (fn && fn->isEqualTo(NMINTELFB_FN_RAM)) {
+         NMIntelFBRamPages *r = (NMIntelFBRamPages *)p1;
+         if (!r || r->version != NMINTELFB_RAM_VERSION) return kIOReturnBadArgument;
+-        if (!fRamOn) return kIOReturnNotReady;
+-        r->pitch = fRowBytes; r->pages = fRamPages; r->count = fRamCount; r->length = (unsigned long long)fRowBytes * fHeight;
+-        r->kva = fRam->getBytesNoCopy();
++        const int mode = fRamMode;
++        if (!mode) return kIOReturnNotReady;
++        // mode 2: the buffer not on screen, once the last flip has reached the panel (else it may still be scanned)
++        unsigned b = 0;
++        if (mode == 2) { b = fFront ^ 1u; flipLatched(20000); }
++        r->pitch = fRowBytes; r->pages = fRamPages[b]; r->count = fRamCount; r->length = (unsigned long long)fRowBytes * fHeight;
++        r->kva = fRam[b]->getBytesNoCopy();
+         return kIOReturnSuccess;
+     }
++    // intelfb-0019: NVAccel wrote the buffer whose page list is p1; show it from the next vblank
++    if (fn && fn->isEqualTo(NMINTELFB_FN_RAM_FLIP)) {
++        const unsigned b = fFront ^ 1u;
++        if (fRamMode != 2 || p1 != (void *)fRamPages[b]) return kIOReturnSuccess;
++        wr(PLANE_SURF(fPipe), fRamGgtt[b] | fSurfLow);
++        fFront = b;
++        OSIncrementAtomic64(&gIfbFlips);
++        return kIOReturnSuccess;
++    }
+     // intelfb-0011: what NVAccel asks its primary framebuffer for, answered from our NVKMS device
+     if (fn && fn->isEqualTo(NVRM_GPUVA_FN_HANDLES)) {
+         NVRMRmHandles *h = (NVRMRmHandles *)p1;
+@@ -1065,72 +1090,125 @@
+ // intelfb-0017. GGTT entries live behind the register BAR at half its size (8 MiB here, i915 gen6_gttadr_offset), one
+ // 64-bit PTE per 4 KiB: phys | present (gen8_ggtt_pte_encode). Display 11+ maps them uncached, as our BAR0 map is;
+ // GFX_FLSH_CNTL_GEN6 (0x101008) = 1 flushes the GGTT TLBs as the GuC path does.
+-void NMIntelFB::ramPtes(bool ours)
++void NMIntelFB::ramPtes(unsigned b, bool ours)
+ {
+-    volatile uint64_t *g = (volatile uint64_t *)(fRegs + 0x800000) + (fSurf >> 12);
+-    for (unsigned i = 0; i < fRamCount; i++) g[i] = ours ? (fRamPages[i] | 1ull) : fOldPte[i];
++    volatile uint64_t *g = (volatile uint64_t *)(fRegs + 0x800000) + (fRamGgtt[b] >> 12);
++    for (unsigned i = 0; i < fRamCount; i++) g[i] = ours ? (fRamPages[b][i] | 1ull) : fOldPte[b][i];
+     *(volatile uint32_t *)(fRegs + 0x101008) = 1;
+     (void)g[fRamCount - 1];   // posts the writes
+ }
+ 
+-// 1 on, 0 off; < 0 why it would not turn on (nothing changed then)
+-int NMIntelFB::ramSet(bool on)
++// intelfb-0019: PLANE_SURFLIVE (PLANE_SURF + 0x10) is the address the plane is scanning now; equal to the front
++// buffer once the last flip latched at a vblank. Waits up to wantUs.
++bool NMIntelFB::flipLatched(unsigned wantUs)
+ {
+-    if (on == fRamOn) return on;
+-    if (!on) { fRamOn = false; ramPtes(false); IFBLOG("ram scanout off: GGTT back to the firmware's pages"); ifb_trail("ram-off"); return 0; }
+-    if (!fRegs || !fSurfMap || fVer < 12) return -1;
++    const uint32_t want = fRamGgtt[fFront];
++    if ((rd(PLANE_SURF(fPipe) + 0x10) & ~0xFFFu) == want) return true;
++    OSIncrementAtomic64(&gIfbFlipWaits);
++    const uint64_t t0 = mach_absolute_time();
++    for (unsigned us = 0; us < wantUs; us += 1000) {
++        IOSleep(1);
++        if ((rd(PLANE_SURF(fPipe) + 0x10) & ~0xFFFu) == want) {
++            uint64_t ns; absolutetime_to_nanoseconds(mach_absolute_time() - t0, &ns);
++            OSAddAtomic64((SInt64)(ns / 1000), &gIfbFlipWaitUs);
++            return true;
++        }
++    }
++    OSIncrementAtomic64(&gIfbFlipLate);
++    return false;
++}
++
++// Allocates buffer b if needed, fills it with the picture on the panel, saves the GGTT entries at fRamGgtt[b] and
++// points them at it. 0 or < 0 as ramSet.
++int NMIntelFB::ramMap(unsigned b)
++{
+     const unsigned long long len = (unsigned long long)fRowBytes * fHeight;
+-    const unsigned n = (unsigned)((len + 4095) >> 12);
+-    if (fMMIO->getLength() < 0x800000ull + ((fSurf >> 12) + (unsigned long long)n) * 8) return -2;
+-    if (!fRam) {
++    const unsigned n = fRamCount;
++    if (fMMIO->getLength() < 0x800000ull + ((fRamGgtt[b] >> 12) + (unsigned long long)n) * 8) return -2;
++    if (!fRam[b]) {
+         // physically contiguous when it can be, so the copy engine makes one run
+         const IOOptionBits o = kIODirectionInOut;
+-        IOBufferMemoryDescriptor *b = IOBufferMemoryDescriptor::inTaskWithPhysicalMask(kernel_task, o | kIOMemoryPhysicallyContiguous, (vm_size_t)n * 4096, 0x7FFFFFF000ull);
+-        if (!b) b = IOBufferMemoryDescriptor::inTaskWithPhysicalMask(kernel_task, o, (vm_size_t)n * 4096, 0x7FFFFFF000ull);
+-        if (!b) return -3;
+-        if (b->prepare() != kIOReturnSuccess) { b->release(); return -3; }
++        IOBufferMemoryDescriptor *m = IOBufferMemoryDescriptor::inTaskWithPhysicalMask(kernel_task, o | kIOMemoryPhysicallyContiguous, (vm_size_t)n * 4096, 0x7FFFFFF000ull);
++        if (!m) m = IOBufferMemoryDescriptor::inTaskWithPhysicalMask(kernel_task, o, (vm_size_t)n * 4096, 0x7FFFFFF000ull);
++        if (!m) return -3;
++        if (m->prepare() != kIOReturnSuccess) { m->release(); return -3; }
+         unsigned long long *pg = IONew(unsigned long long, n), *old = IONew(unsigned long long, n);
+         bool ok = pg && old;
+         for (unsigned i = 0; ok && i < n; i++) {
+             IOByteCount sl = 0;
+-            pg[i] = b->getPhysicalSegment((IOByteCount)i * 4096, &sl, kIOMemoryMapperNone);
++            pg[i] = m->getPhysicalSegment((IOByteCount)i * 4096, &sl, kIOMemoryMapperNone);
+             ok = pg[i] && !(pg[i] & 0xFFF);
+         }
+-        if (!ok) { if (pg) IODelete(pg, unsigned long long, n); if (old) IODelete(old, unsigned long long, n); b->complete(); b->release(); return -4; }
++        if (!ok) { if (pg) IODelete(pg, unsigned long long, n); if (old) IODelete(old, unsigned long long, n); m->complete(); m->release(); return -4; }
+         unsigned runs = 1; for (unsigned i = 1; i < n; i++) if (pg[i] != pg[i - 1] + 4096) runs++;
+-        fRam = b; fRamPages = pg; fOldPte = old; fRamCount = n;
+-        IFBLOG("ram scanout: %u pages at 0x%llx in %u run(s)", n, pg[0], runs);
++        fRam[b] = m; fRamPages[b] = pg; fOldPte[b] = old;
++        IFBLOG("ram scanout: buffer %u, %u pages at 0x%llx in %u run(s)", b, n, pg[0], runs);
+     }
+-    volatile uint64_t *g = (volatile uint64_t *)(fRegs + 0x800000) + (fSurf >> 12);
+-    for (unsigned i = 0; i < fRamCount; i++) fOldPte[i] = g[i];
+-    // the picture on the panel first, so the switch shows no black frame (reads the aperture: slow, once)
+-    memcpy(fRam->getBytesNoCopy(), (const void *)fSurfMap->getVirtualAddress(), (size_t)len);
++    volatile uint64_t *g = (volatile uint64_t *)(fRegs + 0x800000) + (fRamGgtt[b] >> 12);
++    for (unsigned i = 0; i < n; i++) fOldPte[b][i] = g[i];
++    // the picture on the panel first, so the switch shows no black frame (buffer 0 reads the aperture: slow, once)
++    memcpy(fRam[b]->getBytesNoCopy(), b ? fRam[0]->getBytesNoCopy() : (const void *)fSurfMap->getVirtualAddress(), (size_t)len);
+     // the display does not snoop CPU caches: push the copy out to RAM (the copy engine's writes reach RAM themselves)
+-    for (size_t o = 0; o < len; o += 64) __asm__ volatile("clflush %0" : : "m"(((volatile const char *)fRam->getBytesNoCopy())[o]));
++    for (size_t o = 0; o < len; o += 64) __asm__ volatile("clflush %0" : : "m"(((volatile const char *)fRam[b]->getBytesNoCopy())[o]));
+     __asm__ volatile("mfence" ::: "memory");
+-    ramPtes(true);
+-    for (unsigned i = 0; i < fRamCount; i++) if (g[i] != (fRamPages[i] | 1ull)) {
+-        ramPtes(false);
+-        IFBLOG("ram scanout: GGTT entry %u read back 0x%llx, not 0x%llx - firmware pages restored", i, (unsigned long long)g[i], fRamPages[i] | 1ull);
++    ramPtes(b, true);
++    for (unsigned i = 0; i < n; i++) if (g[i] != (fRamPages[b][i] | 1ull)) {
++        ramPtes(b, false);
++        IFBLOG("ram scanout: GGTT entry %u of buffer %u read back 0x%llx, not 0x%llx - old entries restored", i, b, (unsigned long long)g[i], fRamPages[b][i] | 1ull);
+         return -5;
+     }
+-    fRamOn = true;
+-    IFBLOG("ram scanout on: GGTT 0x%x..0x%x now RAM (firmware PTE[0] was 0x%llx)", fSurf, fSurf + fRamCount * 4096, fOldPte[0]);
+-    ifb_trail("ram-on");
+-    return 1;
++    IFBLOG("ram scanout: GGTT 0x%x..0x%x now buffer %u (old PTE[0] 0x%llx)", fRamGgtt[b], fRamGgtt[b] + n * 4096, b, fOldPte[b][0]);
++    return 0;
+ }
+ 
++// 0 firmware pages, 1 one RAM buffer, 2 two flipped; returns the mode now, or < 0 why it would not go up (the mode
++// reached so far stays)
++int NMIntelFB::ramSet(int mode)
++{
++    if (mode < 0 || mode > 2) return -1;
++    if (mode && (!fRegs || !fSurfMap || fVer < 12)) return -1;
++    const unsigned long long len = (unsigned long long)fRowBytes * fHeight;
++    if (mode && !fRamCount) {
++        fRamCount = (unsigned)((len + 4095) >> 12);
++        fRamGgtt[0] = fSurf;
++        // linear planes need 256 KiB alignment (i915 intel_linear_alignment); 2 MiB past buffer 0
++        fRamGgtt[1] = (uint32_t)((fSurf + (unsigned long long)fRamCount * 4096 + 0x1FFFFF) & ~0x1FFFFFull);
++        fSurfLow = rd(PLANE_SURF(fPipe)) & 0xFFFu;
++    }
++    while (fRamMode > mode) {
++        if (fRamMode == 2) {
++            // back to buffer 0 at the firmware's offset before buffer 1's entries go
++            fRamMode = 1;
++            wr(PLANE_SURF(fPipe), fRamGgtt[0] | fSurfLow); fFront = 0;
++            flipLatched(50000);
++            ramPtes(1, false);
++            IFBLOG("ram scanout: flipping off, one buffer"); ifb_trail("flip-off");
++        } else {
++            fRamMode = 0;
++            ramPtes(0, false);
++            IFBLOG("ram scanout off: GGTT back to the firmware's pages"); ifb_trail("ram-off");
++        }
++    }
++    while (fRamMode < mode) {
++        const unsigned b = (unsigned)fRamMode;
++        if (int r = ramMap(b)) return r;
++        if (b == 0) { fFront = 0; fRamMode = 1; ifb_trail("ram-on"); }
++        else { fFront = 0; fRamMode = 2; IFBLOG("ram scanout: flipping between GGTT 0x%x and 0x%x", fRamGgtt[0], fRamGgtt[1]); ifb_trail("flip-on"); }
++    }
++    return fRamMode;
++}
++
+ static int gIfbRamState;
+ static volatile SInt32 gIfbRamBusy;
+ static int ifb_ram_sysctl SYSCTL_HANDLER_ARGS
+ {
+     int v = gIfbRamState, err = sysctl_handle_int(oidp, &v, 0, req);
+     if (err || !req->newptr) return err;
+-    if (v != 0 && v != 1) return EINVAL;
++    if (v < 0 || v > 2) return EINVAL;
+     NMIntelFB *fb = gIfbRamFB;
+     if (!fb) return ENXIO;
+     if (!OSCompareAndSwap(0, 1, &gIfbRamBusy)) return EBUSY;
+-    gIfbRamState = fb->ramSet(v == 1);
++    gIfbRamState = fb->ramSet(v);
+     gIfbRamBusy = 0;
+     return gIfbRamState < 0 ? EIO : 0;
+ }
+@@ -1143,11 +1221,17 @@
+ SYSCTL_PROC(_debug, OID_AUTO, nmintelfb_regs, CTLTYPE_STRING | CTLFLAG_RD | CTLFLAG_LOCKED, nullptr, 0,
+             ifb_regs_sysctl, "A", "intelfb-0018: pipe, plane, panel power, backlight PWM and the first scan-out PTE");
+ SYSCTL_PROC(_debug, OID_AUTO, nmintelfb_ram, CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_LOCKED | CTLFLAG_KERN, nullptr, 0,
+-            ifb_ram_sysctl, "I", "1 = the panel scans out of RAM that NVAccel's copy engine writes (0 off, < 0 failed)");
++            ifb_ram_sysctl, "I", "1 = the panel scans out of RAM that NVAccel's copy engine writes, 2 = two such buffers flipped at vblank (0 off, < 0 failed)");
++SYSCTL_QUAD(_debug, OID_AUTO, nmintelfb_flips, CTLFLAG_RD | CTLFLAG_LOCKED, (SInt64 *)&gIfbFlips, "intelfb-0019: flips to the buffer NVAccel just wrote");
++SYSCTL_QUAD(_debug, OID_AUTO, nmintelfb_flip_waits, CTLFLAG_RD | CTLFLAG_LOCKED, (SInt64 *)&gIfbFlipWaits, "frames that waited for the previous flip to reach the panel");
++SYSCTL_QUAD(_debug, OID_AUTO, nmintelfb_flip_wait_us, CTLFLAG_RD | CTLFLAG_LOCKED, (SInt64 *)&gIfbFlipWaitUs, "microseconds spent in those waits");
++SYSCTL_QUAD(_debug, OID_AUTO, nmintelfb_flip_late, CTLFLAG_RD | CTLFLAG_LOCKED, (SInt64 *)&gIfbFlipLate, "waits given up after 20 ms (that frame may tear)");
+ static void ifb_ram_register(NMIntelFB *fb)
+ {
+-    if (fb && !gIfbRamFB) { gIfbRamFB = fb; sysctl_register_oid(&sysctl__debug_nmintelfb_ram); sysctl_register_oid(&sysctl__debug_nmintelfb_regs); }
+-    else if (!fb && gIfbRamFB) { sysctl_unregister_oid(&sysctl__debug_nmintelfb_ram); sysctl_unregister_oid(&sysctl__debug_nmintelfb_regs); gIfbRamFB = nullptr; }
++    sysctl_oid *o[] = { &sysctl__debug_nmintelfb_ram, &sysctl__debug_nmintelfb_regs, &sysctl__debug_nmintelfb_flips,
++                        &sysctl__debug_nmintelfb_flip_waits, &sysctl__debug_nmintelfb_flip_wait_us, &sysctl__debug_nmintelfb_flip_late };
++    if (fb && !gIfbRamFB) { gIfbRamFB = fb; for (sysctl_oid *x : o) sysctl_register_oid(x); }
++    else if (!fb && gIfbRamFB) { for (sysctl_oid *x : o) sysctl_unregister_oid(x); gIfbRamFB = nullptr; }
+ }
+ 
+ #ifdef NMINTELFB_VIRTUAL

@@ -119,3 +119,7 @@ re-applies the PTEs on `kIOFBNotifyDidPowerOn` (checked in RTX-20 by sleeping on
 Works: the copy engine writes straight into the panel's RAM scanout, 2.78 → 1.44 ms per frame and kernel_task per
 frame −46 % [measured], no visible artefacts. The rest is the copy engine's own ~1.4 ms, spent spinning in NVRM (4c).
 Test numbers shifted by one: RTX-21 is `auto.sh` at boot, the flip is RTX-22, the NVRM wait RTX-23.
+
+## Sleep and numbering (2026-10-17)
+S3 resets the Intel display engine (RTX-22), so system sleep is off until NMIntelFB can light the panel itself; not
+caused by the RAM scanout. The flip (4b) is RTX-23, the copy-engine wait without spinning (4c) RTX-24.
