@@ -30,6 +30,7 @@ register 0 after wake) and nothing relights it; sleep is off for now (`pmset`). 
 `659dfa20`); RTX-24: `auto.sh` turns it on at boot (works). **RTX-25** (4c) works: NVRM `f5171d7b` (binary patch) sleeps during the copy; kernel_task ~4 %
 (RTX-16: ~40 %). Stage 4 done. **BL-2** brightness works (NMIntelFB `36afddf1`). Open:
 real vblank (5), battery numbers (7), sleep relight.
+**Wi-Fi:** WIFI-1 built (MT7921, OverlordDev SimpleMtkWlan from source, Ethernet type): [tests/wifi-1-mt7921.md](tests/wifi-1-mt7921.md).
 
 ## Open problems
 

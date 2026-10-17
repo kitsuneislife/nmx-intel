@@ -82,3 +82,5 @@ source-fixes/00NN-<slug>.patch`, add an `apply` line to `build/apply-fixes.sh` (
 - `tools/nvrm/build.sh` (binary patch, RTX-25) — NVRM `12fcabf3` → `f5171d7b`: the copy-engine wait in
   `nvrm_ce_copy_to_pages` sleeps 1 ms (`os_delay`) instead of spinning 10 µs (`osDelayUs`), limit 2000. NVRM cannot
   be rebuilt from the published source (needs a Darwin RM build nullmoth does not publish).
+- `source-fixes/wifi/wifi-0001` (WIFI-1) — SimpleMtkWlan (OverlordDev fork): `probe` leaves the card alone on
+  `-nvoff` or `-mtkwlanoff`. Applied by `tools/wifi/build.sh` with `git am`.

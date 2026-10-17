@@ -1,0 +1,28 @@
+From 6e0b0cb42c4b2c6ba5e89591a52566f7c1c4b9f1 Mon Sep 17 00:00:00 2001
+From: kitsuneislife <kitsuneislife@users.noreply.github.com>
+Date: Sat, 17 Oct 2026 12:29:36 -0300
+Subject: [PATCH] Leave the card alone on -nvoff or -mtkwlanoff
+
+---
+ SimpleMtkWlan/SimpleMtkWlan.cpp | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/SimpleMtkWlan/SimpleMtkWlan.cpp b/SimpleMtkWlan/SimpleMtkWlan.cpp
+index 563551c..13c00cd 100644
+--- a/SimpleMtkWlan/SimpleMtkWlan.cpp
++++ b/SimpleMtkWlan/SimpleMtkWlan.cpp
+@@ -82,6 +82,11 @@ IOService* SimpleMtkWlan::probe(IOService *provider, SInt32 *score)
+     if (!device) {
+         return NULL;
+     }
++    /* Safe boot: -nvoff (OpenCore "Start once without NVIDIA driver") or -mtkwlanoff leaves the card alone. */
++    int off = 0;
++    if (PE_parse_boot_argn("-nvoff", &off, sizeof(off)) || PE_parse_boot_argn("-mtkwlanoff", &off, sizeof(off))) {
++        return NULL;
++    }
+     if (MtkMwx::mwx_match(device)) {
+         isMatch = true;
+         fHalService = new MtkMwx;
+-- 
+2.39.5 (Apple Git-154)
+
