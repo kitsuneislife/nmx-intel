@@ -14,6 +14,7 @@ summary block on top, linked to each other). The original Portuguese diary is pr
 | "Did we already try X?" | [tests/index.md](tests/index.md) → the one phase file |
 | Recovering the original binary / legacy patches | [knowledge/binary-patches.md](knowledge/binary-patches.md) |
 | Other projects, upstream state | [knowledge/research.md](knowledge/research.md) |
+| Making the RTX → Intel bridge cheaper | [knowledge/bridge-optimization.md](knowledge/bridge-optimization.md) |
 
 ## Map
 
@@ -32,6 +33,7 @@ knowledge/diagnostics.md          trail/beat/io tokens, knobs, tools, recovery
 knowledge/patches.md              every source fix: repo, kind, test, purpose
 knowledge/binary-patches.md       legacy byte patches 1–5
 knowledge/research.md             external projects and upstream
+knowledge/bridge-optimization.md  per-frame cost of the bridge and the staged plan (CASO shape)
 archive/LOG-pt.md                 original diary (Portuguese, verbatim)
 ```
 

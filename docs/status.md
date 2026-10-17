@@ -22,12 +22,12 @@ B works. 60 Hz is not wanted.
 
 ## Next step
 
-Daily use. Reinstall `auto.sh` (fallback restart fixed). Then optimise the per-frame cost (open problem 1).
+Daily use. Then the bridge plan: stop `displaytrace`, then get `open-gpu-kernel-modules` 610.57.04 to build NVAccel.
 
 ## Open problems
 
-1. Cost per frame: full 8.3 MB `volatile` word copy in `performTransaction` + a GPU→system-memory sync each frame
-   (NVAccel, nullmoth's binary). Options: dirty rows, faster copy, GPU writing into the Intel surface.
+1. Cost per frame: CE copy + two CPU copies of 8.3 MB (~4 ms CPU per frame, ~35 % of a core) and nullmoth's
+   `displaytrace` (~20 %). Staged plan: [knowledge/bridge-optimization.md](knowledge/bridge-optimization.md).
 2. Boot without the 45 s delay (WindowServer accelerated from the start, no restart) — untested since RTX-7's freeze.
 3. `Invalid display 0x5b81c5c0` in WindowServer ~17/min; battery cost of the RTX always on (unmeasured).
 4. Path A (Intel Metal) parked.
