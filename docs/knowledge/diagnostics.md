@@ -73,6 +73,7 @@ Lukas cannot type `|`: when he runs commands, write to a file and `grep`/`tail` 
 | `tools/mirror` | LaunchAgent mirroring the ghost firmware display (with `NMXGPUFB` or `NMIntelFB`); log: `log show --last 1h --predicate 'process == "nmx-mirror"'` |
 | `tools/intelfb/auto.sh` | LaunchDaemon: `enable.sh` + WindowServer restart at the login window every boot; `nullmoth-intelfb-auto=0` off; log: `log show --last 10m --predicate 'eventMessage CONTAINS "nmx-intelfb-auto"'` |
 | `tools/accel/build.sh`, `install.sh` | build NVAccel from branch `nmx-accel` (v2.1.0) with `~/ogkm610`; install into `/Library/Extensions` + aux KC; `install.sh restore` puts nullmoth's back (`~/NVAccel.kext.original`). The 1401 app may copy its own NVAccel back when the driver is toggled |
+| `tools/checkpoint.sh` | before every install: `save <name>` (no sudo) copies NV*/NM* kexts, the aux KC and nullmoth-* knobs to `~/nmx-checkpoints/<date>-<name>` with a verified SHA256 list; `sudo … restore <dir>` puts them back (reboot after). First one: `20261016-233841-rtx16-funcionando` (NMIntelFB 1d3ea017, NVAccel f0edef4e, NVRM 12fcabf3, NVRMFB 0a75504b, NVRMAGDC 223a327f) |
 | `top -o cpu`, `ps -M <pid>` | WindowServer CPU and per-thread load (`sample` needs root) |
 
 ## Recovering
