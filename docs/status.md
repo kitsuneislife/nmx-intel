@@ -28,7 +28,8 @@ engine writes it, 2.78 → 1.44 ms per frame, no CPU copy left (NMIntelFB `6145a
 turns it on at boot (works). **Sleep breaks the panel**: S3 resets the Intel display engine (RTX-22: every display
 register 0 after wake) and nothing relights it; sleep is off for now (`pmset`). **RTX-23** flip (4b) works (NMIntelFB `59c98103`, NVAccel
 `659dfa20`); RTX-24: `auto.sh` turns it on at boot (works). **RTX-25** (4c) works: NVRM `f5171d7b` (binary patch) sleeps during the copy; kernel_task ~4 %
-(RTX-16: ~40 %). Stage 4 done. Open: brightness (BL-2), real vblank (5), battery numbers (7), sleep relight.
+(RTX-16: ~40 %). Stage 4 done. **BL-2** (brightness, NMIntelFB `36afddf1`) built. Open:
+real vblank (5), battery numbers (7), sleep relight.
 
 ## Open problems
 

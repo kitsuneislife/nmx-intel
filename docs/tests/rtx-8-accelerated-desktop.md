@@ -429,3 +429,11 @@ Installed NVRM `f5171d7b`, rebooted, `sudo bash tools/accel/ab.sh flip`. `~/nmx-
 - [inferred] µs per frame rose ~0.8 ms: the 1 ms sleep granularity (the copy itself takes ~1.4 ms, the wait ends on
   the second tick). It is latency, not CPU; with the flip, frames still land on the next vblank.
 - Bridge cost now, from RTX-16: ~4 ms CPU per frame, kernel_task ~37–48 % → ~0 CPU copies, kernel_task ~4 %.
+
+## BL-2 prep — panel brightness from NMIntelFB
+Plan: [knowledge/brightness.md](../knowledge/brightness.md). `intelfb-0020` (NMIntelFB `36afddf1`, on top of 0019):
+before `IOFramebuffer::start()` NMIntelFB attaches `NMIntelFBBacklight`, an `IODisplayParameterHandler` named
+"backlight" (nullmoth's NVRMFB handler, 60dc7c8, ported), and answers `getAppleSense()` with `kGenericLCD`, so
+IOGraphics should make an `AppleBacklightDisplay` (keys + slider). Brightness 0–100 → `BXT_BLC_PWM_DUTY1` = period ×
+level (floor 5 %, inverted polarity respected), from a thread call. Only when PWM 1 is running at start;
+`nvram nullmoth-intelfb-backlight=0` leaves it out. Trail tokens `bl`, `bl-display`, `bl-off`.

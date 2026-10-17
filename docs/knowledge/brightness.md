@@ -54,3 +54,6 @@
 ## BL-1 answered (RTX-22, 2026-10-17) [measured]
 `debug.nmintelfb_regs`: `blc 80000000/00004b00/00004b00 blc2 0/0/0`. PWM controller 1 drives the panel, enabled,
 period 19200, duty 19200 (100 %); controller 2 unused. BL-2 writes `BXT_BLC_PWM_DUTY1` (0xC8258) = period × level.
+
+## BL-2 built (2026-10-17)
+`intelfb-0020`, NMIntelFB `36afddf1`: the plan above, as written (knob `nullmoth-intelfb-backlight`, trail `bl`).

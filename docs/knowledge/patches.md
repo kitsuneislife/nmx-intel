@@ -64,6 +64,8 @@ Other series:
   logged at each power change and readable as `sysctl debug.nmintelfb_regs`.
 - `intelfb-0019` (knob, RTX-23) — `debug.nmintelfb_ram=2`: second RAM buffer at GGTT 0x800000, NVAccel writes the one
   off screen (after `PLANE_SURFLIVE` shows the last flip landed), `nmIntelFBRamFlip` sets `PLANE_SURF` to it.
+- `intelfb-0020` (BL-2) — panel brightness: "backlight" `IODisplayParameterHandler` + `getAppleSense` LCD (NVRMFB's,
+  ported); level → `BXT_BLC_PWM_DUTY1`. `nvram nullmoth-intelfb-backlight=0` turns it off.
 - `source-fixes/accel/accel-0001` (knob/diag, RTX-18) — NVAccel (branch `nmx-accel` from nullmoth v2.1.0, worktree
   `~/nmx-build/accel/src`, tag `accel-0001`, built by `tools/accel/build.sh`): `debug.nvaccel_iop_memcpy=1` copies
   frames to a CPU scanout with `memcpy` rows; `debug.nvaccel_iop_direct=1` puts the copy engine's staging buffer on
