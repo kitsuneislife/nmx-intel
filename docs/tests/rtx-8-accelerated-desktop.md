@@ -176,4 +176,26 @@ Boot 21:38; WindowServer restart 21:42:33; console stayed; power-off, boot 21:44
 surface (performTransaction's copy target). NVAccel only records a scanout vidmem's address and never frees it;
 home flips skip non-NVIDIA framebuffers. Trail `scanres`; knob `nullmoth-intelfb-scanres=0`. `NMIntelFB 1d3ea017…`.
 
-## RTX-15 — intelfb-0016 (pending)
+## RTX-15 — intelfb-0016 — **accelerated desktop on the internal panel** (first working run)
+Boot 21:54; `enable.sh` 21:58:51; `killall -9 WindowServer` → login window, session works. Lukas: wallpaper,
+animations, transparency and YouTube work; a short stall while entering the session after the password.
+- [measured, kernel] `trail: scanres`; `scanout resource: VRAM phys 0x7c22200000 (8323072 bytes)`; `nvaccelfb=3:
+  scanout-backed display pipe ENABLED`; `iop … transaction hooks OPEN`; 21:59:01 `iop: K6 plane 0: surface yes id 0x2
+  1920x1080 row 7680 fmt 0x42475241 | resource NVResource … kva 1 scanout 0`. No "submission failed" in WindowServer.
+- [measured, sysctl ~6 min later] `nvaccel_iop_ok 14801` (all `_h0`, all `src_surf`), `iop_fail 0`, `iop_blank 5`,
+  `copy_skip 25`, `surface_gpu_waits 6475`, `timeouts 13`, `wait_max_us 102100`; `vm_refused 0`.
+- [measured, system_profiler] one display: RTX 3050, Metal 3, 1920x1080, main, mirror off (no ghost display).
+- [measured, resource use, Claude app streaming text] ~89 frames/s copied (10 s sample: 887 frames); WindowServer
+  ~67 % CPU (user ~48 %, system ~19 %; software compositing was ~225 %), kernel_task ~33 % [unverified source].
+  WindowServer logs `Invalid display 0x5b81c5c0` (SkyLight) ~17/min.
+- [measured, `nvrm-accel.cpp`] every frame: GPU makes the surface's pixels current in system memory
+  (`nvAccelSurfCopyReady`), then `performTransaction` copies the whole frame (8.3 MB) word by word through `volatile`
+  pointers into NMIntelFB's surface, synchronously. [inferred] that copy is most of WindowServer's system time and
+  the per-frame GPU wait the cost behind the stall at login; dirty-row copies or a GPU write straight into the Intel
+  surface would cut it (NVAccel is nullmoth's binary: changing it means building NVAccel).
+
+### RTX-16 prep: `tools/intelfb/auto.sh`
+No kext change. A LaunchDaemon does at every boot what was manual: waits for NMIntelFB under NVRM, 15 s, runs
+`enable.sh` (3 tries), and restarts WindowServer only while the login window is up (console owner root); with a user
+already logged in it only enables. `nullmoth-intelfb-auto=0` turns it off; log tag `nmx-intelfb-auto`.
+

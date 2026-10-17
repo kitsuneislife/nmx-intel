@@ -1,6 +1,6 @@
 # Status
 
-> Last updated: 2026-10-16, RTX-8 prepared. Keep this file short: it is read at the start of every session.
+> Last updated: 2026-10-16, RTX-15 works; RTX-16 prepared. Keep this file short: it is read at the start of every session.
 
 ## Goal and decision
 
@@ -11,24 +11,23 @@ B works. 60 Hz is not wanted.
 
 ## Where we are
 
-- **i915 path (Intel test driver on):** stable desktop on `NMXGPUFB`, 144 Hz, software compositing (~225 % CPU).
-  Ghost firmware display hidden by `tools/mirror` (fixed 10-16: it had never run; now `state = running`).
-- **RTX path (Intel test driver off):** step by step, each test past the last one's wall: RTX-10 WindowServer on the
-  RTX's Metal; RTX-12 panel under the NVIDIA GPU; RTX-13 display pipe (AGDC 0x980); RTX-14 plane (AGDC K5):
-  **WindowServer now composites the whole desktop on the RTX**, but every display-pipe transaction fails before
-  NVAccel ("Fallback GPU Display Pipe transaction submission failed"). intelfb-0016 gives the pipe a VRAM scanout
-  resource. Details: [tests/rtx-8-accelerated-desktop.md](tests/rtx-8-accelerated-desktop.md).
-- **Built, not installed:** `NMIntelFB 1d3ea017…`. Installed: `NMIntelFB a96fc475…` (RTX-14). NVRAM
-  `nullmoth-intelfb-delay=45`.
+- **RTX path works (RTX-15, 10-16):** the RTX composites the whole desktop with Metal, NVAccel copies each frame into
+  NMIntelFB on the Intel panel. Lukas: wallpaper, animations, transparency, YouTube all work; one short stall when
+  the session starts. One display only (no ghost). ~89 frames/s copied while busy, 0 failures; WindowServer ~67 %
+  CPU (was ~225 % software). Details: [tests/rtx-8-accelerated-desktop.md](tests/rtx-8-accelerated-desktop.md).
+- Still manual per boot: `enable.sh`, then `killall -9 WindowServer`. Installed: `NMIntelFB 1d3ea017…`, NVRAM
+  `nullmoth-intelfb-delay=45`, Intel test driver off.
+- **i915 path (Intel test driver on):** stable software desktop on `NMXGPUFB`, 144 Hz; `tools/mirror` hides the ghost.
 
 ## Next step
 
-RTX-15: `tools/intelfb/install.sh`, reboot; 1 min after login `enable.sh`, then `killall -9 WindowServer`.
-Success: trail `scanres`, kernel `iop: K6 …`, `nvaccel_iop_ok_h0` growing, the login screen on the panel. If the
-submission still fails: disassemble IOAcceleratorFamily2's transaction path (BootKC) for the refusing check.
+RTX-16: `sudo bash tools/intelfb/auto.sh install`, reboot, wait at the login window (~1 min) until it restarts by
+itself. Success: log `nmx-intelfb-auto` "restarting WindowServer", accelerated login with no manual step.
 
 ## Open problems
 
-1. RTX-15 result (frames copied? CPU copy cost BAR1 → Intel aperture at 144 Hz).
-2. Making it automatic at boot (drop the delay so NVRM's auto-go arms it) once it works.
-3. Proper ghost fix (WindowServer never adopting `.Display_boot`) still open; mirror covers both paths.
+1. Cost per frame: full 8.3 MB `volatile` word copy in `performTransaction` + a GPU→system-memory sync each frame
+   (NVAccel, nullmoth's binary). Options: dirty rows, faster copy, GPU writing into the Intel surface.
+2. Boot without the 45 s delay (WindowServer accelerated from the start, no restart) — untested since RTX-7's freeze.
+3. `Invalid display 0x5b81c5c0` in WindowServer ~17/min; battery cost of the RTX always on (unmeasured).
+4. Path A (Intel Metal) parked.

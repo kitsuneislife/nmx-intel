@@ -71,6 +71,7 @@ Lukas cannot type `|`: when he runs commands, write to a file and `grep`/`tail` 
 | `tools/vram/displays.c` | CoreGraphics online/active displays, bounds, mirroring, cursor position |
 | `sysctl debug.nmintelfb_agdc` | NMIntelFB's AGDC: write 1 to start (enable.sh); reads 1 up, 2 starting, < 0 failed |
 | `tools/mirror` | LaunchAgent mirroring the ghost firmware display (with `NMXGPUFB` or `NMIntelFB`); log: `log show --last 1h --predicate 'process == "nmx-mirror"'` |
+| `tools/intelfb/auto.sh` | LaunchDaemon: `enable.sh` + WindowServer restart at the login window every boot; `nullmoth-intelfb-auto=0` off; log: `log show --last 10m --predicate 'eventMessage CONTAINS "nmx-intelfb-auto"'` |
 | `top -o cpu`, `ps -M <pid>` | WindowServer CPU and per-thread load (`sample` needs root) |
 
 ## Recovering
