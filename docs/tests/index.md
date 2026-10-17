@@ -64,7 +64,7 @@ phase file; open only the row you need.
 | RTX-23 | 10-17 | NMIntelFB `59c98103`, NVAccel `659dfa20` | stage 4b: two RAM buffers flipped at vblank (`ab.sh flip`) | **works**: 3409 flips, 0 late, same CPU per frame, no artefacts | [rtx-8](rtx-8-accelerated-desktop.md) |
 | RTX-24 | 10-17 | same + `auto.sh` | `auto.sh` turns the flip (ram=2) on at boot | **works**: mode 2 at boot, 7840 flips, 0 late, 0 failures | [rtx-8](rtx-8-accelerated-desktop.md) |
 | RTX-25 | 10-17 | NVRM `f5171d7b` (binary patch) | stage 4c: copy-engine wait sleeps instead of spinning | **works**: kernel_task 12 % → 4 %, per frame −57 %, 0 failures | [rtx-8](rtx-8-accelerated-desktop.md) |
-| BL-2 | 10-17 | NMIntelFB `36afddf1` | panel brightness: backlight handler + PWM duty (intelfb-0020) | pending | [rtx-8](rtx-8-accelerated-desktop.md) |
+| BL-2 | 10-17 | NMIntelFB `36afddf1` | panel brightness: backlight handler + PWM duty (intelfb-0020) | **works**: keys + slider, duty follows (49 % at half) | [rtx-8](rtx-8-accelerated-desktop.md) |
 
 Adding a test: one row here, the entry at the end of the current phase file (start a new phase file when the goal
 changes), then [../status.md](../status.md).

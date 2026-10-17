@@ -437,3 +437,12 @@ before `IOFramebuffer::start()` NMIntelFB attaches `NMIntelFBBacklight`, an `IOD
 IOGraphics should make an `AppleBacklightDisplay` (keys + slider). Brightness 0–100 → `BXT_BLC_PWM_DUTY1` = period ×
 level (floor 5 %, inverted polarity respected), from a thread call. Only when PWM 1 is running at start;
 `nvram nullmoth-intelfb-backlight=0` leaves it out. Trail tokens `bl`, `bl-display`, `bl-off`.
+
+## BL-2 — panel brightness — **works**
+Installed NMIntelFB `36afddf1` (hash checked), rebooted. Lukas: brightness keys and slider work, first try.
+- [measured, log] 12:04:16.689 `backlight: panel at 100% - brightness keys and slider through AppleBacklightDisplay`;
+  12:05:18.002 `brightness parameters on AppleBacklightDisplay, panel at 100%`.
+- [measured, ioreg] `AppleBacklightDisplay` registered, `IODisplayParameters` with `brightness {min 0, max 100}`.
+- [measured, sysctl] brightness at half: `blc 80000000/00004b00/000024c0` (duty 9408 of 19200 = 49 %); at full
+  `…/00004b00` — the duty follows the slider, through our handler.
+- [unverified] the handler's `backlight: N% -> duty` lines did not show in `log show` although the duty changed.

@@ -57,3 +57,7 @@ period 19200, duty 19200 (100 %); controller 2 unused. BL-2 writes `BXT_BLC_PWM_
 
 ## BL-2 built (2026-10-17)
 `intelfb-0020`, NMIntelFB `36afddf1`: the plan above, as written (knob `nullmoth-intelfb-backlight`, trail `bl`).
+
+## BL-2 result (2026-10-17) [measured]
+Works: `AppleBacklightDisplay` appears, keys and slider change `BXT_BLC_PWM_DUTY1` (half = 0x24c0 of 0x4b00). After
+S3 the PWM is off (RTX-22), so brightness, like the panel, needs the sleep relight.
