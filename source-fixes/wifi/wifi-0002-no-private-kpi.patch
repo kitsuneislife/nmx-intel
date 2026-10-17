@@ -1,0 +1,55 @@
+From 2c0dc924cab9e9e892320c6862013c5d0317f989 Mon Sep 17 00:00:00 2001
+From: kitsuneislife <kitsuneislife@users.noreply.github.com>
+Date: Sat, 17 Oct 2026 12:37:18 -0300
+Subject: [PATCH] Stop the ring log without thread_call_cancel_wait (private
+ KPI, kmutil refuses it)
+
+---
+ mtk80211/compat.cpp | 10 +++++++++-
+ 1 file changed, 9 insertions(+), 1 deletion(-)
+
+diff --git a/mtk80211/compat.cpp b/mtk80211/compat.cpp
+index 45ab67d..3c6a8c1 100644
+--- a/mtk80211/compat.cpp
++++ b/mtk80211/compat.cpp
+@@ -538,6 +538,7 @@ static IOSimpleLock *mtk_ring_lock;
+ static thread_call_t mtk_ring_call;
+ static IOService *mtk_ring_svc;
+ static bool mtk_ring_run;
++static volatile bool mtk_ring_busy;
+ 
+ static bool mtk_has(const char *h, const char *n)
+ {
+@@ -624,6 +625,7 @@ extern "C" void mtk_ringlog(const char *fmt, ...)
+ 
+ static void mtk_ring_publish(thread_call_param_t, thread_call_param_t)
+ {
++    mtk_ring_busy = true;
+     static UInt32 last_seq = (UInt32)-1, last_kseq = (UInt32)-1, last_hseq = (UInt32)-1;
+     char *copy = (char *)IOMalloc(MTK_RING_SIZE + 1);
+     if (copy && mtk_ring_svc) {
+@@ -688,6 +690,7 @@ static void mtk_ring_publish(thread_call_param_t, thread_call_param_t)
+         clock_interval_to_deadline(500, kMillisecondScale, &dl);
+         thread_call_enter_delayed(mtk_ring_call, dl);
+     }
++    mtk_ring_busy = false;
+ }
+ 
+ extern "C" void mtk_ringlog_start(IOService *svc)
+@@ -707,7 +710,12 @@ extern "C" void mtk_ringlog_stop(void)
+ {
+     mtk_ring_run = false;
+     if (mtk_ring_call) {
+-        thread_call_cancel_wait(mtk_ring_call);
++        /* thread_call_cancel_wait is private KPI (kmutil refuses to link it): cancel, let a running publish
++           finish (it no longer re-arms once mtk_ring_run is false), then cancel any re-arm it made. */
++        thread_call_cancel(mtk_ring_call);
++        for (int i = 0; i < 200 && mtk_ring_busy; i++)
++            IOSleep(5);
++        thread_call_cancel(mtk_ring_call);
+         thread_call_free(mtk_ring_call);
+         mtk_ring_call = NULL;
+     }
+-- 
+2.39.5 (Apple Git-154)
+

@@ -36,3 +36,14 @@
   and the kext is re-signed ad hoc. `restore` removes the driver. EFI untouched.
 - Expected: a new `en*` Ethernet-type interface, DHCP address from the router, traffic. Read with
   `ioreg -w0 -r -c SimpleMtkWlan` and `ioreg -w0 -rn PXSX -l` (`MtkLog`, `MtkHB`).
+
+### WIFI-1 first install attempt (2026-10-17) — kmutil refused the kext [measured]
+`sudo bash tools/wifi/install.sh`: `Failed to bind '_thread_call_cancel_wait' … could not find a kext which exports this
+symbol`; the collection was left unchanged. The symbol is private KPI (`kmutil libraries` puts it in
+`com.apple.kpi.private`), which kmutil does not let a third-party kext link; OpenCore injection (how the fork was
+tested) links against the kernel directly and never noticed. The fork's own check passed because it compares
+against every kernel export. Declaring `com.apple.kpi.private` does not help: kmutil then drops the kext ("No
+extension"). Fix `wifi-0002`: the only caller (ring-log stop) now uses public `thread_call_cancel`, waits for a
+running publish to finish, and cancels again. `kmutil libraries` now needs only the public KPIs
+(IONetworkingFamily, IOPCIFamily, kpi.bsd/iokit/libkern/mach). A full collection build needs root, so linking is
+[inferred] until the next install.

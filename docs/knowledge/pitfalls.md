@@ -139,3 +139,9 @@
   the GGTT (in stolen memory) survives. Firmware resume does not relight the panel, and NMIntelFB only adopts the
   firmware's mode, so the panel stays black and WindowServer stalls waiting for it (watchdog after 40 s).
 - Until NMIntelFB can light the panel itself, avoid system sleep on the RTX path (display sleep is fine).
+
+## kmutil refuses private KPI in third-party kexts (WIFI-1)
+A kext that works when OpenCore injects it can still fail `kmutil create` for the auxiliary collection: kmutil binds
+only against the libraries in `OSBundleLibraries`, and `com.apple.kpi.private` is closed to third-party kexts (adding
+it makes kmutil drop the kext). Check with `kmutil libraries -p <kext> --arch x86_64 --xml` before installing in
+`/Library/Extensions`: the list must not contain `com.apple.kpi.private`.
