@@ -54,7 +54,7 @@ phase file; open only the row you need.
 | RTX-13 | 10-16 | `937ae0fa` | intelfb-0014 own AGDC lists the panel (0x980) | **"no display pipes" gone**, display online; "No plane indices" (0x921/0x711 unanswered) | [rtx-8](rtx-8-accelerated-desktop.md) |
 | RTX-14 | 10-16 | `a96fc475` | intelfb-0015 AGDC answers link config + plane scaler (K5) | **WS composites the desktop on the RTX**; plane 0 exists; every transaction submission fails | [rtx-8](rtx-8-accelerated-desktop.md) |
 | RTX-15 | 10-16 | `1d3ea017` | intelfb-0016 VRAM block as the pipe's scanout resource | **accelerated desktop on the panel** (frames copied, 0 failures; WS ~67 % CPU) | [rtx-8](rtx-8-accelerated-desktop.md) |
-| RTX-16 | 10-16 | `1d3ea017` | `tools/intelfb/auto.sh` enables at boot (LaunchDaemon) | pending | [rtx-8](rtx-8-accelerated-desktop.md) |
+| RTX-16 | 10-16 | `1d3ea017` | `tools/intelfb/auto.sh` enables at boot (LaunchDaemon) | **accelerated from the login window**, no restart needed | [rtx-8](rtx-8-accelerated-desktop.md) |
 
 Adding a test: one row here, the entry at the end of the current phase file (start a new phase file when the goal
 changes), then [../status.md](../status.md).

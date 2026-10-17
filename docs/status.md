@@ -1,6 +1,6 @@
 # Status
 
-> Last updated: 2026-10-16, RTX-15 works; RTX-16 prepared. Keep this file short: it is read at the start of every session.
+> Last updated: 2026-10-16, RTX-16: automatic at boot. Keep this file short: it is read at the start of every session.
 
 ## Goal and decision
 
@@ -15,14 +15,14 @@ B works. 60 Hz is not wanted.
   NMIntelFB on the Intel panel. Lukas: wallpaper, animations, transparency, YouTube all work; one short stall when
   the session starts. One display only (no ghost). ~89 frames/s copied while busy, 0 failures; WindowServer ~67 %
   CPU (was ~225 % software). Details: [tests/rtx-8-accelerated-desktop.md](tests/rtx-8-accelerated-desktop.md).
-- Still manual per boot: `enable.sh`, then `killall -9 WindowServer`. Installed: `NMIntelFB 1d3ea017…`, NVRAM
+- **Automatic since RTX-16:** `tools/intelfb/auto.sh` (LaunchDaemon) enables at boot; the login window's WindowServer
+  adopts the RTX by itself (no restart). Installed: `NMIntelFB 1d3ea017…`, NVRAM
   `nullmoth-intelfb-delay=45`, Intel test driver off.
 - **i915 path (Intel test driver on):** stable software desktop on `NMXGPUFB`, 144 Hz; `tools/mirror` hides the ghost.
 
 ## Next step
 
-RTX-16: `sudo bash tools/intelfb/auto.sh install`, reboot, wait at the login window (~1 min) until it restarts by
-itself. Success: log `nmx-intelfb-auto` "restarting WindowServer", accelerated login with no manual step.
+Daily use. Reinstall `auto.sh` (fallback restart fixed). Then optimise the per-frame cost (open problem 1).
 
 ## Open problems
 

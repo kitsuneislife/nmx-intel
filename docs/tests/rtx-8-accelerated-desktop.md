@@ -199,3 +199,17 @@ No kext change. A LaunchDaemon does at every boot what was manual: waits for NMI
 `enable.sh` (3 tries), and restarts WindowServer only while the login window is up (console owner root); with a user
 already logged in it only enables. `nullmoth-intelfb-auto=0` turns it off; log tag `nmx-intelfb-auto`.
 
+## RTX-16 — `auto.sh` — **accelerated from the login window, no manual step, no restart**
+Boot 22:11; Lukas logged in 22:14. The login window was already accelerated (transparent password field); short
+stalls while apps open, nothing unusual.
+- [measured, log] 22:12:42 WindowServer 1160 starts; 22:12:51 headless check "a display head published"; 22:12:59
+  `trail: scanres`; 22:13:00 `iop … transaction hooks OPEN`; logger `enabled: agdc 1 iop 1` then `user _windowserver
+  already logged in` — **no restart** (the login window's console owner is `_windowserver`, not root).
+- [measured] the same WindowServer 1160 took the panel by itself: 22:13:43 `Display 0x5b81c5c0 … isAcc=YES`,
+  22:13:44 `iop: K6 transaction #0`; #600 at 22:14:18 with real content. Later `iop_ok 3754`, `iop_fail 0`,
+  `wait_max_us 101129`, `timeouts 10`.
+- [inferred] the WindowServer restart of RTX-9…15 is not needed once the pipe is enabled; what makes WindowServer
+  re-evaluate ~43 s later is not identified.
+- `auto.sh` changed: waits up to 90 s for the first frame and restarts WindowServer only if none came and the console
+  owner is `root` or `_windowserver`.
+

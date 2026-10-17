@@ -1,7 +1,7 @@
 #!/bin/bash
 # auto.sh: liga sozinho, a cada boot, o desktop acelerado (RTX compõe, NMIntelFB mostra no painel) — o que enable.sh +
-# killall faziam à mão (RTX-15). Roda como LaunchDaemon: espera o NMIntelFB, roda enable.sh e, se ninguém entrou
-# ainda (tela de login), reinicia o WindowServer. Se alguém já entrou, só liga; vale depois de um killall/logout.
+# killall faziam à mão (RTX-15). Roda como LaunchDaemon: espera o NMIntelFB e roda enable.sh; o WindowServer adota a
+# RTX sozinho (RTX-16). Só se nenhum quadro chegar em 90 s na tela de login ele reinicia o WindowServer.
 #   sudo bash tools/intelfb/auto.sh install    instala (vale no próximo boot)
 #   sudo bash tools/intelfb/auto.sh remove     remove
 #   sudo nvram nullmoth-intelfb-auto=0          desliga sem remover (apagar a variável religa)
@@ -61,11 +61,18 @@ run)
     for i in 1 2 3; do bash "$EN" >/dev/null 2>&1 && { ok=1; break; }; sleep 10; done
     [ $ok = 1 ] || { say "enable.sh failed 3 times; WindowServer left alone"; exit 1; }
     say "enabled: agdc $(sysctl -n debug.nmintelfb_agdc) iop $(sysctl -n debug.nvaccel_iop)"
-    if [ "$(stat -f %Su /dev/console)" = root ]; then
-        say "login window: restarting WindowServer onto the RTX"
+    # RTX-16: the running WindowServer took the accelerated panel by itself ~45 s after enabling (no restart). Restart
+    # it only if no frame arrived in 90 s and nobody is logged in yet (the login window's console owner is
+    # _windowserver, or root early on).
+    for i in $(seq 1 45); do [ "$(sysctl -n debug.nvaccel_iop_ok)" != 0 ] && break; sleep 2; done
+    owner=$(stat -f %Su /dev/console)
+    if [ "$(sysctl -n debug.nvaccel_iop_ok)" != 0 ]; then
+        say "frames reach the panel (iop_ok $(sysctl -n debug.nvaccel_iop_ok)); no restart"
+    elif [ "$owner" = root ] || [ "$owner" = _windowserver ]; then
+        say "no frame after 90 s at the login window: restarting WindowServer onto the RTX"
         killall -9 WindowServer
     else
-        say "user $(stat -f %Su /dev/console) already logged in: accelerated after the next WindowServer restart"
+        say "no frame after 90 s and $owner is logged in: accelerated after the next WindowServer restart"
     fi
     ;;
 *) echo "uso: auto.sh install|remove"; exit 1 ;;
