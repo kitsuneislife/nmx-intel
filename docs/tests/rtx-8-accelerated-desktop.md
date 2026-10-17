@@ -269,3 +269,18 @@ into its folder; fixed `1900923`). Boot 10-17 08:56:26.
 - [measured, sysctl] `iop_ok 9664` = `iop_direct_frames 9664` (every frame direct), `iop_fail 0`, `iop_blank 102`
   (boot, before the first real frame); `iop_copy_us / iop_ok` = 2796 µs per frame (RTX-18 direct: 2746).
   kernel_task ~16 %.
+
+## RTX-20 prep — stage 4a: the panel scans out of RAM, the copy engine writes it
+Plan: [knowledge/bridge-optimization.md](../knowledge/bridge-optimization.md) "Stage 4 plan". Two builds, both off
+until switched on at runtime:
+- `intelfb-0017` (NMIntelFB `6145a549`): `sysctl debug.nmintelfb_ram=1` allocates a panel-sized wired buffer in RAM
+  (contiguous when possible), copies the current picture into it (then `clflush`), saves the GGTT entries of the
+  scanout (GGTT `fSurf`.., BAR0 + 8 MiB) and points them at the buffer (`phys | 1`, then `GFX_FLSH_CNTL_GEN6` = 1),
+  checking each entry reads back. `PLANE_SURF`, the GGTT offset and the aperture view do not change. `=0` writes the
+  saved entries back. The page list goes to NVAccel through `nmIntelFBRamPages`.
+- `accel-0002` (NVAccel `a4d13738`): `debug.nvaccel_iop_direct=2` gives those pages to NVRM's page-off, so the copy
+  engine writes the frame onto the panel and no CPU copy is left; anything that does not fit falls back to the
+  direct=1 staging path. Counter `debug.nvaccel_iop_ram_frames`.
+- Test: `sudo bash tools/accel/ab.sh ram` (70 s direct=1, then 70 s direct=2 + RAM scanout; ends with the RAM scanout on).
+- [unverified] whether the copy engine's writes reach RAM before the display reads them (snooped PCIe writes vs a
+  display that does not snoop): stale stripes or flicker on screen would say no.
