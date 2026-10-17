@@ -414,3 +414,18 @@ Installed NMIntelFB `59c98103` + NVAccel `659dfa20`, `sudo bash tools/accel/ab.s
   `~/NVRM.kext.original`).
 - Expected: kernel_task per frame/s well under RTX-23's 0.21; µs per frame up a little (1 ms sleep granularity:
   ~2 ms instead of ~1.4 ms). Test: `sudo bash tools/accel/ab.sh flip` with the same kind of video, compare with RTX-23.
+
+## RTX-25 — stage 4c: the copy-engine wait sleeps — **works**
+Installed NVRM `f5171d7b`, rebooted, `sudo bash tools/accel/ab.sh flip`. `~/nmx-ab-20261017-115622.txt` [measured]:
+
+| setting | frames/s | µs per copied frame | kernel_task | kernel_task per frame/s | WindowServer | flips / waits / late |
+| --- | --- | --- | --- | --- | --- | --- |
+| ram=1 | 46 | 2364 | 4 % | 0.09 | 26 % | — |
+| ram=2 (flip) | 44 | 2454 | 4 % | 0.09 | 25 % | 2683 / 121 / 0 |
+| RTX-23 ram=2, spinning NVRM | 56 | 1591 | 12 % | 0.21 | 35 % | 3409 / 233 / 0 |
+
+- [measured] kernel_task per frame/s 0.21 → 0.09 (−57 %); `iop_fail 0`, `flip_late 0`, no copy-engine timeout in
+  the log; `iop_ram_frames 12334` since boot. Installed hash checked (`f5171d7b`).
+- [inferred] µs per frame rose ~0.8 ms: the 1 ms sleep granularity (the copy itself takes ~1.4 ms, the wait ends on
+  the second tick). It is latency, not CPU; with the flip, frames still land on the next vblank.
+- Bridge cost now, from RTX-16: ~4 ms CPU per frame, kernel_task ~37–48 % → ~0 CPU copies, kernel_task ~4 %.

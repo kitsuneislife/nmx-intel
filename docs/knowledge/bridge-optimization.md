@@ -127,3 +127,8 @@ caused by the RAM scanout. The flip (4b) is RTX-23, the copy-engine wait without
 ## Stage 4c route (2026-10-17)
 NVRM cannot be rebuilt from nullmoth's published source (it assumes a Darwin RM build; `make TARGET_OS=Darwin` fails
 with 2618 errors), so 4c is a 9-byte binary patch of the installed NVRM (`tools/nvrm/build.sh`, RTX-25).
+
+## Stage 4 result (RTX-20..25)
+Every CPU copy is gone (CE writes the panel's RAM buffers), frames flip at vblank, and NVRM sleeps through the copy:
+kernel_task ~4 % while a video plays (RTX-16: ~37–48 %), 0 failures [measured]. Cost left: ~2.4 ms latency per frame
+(1 ms sleep steps), WindowServer's own compositing, and the RTX staying powered (path A).
