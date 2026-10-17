@@ -22,8 +22,8 @@ B works. 60 Hz is not wanted.
 
 ## Next step
 
-Bridge plan stage 0: NVAccel builds from source (`tools/accel/build.sh`, v2.1.0). RTX-17: install the unchanged build
-(`29a7f015`) and confirm the desktop is as RTX-16; then stages 2–3.
+Bridge plan: stage 0 done (our NVAccel `29a7f015` = RTX-16, RTX-17). RTX-18: accel-0001 (`41260d45`), A/B of
+`debug.nvaccel_iop_memcpy` and `debug.nvaccel_iop_direct` at run time. Checkpoint before each install.
 
 ## Open problems
 

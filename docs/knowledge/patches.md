@@ -58,6 +58,11 @@ Other series:
   (plane scaler) with nullmoth's `nvk5_answer`.
 - `intelfb-0016` (fix/knob, RTX-15) — a VRAM block of our own stands for the scanout (`phys`), kva stays the Intel
   surface; `nullmoth-intelfb-scanres=0` = phys 0.
+- `source-fixes/accel/accel-0001` (knob/diag, RTX-18) — NVAccel (branch `nmx-accel` from nullmoth v2.1.0, worktree
+  `~/nmx-build/accel/src`, tag `accel-0001`, built by `tools/accel/build.sh`): `debug.nvaccel_iop_memcpy=1` copies
+  frames to a CPU scanout with `memcpy` rows; `debug.nvaccel_iop_direct=1` puts the copy engine's staging buffer on
+  the panel without writing the IOSurface's pages (pending mark kept); counters `nvaccel_iop_direct_frames`,
+  `nvaccel_iop_copy_us`. Both off by default.
 - `source-fixes/libdrm/libdrm-0001` — Darwin node numbers from names (clone nodes). Built by `tools/libdrm/build.sh`.
 - `build/nmx-src-paths.patch` — source paths for building on this Mac (applied by `build/setup.sh`).
 

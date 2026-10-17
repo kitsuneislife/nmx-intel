@@ -226,3 +226,18 @@ stalls while apps open, nothing unusual.
   17 here]. v2.2.0 builds the same binary as v2.1.0; v2.3.1 adds `nullmoth-nv-starts`. `NVAccel 29a7f015`.
 - RTX-17 tests only this: our build of unchanged v2.1.0 installed by `tools/accel/install.sh` (keeps the original in
   `~/NVAccel.kext.original`; `restore` puts it back). Expected: everything as RTX-16.
+
+## RTX-17 — our NVAccel `29a7f015` (v2.1.0 unchanged) — **same as RTX-16**
+Checkpoint `~/nmx-checkpoints/20261016-233841-rtx16-funcionando` first (`tools/checkpoint.sh`). Boot 23:40:17;
+`displaytrace` stopped (bridge plan stage 1: no `log stream` running).
+- [measured] loaded hash `29a7f015`; 23:41:31 headless check "a display head published"; 23:41:40 `iop … hooks OPEN`;
+  23:42:24 WindowServer `isAcc=YES`; 23:42:25 `K6 transaction #0`; #600 at 23:42:52 with real content (64/64 varied).
+- [measured] `iop_ok 4548`, `iop_fail 0`, `iop_blank 106` (all before the first real frame, not growing), `copy_skip 3`;
+  pageoff CE ~1.35 ms + CPU ~1.0–1.7 ms per frame, as with nullmoth's binary.
+- [measured, 10 s] 75 frames/s; WindowServer ~60 %, kernel_task ~33 % (as RTX-16; `trustd` 50 % right after boot).
+
+### accel-0001 (RTX-18 prep)
+Two run-time knobs, both 0 at boot, so the stages are compared in one boot without reboots: `debug.nvaccel_iop_memcpy`
+(stage 2) and `debug.nvaccel_iop_direct` (stage 3); `nvaccel_iop_copy_us` / `nvaccel_iop_ok` = µs per copied frame
+(copy engine + CPU, from after the composite wait). `NVAccel 41260d45`. Plan: 60 s each of 0/0, 1/0, 1/1 with the same
+on-screen load, `top` + counters for each.
