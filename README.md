@@ -58,3 +58,8 @@ Then: in the 1401 app, turn the **AMD / Intel** test driver off and on; `sudo ba
 
 nullmoth's code is PolyForm Noncommercial 1.0.0 (personal and research use). This repository ships no binaries,
 only scripts and diffs.
+
+<div align="center">
+  <img src="claude.png" width="300" height="300">
+  <p>kitsuneislife, 2026</p>
+</div>
