@@ -50,7 +50,8 @@ phase file; open only the row you need.
 | RTX-9 | 10-16 | `0d6239e0` | intelfb-0010 publish as head 0; `enable.sh` +iop | pipe registered; new WS hangs: no RM handles/VRAM | [rtx-8](rtx-8-accelerated-desktop.md) |
 | RTX-10 | 10-16 | `29893f31` | intelfb-0011 own NVKMS device answers NVAccel | **WS runs on RTX Metal**, VRAM ok; no frame reaches the panel (no VBL) | [rtx-8](rtx-8-accelerated-desktop.md) |
 | RTX-11 | 10-16 | `c07eb921` | intelfb-0012 VBL always + BAR1 size | VBL fires; CoreDisplay: "no display pipes" (fb on the Intel GPU) | [rtx-8](rtx-8-accelerated-desktop.md) |
-| RTX-12 | 10-16 | `b230f46f` | intelfb-0013 panel under NVRM (claim + nub) | pending | [rtx-8](rtx-8-accelerated-desktop.md) |
+| RTX-12 | 10-16 | `b230f46f` | intelfb-0013 panel under NVRM (claim + nub) | fb now on the NVIDIA GPU; still "no display pipes": no AGDC | [rtx-8](rtx-8-accelerated-desktop.md) |
+| RTX-13 | 10-16 | `937ae0fa` | intelfb-0014 own AGDC lists the panel (0x980) | pending | [rtx-8](rtx-8-accelerated-desktop.md) |
 
 Adding a test: one row here, the entry at the end of the current phase file (start a new phase file when the goal
 changes), then [../status.md](../status.md).

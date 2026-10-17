@@ -69,6 +69,7 @@ Lukas cannot type `|`: when he runs commands, write to a file and `grep`/`tail` 
 | `tools/vram/dump.c` | maps `NMXGPUFB` VRAM like WindowServer (shared client type 1, memory type 110), writes a PPM |
 | `tools/vram/watch.c` | samples VRAM tiles over time (flip-flopping regions); slow on the aperture |
 | `tools/vram/displays.c` | CoreGraphics online/active displays, bounds, mirroring, cursor position |
+| `sysctl debug.nmintelfb_agdc` | NMIntelFB's AGDC: write 1 to start (enable.sh); reads 1 up, 2 starting, < 0 failed |
 | `tools/mirror` | LaunchAgent mirroring the ghost firmware display (with `NMXGPUFB` or `NMIntelFB`); log: `log show --last 1h --predicate 'process == "nmx-mirror"'` |
 | `top -o cpu`, `ps -M <pid>` | WindowServer CPU and per-thread load (`sample` needs root) |
 

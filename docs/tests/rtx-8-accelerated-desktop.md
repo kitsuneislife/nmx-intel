@@ -119,4 +119,23 @@ on it (score 60000 > NVRMFB 1000), which drives the Intel GPU through `gIfbPCI`.
 no claim, NMIntelFB on GFX0 as before. Log `claim: Intel-panel NVRMDisplay nub published under NVRM`. Claim trail
 tokens are cleared when NMIntelFB starts (read the log). `NMIntelFB b230f46f…`.
 
-## RTX-12 — intelfb-0013 (pending)
+## RTX-12 — intelfb-0013 — the panel is on the NVIDIA GPU; still no display pipe
+Boot 20:05; `claim: Intel-panel NVRMDisplay nub published under NVRM` (20:06:09); `enable.sh` 20:09:44; after
+`killall -9` the console stayed; power-off, boot 21:15:51.
+- [measured, WindowServer log 20:09:54] `gpu 0xcb26 (DG) 10de.25ac … agdc 0x000000000 … accel /NVAccel … fb0:0
+  /NVRM/NVRMDisplay/NMIntelFB`; `Creating FB 1 of 1`; `IOPresentment: Unable to get AGDC information … Unable to
+  locate service dependencies … Unable to acquire map`; again `System set to use IOP but no display pipes are present`.
+- [measured, kernel] `IOAccelDisplayPipeUserClient2`, `vram1`, surfaces; no transaction.
+- [measured, source `kexts/NVRMAGDC/nvrm-agdc.cpp`] "WindowServer reads AGDC command 0x980 when it (re)starts and
+  builds one display pipe per entry in the reply." NVRMAGDC lists only `NVRMNVDAFramebuffer`s (none here) and starts
+  only on `debug.nvrmfb_agdc=1`, which NVRM's auto-go writes between `nvaccelfb` and `nvaccel_iop`.
+
+### intelfb-0014
+`NMIntelFBAGDC` (an `AppleGraphicsDeviceControl`, nullmoth's reconstructed header; link
+`com.apple.AppleGraphicsDeviceControl`, same 17 imports as NVRMAGDC) on the NVIDIA PCI device: command 1 = vendor
+NVIDIA 0x10de class 2, command 0x980 = one framebuffer (the panel), portMask 1 << 1, as NVRMAGDC's one-head reply.
+Started by `sysctl debug.nmintelfb_agdc=1` (registered only when NMIntelFB runs on the nub); state 1 up, 2 starting,
+< 0 failed; trail `agdc`, first 0x980 `agdc-980`. `enable.sh`: `nvaccelfb=3` → `nmintelfb_agdc=1` (waits for 1) →
+`nvaccel_iop=1`. `NMIntelFB 937ae0fa…`.
+
+## RTX-13 — intelfb-0014 (pending)

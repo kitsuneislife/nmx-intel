@@ -68,6 +68,11 @@
   to use IOP but no display pipes are present"); NVAccel's pipes are on the NVIDIA GPU. A framebuffer composited by
   NVAccel must sit under the NVIDIA PCI device (intelfb-0013, as nullmoth's virtual build).
 
+### WindowServer builds display pipes from the GPU's AGDC (command 0x980)
+- [measured, RTX-12] With the framebuffer under the NVIDIA GPU but no AGDC there: `IOPresentment: Unable to get AGDC
+  information … Unable to acquire map` → "no display pipes are present". NVRMAGDC lists only NVRMFB framebuffers.
+  Fix: NMIntelFB's own AGDC (intelfb-0014), started before `nvaccel_iop=1`.
+
 ### `getDeviceMemoryWithRegister` is stale for the NVIDIA BAR1
 - [measured, RTX-10] NVRM replaces the device memory list when it places BAR1; the register lookup returned 64 MB of
   8 GB. Take the first range ≥ 256 MB (NVRMFB's `surveyBar1`).

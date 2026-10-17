@@ -1,0 +1,188 @@
+diff -ruN a/AppleGraphicsDeviceControl_re.h src/AppleGraphicsDeviceControl_re.h
+--- a/AppleGraphicsDeviceControl_re.h	1969-12-31 21:00:00
++++ b/AppleGraphicsDeviceControl_re.h	2026-10-16 21:21:35
+@@ -0,0 +1,30 @@
++/*
++ * NullMoth NVIDIA driver for macOS
++ * Copyright (c) 2026 NullMoth Systems.
++ * SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
++ */
++
++#pragma once
++#include <IOKit/IOService.h>
++#include <IOKit/IOUserClient.h>
++struct AGDCClientState_t;
++struct IOExternalMethodArguments;
++class AppleGraphicsDeviceControl : public IOService {
++    OSDeclareDefaultStructors(AppleGraphicsDeviceControl)
++    uint8_t _agdc_private[0x110 - sizeof(IOService)];
++public:
++    virtual bool     start(IOService *provider) APPLE_KEXT_OVERRIDE;
++    virtual void     stop(IOService *provider) APPLE_KEXT_OVERRIDE;
++    virtual IOReturn message(UInt32 type, IOService *provider, void *argument = 0) APPLE_KEXT_OVERRIDE;
++    virtual bool     terminate(IOOptionBits options = 0) APPLE_KEXT_OVERRIDE;
++    virtual IOReturn newUserClient(task_t owningTask, void *securityID, UInt32 type, OSDictionary *properties, IOUserClient **handler) APPLE_KEXT_OVERRIDE;
++    virtual IOReturn vendor_doDeviceAttribute(unsigned int cmd, unsigned long *in, unsigned long inSize,
++                                              unsigned long *out, unsigned long *outSize, IOExternalMethodArguments *args) = 0;
++    virtual IOReturn vendor_doDeviceAttribute(unsigned int cmd, unsigned long *in, unsigned long inSize,
++                                              unsigned long *out, unsigned long *outSize, AGDCClientState_t *state);
++    virtual void _RESERVEDAppleGraphicsDeviceControl0(); virtual void _RESERVEDAppleGraphicsDeviceControl1();
++    virtual void _RESERVEDAppleGraphicsDeviceControl2(); virtual void _RESERVEDAppleGraphicsDeviceControl3();
++    virtual void _RESERVEDAppleGraphicsDeviceControl4(); virtual void _RESERVEDAppleGraphicsDeviceControl5();
++    virtual void _RESERVEDAppleGraphicsDeviceControl6(); virtual void _RESERVEDAppleGraphicsDeviceControl7();
++};
++static_assert(sizeof(AppleGraphicsDeviceControl) == 0x110, "AppleGraphicsDeviceControl is 0x110 bytes in 15.7.9");
+diff -ruN a/Info.plist src/Info.plist
+--- a/Info.plist	2026-10-16 21:21:35
++++ b/Info.plist	2026-10-16 21:21:35
+@@ -43,5 +43,6 @@
+     <key>com.apple.kpi.mach</key><string>8.0</string>
+     <key>com.apple.iokit.IOPCIFamily</key><string>1.0.0</string>
+     <key>com.apple.iokit.IOGraphicsFamily</key><string>1.0.0</string>
++    <key>com.apple.AppleGraphicsDeviceControl</key><string>1.0.0</string>
+   </dict>
+ </dict></plist>
+diff -ruN a/intelfb.cpp src/intelfb.cpp
+--- a/intelfb.cpp	2026-10-16 21:21:35
++++ b/intelfb.cpp	2026-10-16 21:21:35
+@@ -20,6 +20,7 @@
+ extern "C" {
+ #include "nvkms-kapi.h"
+ }
++#include "AppleGraphicsDeviceControl_re.h"   // nullmoth's reconstructed header (kexts/NVRMAGDC), intelfb-0014
+ #define NVRM_GPUVA_ABI_VERSION 1u
+ #define NVRM_GPUVA_FN_HANDLES  "nvRmHandles"
+ struct NVRMRmHandles { unsigned int version; void *kapiDevice; unsigned int hClient, hDevice, hSubDevice; };
+@@ -405,6 +406,8 @@
+ 
+ // intelfb-0013: the Intel GPU whose panel this driver shows, kept by NMIntelFBClaim when the framebuffer sits under NVRM
+ static IOPCIDevice *gIfbPCI = nullptr;
++static IOService *gIfbNubFB = nullptr;   // intelfb-0014: the framebuffer on the nub, which the AGDC reports
++static void ifb_agdc_register(bool on);
+ static bool ifb_pci_ok(IOPCIDevice *pci, uint8_t *ver);
+ 
+ IOService *NMIntelFB::probe(IOService *provider, SInt32 *score)
+@@ -544,7 +547,7 @@
+ bool NMIntelFB::startReal(IOService *provider)
+ {
+     fPCI = OSDynamicCast(IOPCIDevice, provider);
+-    if (!fPCI) fPCI = gIfbPCI;   // intelfb-0013: under NVRM, the Intel GPU the claim holds
++    if (!fPCI) { fPCI = gIfbPCI; gIfbNubFB = this; }   // intelfb-0013: under NVRM, the Intel GPU the claim holds
+     if (!fPCI) return false;
+     fPCI->setMemoryEnable(true);
+     fMMIO = fPCI->mapDeviceMemoryWithRegister(kIOPCIConfigBaseAddress0);
+@@ -594,6 +597,7 @@
+         registerPowerDriver(this, kPowerStates, 2);
+         ifb_trail("power");
+     } else ifb_trail("no-pm");
++    if (gIfbNubFB == this) ifb_agdc_register(true);
+     IFBLOG("built-in panel published (%ux%u)", fWidth, fHeight);
+     return true;
+ }
+@@ -608,6 +612,7 @@
+     fVblOn = false;
+     thread_wakeup((event_t)&fVblNext);
+     while (fVblRunning) IOSleep(5);
++    if (gIfbNubFB == this) { ifb_agdc_register(false); gIfbNubFB = nullptr; }
+     kapiFree();
+     OSSafeReleaseNULL(fSurfMap); OSSafeReleaseNULL(fMMIO); fRegs = nullptr;
+     IOFramebuffer::stop(provider);
+@@ -880,6 +885,98 @@
+     IFBLOG("claim: Intel-panel NVRMDisplay nub %s", ok ? "published under NVRM" : nub0 ? "could not be published" : "not published: no NVRMDisplay 0 after 120 s");
+     OSSafeReleaseNULL(nub); OSSafeReleaseNULL(nub0); OSSafeReleaseNULL(nvrm);
+     thread_terminate(current_thread());
++}
++
++// intelfb-0014. WindowServer builds one display pipe per framebuffer that the GPU's AppleGraphicsDeviceControl lists
++// in its reply to command 0x980 (nullmoth's NVRMAGDC); without an AGDC, IOPresentment logged "Unable to get AGDC
++// information ... Unable to acquire map" and CoreDisplay "System set to use IOP but no display pipes are present"
++// (RTX-12, with the panel already under the NVIDIA GPU). NVRMAGDC lists only NVRMFB framebuffers, so this one lists
++// the panel: vendor info (1) and the framebuffer table (0x980), as NVRMAGDC answers them. Started by sysctl
++// debug.nmintelfb_agdc=1 (tools/intelfb/enable.sh), in the order NVRM's auto-go uses: accelerator, AGDC, iop.
++#pragma pack(push, 1)
++struct IfbAgdcVendorInfo { uint32_t version; char vendor[0x20]; uint32_t vendorID, vendorClass; };
++struct IfbAgdcGPUCapability {
++    uint64_t portMask, portFeatureA, portFeatureB, portFeatureC;
++    uint32_t countA, countB, countC, countD, maxFramebuffers;
++    IOService *pciDevice;
++    IOService *framebuffer[20];
++};
++#pragma pack(pop)
++static_assert(sizeof(IfbAgdcVendorInfo) == 0x2c, "AGDCVendorInfo_t is 0x2c");
++static_assert(sizeof(IfbAgdcGPUCapability) == 0xdc, "AGDCGPUCapability_t is 0xdc");
++
++class NMIntelFBAGDC : public AppleGraphicsDeviceControl {
++    OSDeclareDefaultStructors(NMIntelFBAGDC)
++public:
++    IOService *fPci = nullptr, *fFB = nullptr;
++    using AppleGraphicsDeviceControl::vendor_doDeviceAttribute;
++    IOReturn vendor_doDeviceAttribute(unsigned int cmd, unsigned long *in, unsigned long inSize, unsigned long *out,
++                                      unsigned long *outSize, IOExternalMethodArguments *args) override;
++};
++OSDefineMetaClassAndStructors(NMIntelFBAGDC, AppleGraphicsDeviceControl)
++
++static int gIfbAgdcState = 0;   // 0 off, 2 starting, 1 up, < 0 failed
++static unsigned gIfbAgdcLogged = 0;
++
++IOReturn NMIntelFBAGDC::vendor_doDeviceAttribute(unsigned int cmd, unsigned long *in, unsigned long inSize,
++                                                 unsigned long *out, unsigned long *outSize, IOExternalMethodArguments *)
++{
++    if (cmd == 1) {
++        if (!out || !outSize || *outSize != sizeof(IfbAgdcVendorInfo)) return kIOReturnBadArgument;
++        IfbAgdcVendorInfo *v = (IfbAgdcVendorInfo *)out; bzero(v, sizeof *v);
++        v->version = 0x30000; strlcpy(v->vendor, "NVIDIA", sizeof v->vendor); v->vendorID = 0x10de; v->vendorClass = 2;
++        return kIOReturnSuccess;
++    }
++    if (cmd == 0x980) {
++        if (!out || !outSize || *outSize != sizeof(IfbAgdcGPUCapability)) return kIOReturnBadArgument;
++        IfbAgdcGPUCapability *c = (IfbAgdcGPUCapability *)out; bzero(c, sizeof *c);
++        c->portMask = 1ull << 1;
++        c->countA = c->countB = c->countC = c->countD = 1;
++        c->maxFramebuffers = 1; c->pciDevice = fPci; c->framebuffer[0] = fFB;
++        IFB_ONCE("agdc-980");
++        return kIOReturnSuccess;
++    }
++    if (gIfbAgdcLogged < 20) { gIfbAgdcLogged++; IFBLOG("AGDC: command %#x (in %lu bytes) -> Unsupported", cmd, inSize); }
++    return kIOReturnUnsupported;
++}
++
++static void ifb_agdc_up(void *, wait_result_t)
++{
++    IOService *fb = gIfbNubFB, *pci = fb ? fb->getProvider() : nullptr;
++    for (int hops = 0; pci && !OSDynamicCast(IOPCIDevice, pci) && hops < 8; hops++) pci = pci->getProvider();
++    NMIntelFBAGDC *d = (fb && OSDynamicCast(IOPCIDevice, pci)) ? OSTypeAlloc(NMIntelFBAGDC) : nullptr;
++    int st = !d ? -1 : !d->init(nullptr) ? -2 : 0;
++    if (!st) {
++        d->fPci = pci; d->fFB = fb;
++        if (!d->attach(pci)) st = -3;
++        else if (!d->start(pci)) { d->detach(pci); st = -4; }
++        else st = 1;
++    }
++    if (st != 1) OSSafeReleaseNULL(d);   // an AGDC that came up stays until the next boot
++    gIfbAgdcState = st;
++    ifb_trail(st == 1 ? "agdc" : "agdc-fail");
++    IFBLOG("AGDC: %s (state %d) on %s", st == 1 ? "UP" : "not started", st, pci ? pci->getName() : "no NVIDIA PCI device");
++    thread_terminate(current_thread());
++}
++
++static int ifb_agdc_sysctl SYSCTL_HANDLER_ARGS
++{
++    int v = gIfbAgdcState, err = sysctl_handle_int(oidp, &v, 0, req);
++    if (err || !req->newptr) return err;
++    if (v != 1) return EINVAL;
++    if (gIfbAgdcState == 1 || gIfbAgdcState == 2) return 0;
++    if (!gIfbNubFB) return ENXIO;
++    gIfbAgdcState = 2;
++    thread_t t = nullptr;
++    if (kernel_thread_start(ifb_agdc_up, nullptr, &t) != KERN_SUCCESS) { gIfbAgdcState = -5; return ENOMEM; }
++    thread_deallocate(t);
++    return 0;
++}
++SYSCTL_PROC(_debug, OID_AUTO, nmintelfb_agdc, CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_LOCKED | CTLFLAG_KERN, nullptr, 0,
++            ifb_agdc_sysctl, "I", "1 = list the Intel panel in an AppleGraphicsDeviceControl on the NVIDIA GPU (1 up, 2 starting, < 0 failed)");
++static void ifb_agdc_register(bool on)
++{
++    if (on) sysctl_register_oid(&sysctl__debug_nmintelfb_agdc); else sysctl_unregister_oid(&sysctl__debug_nmintelfb_agdc);
+ }
+ 
+ #ifdef NMINTELFB_VIRTUAL
