@@ -7,7 +7,7 @@
 #   sudo nvram nullmoth-intelfb-auto=0          desliga sem remover (apagar a variável religa)
 #   sudo nvram nullmoth-accel-fast=0            liga o desktop mas sem a cópia rápida do RTX-18
 #   sudo nvram nullmoth-accel-ram=0             mantém a cópia rápida mas sem a tela na RAM do RTX-20
-# Log: /usr/bin/log show --last 10m --predicate 'eventMessage CONTAINS "nmx-intelfb-auto"'
+# Log: /usr/bin/log show --last boot --predicate 'process == "logger"' (the tag is not part of eventMessage)
 LABEL=com.nmxintel.intelfb-auto
 BIN=/usr/local/libexec/nmx-intelfb-auto.sh
 EN=/usr/local/libexec/nmx-intelfb-enable.sh

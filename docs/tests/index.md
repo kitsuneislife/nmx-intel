@@ -59,7 +59,7 @@ phase file; open only the row you need.
 | RTX-18 | 10-16 | NVAccel `41260d45` | accel-0001: `iop_memcpy` / `iop_direct` knobs, A/B at run time | **direct: −31 % per frame**, memcpy alone ±0; 0 failures | [rtx-8](rtx-8-accelerated-desktop.md) |
 | RTX-19 | 10-17 | NVAccel `41260d45` | `auto.sh` turns memcpy + direct on at boot | **works**: every frame direct, ~2.8 ms per frame, 0 failures | [rtx-8](rtx-8-accelerated-desktop.md) |
 | RTX-20 | 10-17 | NMIntelFB `6145a549`, NVAccel `a4d13738` | stage 4a: panel scans out of RAM, copy engine writes it (`ab.sh ram`) | **works**: 2.78 → 1.44 ms per frame, kernel_task per frame −46 %, no artefacts | [rtx-8](rtx-8-accelerated-desktop.md) |
-| RTX-21 | 10-17 | same + `auto.sh` | `auto.sh` turns the RAM scanout on at boot (direct=2) | pending | [rtx-8](rtx-8-accelerated-desktop.md) |
+| RTX-21 | 10-17 | same + `auto.sh` | `auto.sh` turns the RAM scanout on at boot (direct=2) | **works**: every frame through RAM, 0 failures | [rtx-8](rtx-8-accelerated-desktop.md) |
 
 Adding a test: one row here, the entry at the end of the current phase file (start a new phase file when the goal
 changes), then [../status.md](../status.md).

@@ -306,3 +306,13 @@ full screen. `~/nmx-ab-20261017-094317.txt` [measured]:
 - Firmware PTE format confirmed: `phys | 1` (stolen memory at 0x3e800000).
 - Numbering from here: RTX-21 = `auto.sh` turns the RAM scanout on at boot (`nullmoth-accel-ram=0` keeps it off),
   RTX-22 = flip (4b), RTX-23 = the copy-engine wait without spinning (4c).
+
+## RTX-21 — `auto.sh` turns the RAM scanout on at boot — **works**
+Boot 10-17 09:49:03.
+- [measured, logger] 09:50:24.898 `enabled: agdc 1 iop 1`; 09:50:24.916 `fast copy on (memcpy 1, direct 1)`;
+  09:50:25.101 `ram scanout on (direct 2)`; 09:51:10.579 `frames reach the panel (iop_ok 7); no restart`.
+- [measured, sysctl 09:54] `nmintelfb_ram 1`, `iop_direct 2`, `iop_ram_frames 13489` = `iop_ok 13489` (every frame
+  through the RAM scanout), `iop_fail 0`. Lukas: normal use looks fine.
+- The log command in `auto.sh`'s header found nothing: `logger -t` does not put the tag in `eventMessage`. Fixed to
+  `--predicate 'process == "logger"'`.
+- Sleep/wake with the RAM scanout on: not tried yet.
