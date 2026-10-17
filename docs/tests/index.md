@@ -65,7 +65,8 @@ phase file; open only the row you need.
 | RTX-24 | 10-17 | same + `auto.sh` | `auto.sh` turns the flip (ram=2) on at boot | **works**: mode 2 at boot, 7840 flips, 0 late, 0 failures | [rtx-8](rtx-8-accelerated-desktop.md) |
 | RTX-25 | 10-17 | NVRM `f5171d7b` (binary patch) | stage 4c: copy-engine wait sleeps instead of spinning | **works**: kernel_task 12 % → 4 %, per frame −57 %, 0 failures | [rtx-8](rtx-8-accelerated-desktop.md) |
 | BL-2 | 10-17 | NMIntelFB `36afddf1` | panel brightness: backlight handler + PWM duty (intelfb-0020) | **works**: keys + slider, duty follows (49 % at half) | [rtx-8](rtx-8-accelerated-desktop.md) |
-| WIFI-1 | 10-17 | SimpleMtkWlan (OverlordDev `5b791c9` + wifi-0001) | MT7921 Wi-Fi, Ethernet-type driver from source | pending | [wifi-1](wifi-1-mt7921.md) |
+| WIFI-1 | 10-17 | SimpleMtkWlan (OverlordDev `5b791c9` + wifi-0001) | MT7921 Wi-Fi, Ethernet-type driver from source | **fails**: loads, firmware patch times out (`command 7`), no interface | [wifi-1](wifi-1-mt7921.md) |
+| WIFI-2 | 10-17 | SimpleMtkWlan + wifi-0003 | dump MCU/DMA state when the patch download times out | pending | [wifi-1](wifi-1-mt7921.md) |
 
 Adding a test: one row here, the entry at the end of the current phase file (start a new phase file when the goal
 changes), then [../status.md](../status.md).

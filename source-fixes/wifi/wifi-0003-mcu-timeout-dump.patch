@@ -1,0 +1,84 @@
+From 1cd2832b9f6233d99d6fdd73871b3b6043162b77 Mon Sep 17 00:00:00 2001
+From: kitsuneislife <kitsuneislife@users.noreply.github.com>
+Date: Sat, 17 Oct 2026 12:48:40 -0300
+Subject: [PATCH] Dump interrupt and DMA ring state when an MCU command times
+ out
+
+---
+ SimpleMtkWlan/hal_mwx/MtkMwx.cpp | 32 ++++++++++++++++++++++++++++++++
+ 1 file changed, 32 insertions(+)
+
+diff --git a/SimpleMtkWlan/hal_mwx/MtkMwx.cpp b/SimpleMtkWlan/hal_mwx/MtkMwx.cpp
+index 3fd738c..7a7ef24 100644
+--- a/SimpleMtkWlan/hal_mwx/MtkMwx.cpp
++++ b/SimpleMtkWlan/hal_mwx/MtkMwx.cpp
+@@ -78,6 +78,9 @@ static uint32_t g_rxrate_val[8], g_rxrate_cnt[8];
+ #define MWX_TXLOCK()	do { if (g_txlock) IORecursiveLockLock(g_txlock); } while (0)
+ #define MWX_TXUNLOCK()	do { if (g_txlock) IORecursiveLockUnlock(g_txlock); } while (0)
+ 
++/* entries into mwx_intr(), reported when an MCU command times out */
++static volatile uint32_t mwx_intr_calls;
++
+ #define MWX_LOG(x...) do { printf("SimpleMtkWlan-mwx: " x); mtk_ringlog("SimpleMtkWlan-mwx: " x); } while (0)
+ #define MWX_DEV_LOG(sc, fmt, args...) \
+ 	do { printf("SimpleMtkWlan-mwx: %s: " fmt, DEVNAME(sc), ##args); \
+@@ -2092,6 +2095,7 @@ mwx_intr(void *arg)
+ 	static uint32_t intr_log_count;
+ 	static uint32_t intr_unhandled_log_count;
+ 
++	mwx_intr_calls++;
+ 	mwx_write(sc, MT_WFDMA0_HOST_INT_ENA, 0);
+ 	intr = mwx_read(sc, MT_WFDMA0_HOST_INT_STA);
+ 	if (intr == 0) {
+@@ -3844,6 +3848,32 @@ mwx_mcu_rx_event(struct mwx_softc *sc, struct mbuf *m)
+ 	m_freem(m);
+ }
+ 
++/*
++ * Called when an MCU command times out: shows whether the device fetched the
++ * command (TX MCU ring DMA index), answered it (RX MCU ring DMA index) and
++ * raised an interrupt, and how far the firmware download ring got, so a lost
++ * wakeup or dead interrupt path can be told apart from a firmware that does
++ * not answer.
++ */
++static void
++mwx_mcu_dump_state(struct mwx_softc *sc, uint32_t cmd)
++{
++	struct mwx_queue *qs[3] = { &sc->sc_txmcuq, &sc->sc_txfwdlq, &sc->sc_rxmcuq };
++	static const char *names[3] = { "txmcu", "txfwdl", "rxmcu" };
++
++	MWX_DEV_LOG(sc, "mcu timeout cmd=0x%x intr_calls=%u int_sta=0x%08x "
++	    "int_ena=0x%08x mask=0x%08x glo_cfg=0x%08x fw_state=0x%08x\n", cmd,
++	    mwx_intr_calls, mwx_read(sc, MT_WFDMA0_HOST_INT_STA),
++	    mwx_read(sc, MT_WFDMA0_HOST_INT_ENA), sc->sc_intr_mask,
++	    mwx_read(sc, MT_WFDMA0_GLO_CFG), mwx_read(sc, MT_CONN_ON_MISC));
++	for (int i = 0; i < 3; i++)
++		MWX_DEV_LOG(sc, "mcu timeout %s reg=0x%05x cpu=%u dma=%u prod=%u "
++		    "cons=%u count=%u\n", names[i], qs[i]->mq_regbase,
++		    mwx_read(sc, qs[i]->mq_regbase + MT_DMA_CPU_IDX),
++		    mwx_read(sc, qs[i]->mq_regbase + MT_DMA_DMA_IDX),
++		    qs[i]->mq_prod, qs[i]->mq_cons, qs[i]->mq_count);
++}
++
+ int
+ mwx_mcu_wait_resp_int(struct mwx_softc *sc, uint32_t cmd, int seq,
+     uint32_t *val)
+@@ -3855,6 +3885,7 @@ mwx_mcu_wait_resp_int(struct mwx_softc *sc, uint32_t cmd, int seq,
+ 	rv = tsleep_nsec(&sc->sc_mcu_wait[seq], 0, "mwxwait", SEC_TO_NSEC(3));
+ 	if (rv != 0) {
+ 		printf("%s: command %x timeout\n", DEVNAME(sc), cmd);
++		mwx_mcu_dump_state(sc, cmd);
+ 		mwx_reset(sc);
+ 		return rv;
+ 	}
+@@ -3879,6 +3910,7 @@ mwx_mcu_wait_resp_msg(struct mwx_softc *sc, uint32_t cmd, int seq,
+ 	rv = tsleep_nsec(&sc->sc_mcu_wait[seq], 0, "mwxwait", SEC_TO_NSEC(3));
+ 	if (rv != 0) {
+ 		printf("%s: command %x timeout\n", DEVNAME(sc), cmd);
++		mwx_mcu_dump_state(sc, cmd);
+ 		mwx_reset(sc);
+ 		return rv;
+ 	}
+-- 
+2.39.5 (Apple Git-154)
+

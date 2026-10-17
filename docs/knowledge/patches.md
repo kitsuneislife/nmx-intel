@@ -86,3 +86,5 @@ source-fixes/00NN-<slug>.patch`, add an `apply` line to `build/apply-fixes.sh` (
   `-nvoff` or `-mtkwlanoff`. Applied by `tools/wifi/build.sh` with `git am`.
 - `source-fixes/wifi/wifi-0002` (WIFI-1) — the ring log stops with public `thread_call_cancel` + wait instead of
   private `thread_call_cancel_wait`, which kmutil refuses to link into a third-party kext.
+- `source-fixes/wifi/wifi-0003` (WIFI-2) — log interrupt and MCU/FWDL ring state when an MCU command times out
+  (diagnostics only).

@@ -47,3 +47,23 @@ extension"). Fix `wifi-0002`: the only caller (ring-log stop) now uses public `t
 running publish to finish, and cancels again. `kmutil libraries` now needs only the public KPIs
 (IONetworkingFamily, IOPCIFamily, kpi.bsd/iokit/libkern/mach). A full collection build needs root, so linking is
 [inferred] until the next install.
+
+## WIFI-1 result (2026-10-17) — driver loads, firmware patch never finishes [measured]
+- wifi-0002 fixed the link: `kmutil` built the collection, `kextstat` shows `com.laobamac.SimpleMtkWlan` loaded
+  (diag `0ddf79f9`… reinstalled build). No `SimpleMtkWlan` object stays on `PXSX`, no new interface, no network.
+- Driver log (`log show --last boot`, `MtkLog`): probe matches `14c3:7961`, MSI, `chip id=0x7961 hwrev=0x10`,
+  `WFSYS reset ok`, rings allocated (FWDL ring 16 entries), firmware blobs found (`mt7961_patch_mcu_1_2_hdr`
+  92192 B, build `20231109190918a`; `mt7961_ram_code_1` 797300 B). The patch semaphore answers (`status=0x2`: download
+  needed, semaphore granted), the 92032-byte patch region goes out as 4096-byte FW_SCATTER chunks (11 FWDL TX-done
+  interrupts logged), then `command 7 timeout` (PATCH_FINISH_REQ), `patch start failed error=35`, `command 10
+  timeout` (semaphore release), `attach to interface fail`, `start: return false at line 434`.
+- So the interrupt path works (the semaphore reply arrives within 1 ms); either the firmware never answers
+  PATCH_FINISH or its answer is lost. The upstream code sleeps 3 s on a `tsleep` wakeup with no handshake.
+- Also logged: `kernelmanagerd … tried to insert an invalid codeful kernel extension in the restricted lookup
+  table` for this kext; the kext loaded anyway [measured], effect unknown.
+
+## WIFI-2 prep — dump the MCU and DMA state at the timeout
+`wifi-0003`: on an MCU timeout the driver logs `intr_calls`, interrupt status/enable, `GLO_CFG`, `MT_CONN_ON_MISC`
+(firmware state) and CPU/DMA indices of the TX MCU, TX FWDL and RX MCU rings. Reading: RX MCU DMA index moved but no
+wakeup → lost wakeup; TX MCU DMA index did not move → the command never left; FWDL CPU ≠ DMA → the patch was not
+fully fetched. Everything else as WIFI-1.
