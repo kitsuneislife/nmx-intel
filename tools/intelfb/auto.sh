@@ -19,7 +19,7 @@ install)
     cd "$(dirname "$0")" || exit 1
     bash -n enable.sh || exit 1
     mkdir -p /usr/local/libexec
-    cp "$0" "$BIN" && cp enable.sh "$EN" || exit 1
+    cp auto.sh "$BIN" && cp enable.sh "$EN" || exit 1   # after the cd: $0 may be relative to where it was run
     chown root:wheel "$BIN" "$EN" && chmod 755 "$BIN" "$EN"
     cat > "$PL" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
