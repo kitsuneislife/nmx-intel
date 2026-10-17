@@ -22,7 +22,8 @@ B works. 60 Hz is not wanted.
 
 ## Next step
 
-Daily use. Then the bridge plan: stop `displaytrace`, then get `open-gpu-kernel-modules` 610.57.04 to build NVAccel.
+Bridge plan stage 0: NVAccel builds from source (`tools/accel/build.sh`, v2.1.0). RTX-17: install the unchanged build
+(`29a7f015`) and confirm the desktop is as RTX-16; then stages 2–3.
 
 ## Open problems
 

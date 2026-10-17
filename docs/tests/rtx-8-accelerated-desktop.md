@@ -213,3 +213,16 @@ stalls while apps open, nothing unusual.
 - `auto.sh` changed: waits up to 90 s for the first frame and restarts WindowServer only if none came and the console
   owner is `root` or `_windowserver`.
 
+
+### RTX-17 prep: NVAccel built from source (bridge plan stage 0)
+- [measured] the installed NVAccel (`f0edef4e`, 243,512 B) is nullmoth **v2.1.0** (the 1401 app reports 2.1.0), not
+  the 2.0.2 tree our `nmx-intel-build` branch is based on: 2.0.2 lacks the `nvaccel_surface_gpu*` swap wait (commit
+  `e75be1e`, in v2.1.0), whose 100 ms limit is the `surface_gpu_wait_max_us` ~101 ms seen since RTX-15.
+- `~/ogkm610` = NVIDIA open-gpu-kernel-modules `610.57.04` (shallow clone). nullmoth's Darwin RM build is not public;
+  `tools/accel/build.sh` writes `_out/Darwin_x86_64/compile_cmds.sh` with upstream `src/nvidia/Makefile`'s x86_64
+  defines. Branch `nmx-accel` of the clone at v2.1.0, worktree `~/nmx-build/accel/src`.
+- [measured] built from v2.1.0: strings, undefined and exported symbols identical to the installed binary; `__cstring`
+  20,184, `__const` 31,728, `__data` 4,536 equal; `__text` 56,233 vs 56,345 (−112 B) [inferred: compiler, Apple clang
+  17 here]. v2.2.0 builds the same binary as v2.1.0; v2.3.1 adds `nullmoth-nv-starts`. `NVAccel 29a7f015`.
+- RTX-17 tests only this: our build of unchanged v2.1.0 installed by `tools/accel/install.sh` (keeps the original in
+  `~/NVAccel.kext.original`; `restore` puts it back). Expected: everything as RTX-16.

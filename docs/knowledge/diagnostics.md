@@ -72,6 +72,7 @@ Lukas cannot type `|`: when he runs commands, write to a file and `grep`/`tail` 
 | `sysctl debug.nmintelfb_agdc` | NMIntelFB's AGDC: write 1 to start (enable.sh); reads 1 up, 2 starting, < 0 failed |
 | `tools/mirror` | LaunchAgent mirroring the ghost firmware display (with `NMXGPUFB` or `NMIntelFB`); log: `log show --last 1h --predicate 'process == "nmx-mirror"'` |
 | `tools/intelfb/auto.sh` | LaunchDaemon: `enable.sh` + WindowServer restart at the login window every boot; `nullmoth-intelfb-auto=0` off; log: `log show --last 10m --predicate 'eventMessage CONTAINS "nmx-intelfb-auto"'` |
+| `tools/accel/build.sh`, `install.sh` | build NVAccel from branch `nmx-accel` (v2.1.0) with `~/ogkm610`; install into `/Library/Extensions` + aux KC; `install.sh restore` puts nullmoth's back (`~/NVAccel.kext.original`). The 1401 app may copy its own NVAccel back when the driver is toggled |
 | `top -o cpu`, `ps -M <pid>` | WindowServer CPU and per-thread load (`sample` needs root) |
 
 ## Recovering

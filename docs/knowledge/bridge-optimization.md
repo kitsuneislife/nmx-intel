@@ -70,6 +70,13 @@ Not in scope here: the GPU wait spikes (~100 ms, `surface_gpu_timeouts`) are an 
 bridge existed; stage 4 removes the bridge's share of them (no lock-and-wait for the system copy). The RTX stays
 powered while it composites; lower idle power belongs to path A (Intel Metal).
 
+## Stage 0 status (2026-10-16)
+
+Builds: `tools/accel/build.sh` (branch `nmx-accel` at nullmoth v2.1.0, the installed release) reproduces the
+installed binary's strings, symbols and data sections; `__text` differs by 112 B [inferred: compiler]. Note that the
+swap wait behind `surface_gpu_wait_max_us` ~101 ms is v2.1.0's `nvaccel_surface_gpu` (commit `e75be1e`), so it is in
+reach too. RTX-17 runs the unchanged build on the Mac before any change.
+
 ## Order
 
 1 now (config only) → 0 (the gate) → 2 and 3 (small, prove the build works and halve the CPU) → 4 (the real fix) →
