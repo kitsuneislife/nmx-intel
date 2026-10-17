@@ -68,7 +68,7 @@ phase file; open only the row you need.
 | WIFI-1 | 10-17 | SimpleMtkWlan (OverlordDev `5b791c9` + wifi-0001) | MT7921 Wi-Fi, Ethernet-type driver from source | **fails**: loads, firmware patch times out (`command 7`), no interface | [wifi-1](wifi-1-mt7921.md) |
 | WIFI-2 | 10-17 | SimpleMtkWlan + wifi-0003 | dump MCU/DMA state when the patch download times out | **firmware up**: en2, scans ~22 BSSs; first MCU reply lost behind the workloop gate | [wifi-1](wifi-1-mt7921.md) |
 | WIFI-3 | 10-17 | SimpleMtkWlan + wifi-0004 | MCU waits poll the interrupt; join the home network | **connects** (WPA2, DHCP); dies under load (`networkQuality`) | [wifi-1](wifi-1-mt7921.md) |
-| WIFI-4 | 10-17 | SimpleMtkWlan + wifi-0005 | lost-interrupt rescue in the watchdog, silent-RX dump | pending | [wifi-1](wifi-1-mt7921.md) |
+| WIFI-4 | 10-17 | SimpleMtkWlan + wifi-0005 | lost-interrupt rescue in the watchdog, silent-RX dump | **boot hang**: configd watchdog panic after link up; recovered with `-nvoff`; driver removed | [wifi-1](wifi-1-mt7921.md) |
 
 Adding a test: one row here, the entry at the end of the current phase file (start a new phase file when the goal
 changes), then [../status.md](../status.md).

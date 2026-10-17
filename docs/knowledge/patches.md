@@ -90,5 +90,5 @@ source-fixes/00NN-<slug>.patch`, add an `apply` line to `build/apply-fixes.sh` (
   (diagnostics only).
 - `source-fixes/wifi/wifi-0004` (WIFI-3) — MCU waits poll the interrupt handler every 2 ms (guarded `mwx_intr`), so a
   reply that arrives while `start`/`enable` hold the workloop gate is not lost.
-- `source-fixes/wifi/wifi-0005` (WIFI-4) — the 1 s watchdog runs the interrupt handler when `HOST_INT_STA` has
+- `source-fixes/wifi/dropped-wifi-0005` (WIFI-4, **dropped**: hung the boot) — the 1 s watchdog runs the interrupt handler when `HOST_INT_STA` has
   pending bits (lost MSI) and dumps the RX DMA state after 3 s without frames.

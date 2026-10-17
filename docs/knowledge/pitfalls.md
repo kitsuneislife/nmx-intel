@@ -145,3 +145,10 @@ A kext that works when OpenCore injects it can still fail `kmutil create` for th
 only against the libraries in `OSBundleLibraries`, and `com.apple.kpi.private` is closed to third-party kexts (adding
 it makes kmutil drop the kext). Check with `kmutil libraries -p <kext> --arch x86_64 --xml` before installing in
 `/Library/Extensions`: the list must not contain `com.apple.kpi.private`.
+
+## A network driver that blocks configd hangs the whole boot (WIFI-4)
+If an interface driver stalls an ioctl, `configd` stops checking in and the userspace watchdog panics after 180 s;
+until then the login window never appears (looks like a graphics hang). Recovery: OpenCore Space → "Start once
+without NVIDIA driver" (`-nvoff`), which our Wi-Fi build honours, then `sudo bash tools/wifi/install.sh restore`.
+Never call the interrupt handler from another workloop (watchdog) without proving the locking.
+

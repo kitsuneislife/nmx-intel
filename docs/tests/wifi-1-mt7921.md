@@ -108,3 +108,18 @@ for the Ethernet build. Install with the home network this time (WiFiConfig).
 times) and run the guarded interrupt handler; after 3 s with no frame at all, log `INT_STA/ENA`, `GLO_CFG` and the RX
 data and RX MCU ring indices. If the link survives `networkQuality` with `HB rescue` lines, the cause was lost
 interrupts; if it still dies, the dump tells whether the RX DMA stopped (`GLO_CFG`) or the ring is full.
+
+## WIFI-4 result (2026-10-17) — **boot hang, configd watchdog panic** [measured]
+- Normal boot (13:09): no graphical session; the screen stayed on the verbose text. Kernel panic at 13:14:
+  `userspace watchdog timeout: no successful checkins from configd (1 induced crashes) in 180 seconds`; two
+  `configd` hang reports (13:11, 13:16, "monitoring timed out for service"). Lukas recovered with OpenCore Space →
+  "Start once without NVIDIA driver" (`-nvoff`): `wifi-0001` kept the driver off the card and the system came up.
+- Driver log of the hung boot: firmware, scan, join (2.4 GHz ch 8 this time), 4-way handshake, keys, `LINK_STATE_IS_UP`,
+  one TX data frame, then nothing more from the driver.
+- Reading [inferred]: the only change from WIFI-3 is `wifi-0005`, which runs the interrupt handler from the watchdog
+  workloop as soon as the link is up. The handler delivers frames to the network stack and issues MCU commands;
+  from that thread it can deadlock with configd's ioctls on the interface (configd sets up en2 right after link up).
+  `wifi-0005` is dropped. Not proven: the configd stackshot has no symbolicated frame in the driver.
+- Also seen: a `shutdown_stall` report at 13:08 (the reboot out of WIFI-3), so the driver may not stop cleanly
+  either.
+- Safety: the driver is removed with `tools/wifi/install.sh restore` before the next normal boot.
