@@ -7,6 +7,7 @@
 #   sudo nvram nullmoth-intelfb-auto=0          desliga sem remover (apagar a variável religa)
 #   sudo nvram nullmoth-accel-fast=0            liga o desktop mas sem a cópia rápida do RTX-18
 #   sudo nvram nullmoth-accel-ram=0             mantém a cópia rápida mas sem a tela na RAM do RTX-20
+#   sudo nvram nullmoth-accel-ram=1             tela na RAM com um buffer só, sem o flip do RTX-23 (padrão: 2)
 # Log: /usr/bin/log show --last boot --predicate 'process == "logger"' (the tag is not part of eventMessage)
 LABEL=com.nmxintel.intelfb-auto
 BIN=/usr/local/libexec/nmx-intelfb-auto.sh
@@ -66,10 +67,13 @@ run)
     # RTX-18: our NVAccel (accel-0001) copies frames to the panel straight from the copy engine's staging buffer
     if sysctl -n debug.nvaccel_iop_direct >/dev/null 2>&1 && [ "$(nvram nullmoth-accel-fast 2>/dev/null | awk '{print $2}')" != 0 ]; then
         sysctl -w debug.nvaccel_iop_memcpy=1 debug.nvaccel_iop_direct=1 >/dev/null && say "fast copy on (memcpy 1, direct 1)"
-        # RTX-20: the panel scans out of RAM (intelfb-0017) and the copy engine writes it (accel-0002, direct=2)
-        if sysctl -n debug.nmintelfb_ram >/dev/null 2>&1 && [ "$(nvram nullmoth-accel-ram 2>/dev/null | awk '{print $2}')" != 0 ]; then
-            if sysctl -w debug.nmintelfb_ram=1 >/dev/null 2>&1; then
-                sysctl -w debug.nvaccel_iop_direct=2 >/dev/null && say "ram scanout on (direct 2)"
+        # RTX-20: the panel scans out of RAM (intelfb-0017) and the copy engine writes it (accel-0002, direct=2);
+        # RTX-24: two buffers flipped at vblank (intelfb-0019) unless nullmoth-accel-ram says 1 (one) or 0 (off)
+        RAM=$(nvram nullmoth-accel-ram 2>/dev/null | awk '{print $2}'); case "$RAM" in 0|1|2) ;; *) RAM=2;; esac
+        sysctl -n debug.nmintelfb_flips >/dev/null 2>&1 || [ "$RAM" = 0 ] || RAM=1   # an NMIntelFB without the flip
+        if sysctl -n debug.nmintelfb_ram >/dev/null 2>&1 && [ "$RAM" != 0 ]; then
+            if sysctl -w debug.nmintelfb_ram=$RAM >/dev/null 2>&1; then
+                sysctl -w debug.nvaccel_iop_direct=2 >/dev/null && say "ram scanout on (mode $RAM, direct 2)"
             else say "ram scanout refused ($(sysctl -n debug.nmintelfb_ram)); staying on direct 1"; fi
         fi
     fi

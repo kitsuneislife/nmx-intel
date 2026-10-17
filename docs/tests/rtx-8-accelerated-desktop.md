@@ -375,3 +375,22 @@ NMIntelFB `eaf67fa1`, `nullmoth-accel-ram=0` (RAM scanout off). `pmset sleepnow`
 - Test: `sudo bash tools/accel/ab.sh flip` (ram=1, then ram=2), watching a video with fast horizontal motion for
   tearing (a horizontal cut line in mode 1 that should vanish in mode 2).
 - Sleep stays off (RTX-22): `pmset` settings given to Lukas.
+
+## RTX-23 — stage 4b: two RAM buffers flipped at vblank — **works**
+Installed NMIntelFB `59c98103` + NVAccel `659dfa20`, `sudo bash tools/accel/ab.sh flip` with a fast-motion video.
+`~/nmx-ab-20261017-103422.txt` [measured]:
+
+| setting | frames/s | µs per copied frame | kernel_task | kernel_task per frame/s | WindowServer | flips | waits | late |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| ram=1 (one buffer) | 73 | 1440 | 15 % | 0.21 | 45 % | 0 | 0 | 0 |
+| ram=2 (flip) | 56 | 1591 | 12 % | 0.21 | 35 % | 3409 | 233 | 0 |
+
+- [measured, log] 10:35:33.909 `buffer 1, 2025 pages at 0x3e8240000 in 1 run(s)`; `GGTT 0x800000..0xfe9000 now
+  buffer 1 (old PTE[0] 0x3f000001)` (the firmware maps all of stolen memory linearly: GGTT 8 MiB → stolen + 8 MiB);
+  `flipping between GGTT 0x0 and 0x800000`.
+- [measured, sysctl afterwards] `flips 5824`, `flip_waits 486`, `flip_wait_us 1064220` (~2.2 ms per wait, slept in
+  1 ms steps, not spun), `flip_late 0`, `iop_fail 0`. Lukas: no visual problem in either half.
+- [inferred] the flip costs no CPU per frame (kernel_task per frame/s 0.21 in both); the +150 µs per frame is the
+  latch wait (~8 % of frames find the last flip not yet on the panel), which is sleeping time. `blank 25` in the
+  ram=1 half: one-colour video frames [inferred]; 0 in the flip half.
+- Next (RTX-24): `auto.sh` turns mode 2 on at boot (`nullmoth-accel-ram=1` keeps one buffer, `=0` none).
