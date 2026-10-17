@@ -23,7 +23,7 @@ B works. 60 Hz is not wanted.
 ## Next step
 
 Bridge plan: stages 0–3 done. Our NVAccel `41260d45` (accel-0001): the direct copy cuts ~31 % per frame (RTX-18);
-`auto.sh` turns it on at boot (RTX-19). Next: stage 4 (CASO, the copy engine writes the Intel scanout).
+`auto.sh` turns it on at boot (RTX-19, works). Next: stage 4 (CASO, the copy engine writes the Intel scanout).
 
 ## Open problems
 

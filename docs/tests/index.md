@@ -57,7 +57,7 @@ phase file; open only the row you need.
 | RTX-16 | 10-16 | `1d3ea017` | `tools/intelfb/auto.sh` enables at boot (LaunchDaemon) | **accelerated from the login window**, no restart needed | [rtx-8](rtx-8-accelerated-desktop.md) |
 | RTX-17 | 10-16 | NVAccel `29a7f015` | our build of nullmoth v2.1.0 NVAccel, unchanged (bridge stage 0) | **same as RTX-16** (0 failures, accelerated at login) |
 | RTX-18 | 10-16 | NVAccel `41260d45` | accel-0001: `iop_memcpy` / `iop_direct` knobs, A/B at run time | **direct: −31 % per frame**, memcpy alone ±0; 0 failures | [rtx-8](rtx-8-accelerated-desktop.md) |
-| RTX-19 | 10-17 | NVAccel `41260d45` | `auto.sh` turns memcpy + direct on at boot | pending | [rtx-8](rtx-8-accelerated-desktop.md) |
+| RTX-19 | 10-17 | NVAccel `41260d45` | `auto.sh` turns memcpy + direct on at boot | **works**: every frame direct, ~2.8 ms per frame, 0 failures | [rtx-8](rtx-8-accelerated-desktop.md) |
 
 Adding a test: one row here, the entry at the end of the current phase file (start a new phase file when the goal
 changes), then [../status.md](../status.md).

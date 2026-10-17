@@ -260,3 +260,12 @@ Boot ~23:52; `tools/accel/ab.sh` 23:55 with a YouTube video playing full width a
   into the aperture: stage 4 (CASO) removes both.
 - `shutdown_stall` at 23:51:39 (the reboot that installed it): 20 such reports in DiagnosticReports, not new.
 - Next: `auto.sh` turns both knobs on after enabling (`nullmoth-accel-fast=0` keeps them off).
+
+## RTX-19 — `auto.sh` turns the fast copy on at boot — **works**
+`auto.sh install` first failed (`cp: tools/intelfb/auto.sh: No such file or directory`: it copied `$0` after `cd`
+into its folder; fixed `1900923`). Boot 10-17 08:56:26.
+- [measured, logger] 08:57:51.337 `enabled: agdc 1 iop 1`; 08:57:51.358 `fast copy on (memcpy 1, direct 1)`;
+  08:58:34.953 `frames reach the panel (iop_ok 6); no restart`.
+- [measured, sysctl] `iop_ok 9664` = `iop_direct_frames 9664` (every frame direct), `iop_fail 0`, `iop_blank 102`
+  (boot, before the first real frame); `iop_copy_us / iop_ok` = 2796 µs per frame (RTX-18 direct: 2746).
+  kernel_task ~16 %.
