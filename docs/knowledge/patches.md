@@ -88,3 +88,5 @@ source-fixes/00NN-<slug>.patch`, add an `apply` line to `build/apply-fixes.sh` (
   private `thread_call_cancel_wait`, which kmutil refuses to link into a third-party kext.
 - `source-fixes/wifi/wifi-0003` (WIFI-2) — log interrupt and MCU/FWDL ring state when an MCU command times out
   (diagnostics only).
+- `source-fixes/wifi/wifi-0004` (WIFI-3) — MCU waits poll the interrupt handler every 2 ms (guarded `mwx_intr`), so a
+  reply that arrives while `start`/`enable` hold the workloop gate is not lost.

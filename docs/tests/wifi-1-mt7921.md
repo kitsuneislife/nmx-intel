@@ -50,7 +50,7 @@ running publish to finish, and cancels again. `kmutil libraries` now needs only 
 
 ## WIFI-1 result (2026-10-17) — driver loads, firmware patch never finishes [measured]
 - wifi-0002 fixed the link: `kmutil` built the collection, `kextstat` shows `com.laobamac.SimpleMtkWlan` loaded
-. No `SimpleMtkWlan` object stays on `PXSX`, no new interface, no network.
+  No `SimpleMtkWlan` object stays on `PXSX`, no new interface, no network.
 - Driver log (`log show --last boot`, `MtkLog`): probe matches `14c3:7961`, MSI, `chip id=0x7961 hwrev=0x10`,
   `WFSYS reset ok`, rings allocated (FWDL ring 16 entries), firmware blobs found (`mt7961_patch_mcu_1_2_hdr`
   92192 B, build `20231109190918a`; `mt7961_ram_code_1` 797300 B). The patch semaphore answers (`status=0x2`: download
@@ -67,3 +67,23 @@ running publish to finish, and cancels again. `kmutil libraries` now needs only 
 (firmware state) and CPU/DMA indices of the TX MCU, TX FWDL and RX MCU rings. Reading: RX MCU DMA index moved but no
 wakeup → lost wakeup; TX MCU DMA index did not move → the command never left; FWDL CPU ≠ DMA → the patch was not
 fully fetched. Everything else as WIFI-1.
+
+## WIFI-2 result (2026-10-17) — firmware up, interface en2, scanning [measured]
+- This boot the whole firmware load worked: patch (PATCH_FINISH answered `status=0x0`), the 5 WM regions,
+  `firmware start ok`, NIC capability, EEPROM. `start: OK`, `SimpleMtkWlan` attached, macOS lists a new Ethernet port
+  **en2** with the card's MAC `c0:35:32:…`. No network was configured (Lukas skipped the prompt), so it only scans:
+  beacons on 2.4 GHz channels 1–8 and 5 GHz 44/108, ~22 BSSs per scan, a scan every ~5.4 s.
+- The first command after `enable` (MAC enable, `0x46ed`) timed out; the dump: `rxmcu cpu=2 dma=4 prod=2 cons=3`,
+  `int_sta=0x08400000` pending, `intr_calls=209`. The device had written the reply into the RX MCU ring and raised
+  the interrupt, but the handler did not run during the 3 s wait. The retry worked.
+- Reading [inferred]: `enable`/`start` run inside the driver workloop gate, and the interrupt handler is on the same
+  workloop, so a reply that comes in while the gate is held waits for the timeout. That is also the likely cause of
+  WIFI-1's `command 7 timeout` (same 3 s sleep, a reply that sometimes arrives before the sleep and sometimes after).
+  OverlordDev hit the same thing in `AirportMtkWlan` v1.1 ("MCU responses are polled; they were only processed after
+  the timeout").
+
+## WIFI-3 prep — MCU waits poll the interrupt handler, and join the network
+`wifi-0004`: `mwx_mcu_wait()` replaces the single 3 s `tsleep`: every 2 ms it checks the reply slot, calls the
+interrupt handler itself, and sleeps 2 ms; `mwx_intr()` is now a wrapper with an atomic busy flag, so the real
+interrupt and the poller never run the handler at once. Same idea as OverlordDev's `AIRPORT_WCL poll intr`, written
+for the Ethernet build. Install with the home network this time (WiFiConfig).
