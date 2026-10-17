@@ -394,3 +394,9 @@ Installed NMIntelFB `59c98103` + NVAccel `659dfa20`, `sudo bash tools/accel/ab.s
   latch wait (~8 % of frames find the last flip not yet on the panel), which is sleeping time. `blank 25` in the
   ram=1 half: one-colour video frames [inferred]; 0 in the flip half.
 - Next (RTX-24): `auto.sh` turns mode 2 on at boot (`nullmoth-accel-ram=1` keeps one buffer, `=0` none).
+
+## RTX-24 — `auto.sh` turns the flip on at boot — **works**
+`nullmoth-accel-ram` deleted, `auto.sh` reinstalled, rebooted.
+- [measured, logger] 10:43:22.465 `fast copy on (memcpy 1, direct 1)`; 10:43:22.751 `ram scanout on (mode 2, direct
+  2)`; 10:44:08.388 `frames reach the panel (iop_ok 8); no restart`.
+- [measured, sysctl] `nmintelfb_ram 2`, `nmintelfb_flips 7840`, `nmintelfb_flip_late 0`, `iop_fail 0`. Lukas: normal.

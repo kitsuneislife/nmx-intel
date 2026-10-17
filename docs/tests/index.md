@@ -62,7 +62,7 @@ phase file; open only the row you need.
 | RTX-21 | 10-17 | same + `auto.sh` | `auto.sh` turns the RAM scanout on at boot (direct=2) | **works**: every frame through RAM, 0 failures; but real sleep → black panel after wake (hard reboot) | [rtx-8](rtx-8-accelerated-desktop.md) |
 | RTX-22 | 10-17 | NMIntelFB `eaf67fa1` | display registers at sleep/wake (intelfb-0018), RAM scanout off | **black again**: every display register 0 after wake (S3 resets the display engine); not the RAM scanout | [rtx-8](rtx-8-accelerated-desktop.md) |
 | RTX-23 | 10-17 | NMIntelFB `59c98103`, NVAccel `659dfa20` | stage 4b: two RAM buffers flipped at vblank (`ab.sh flip`) | **works**: 3409 flips, 0 late, same CPU per frame, no artefacts | [rtx-8](rtx-8-accelerated-desktop.md) |
-| RTX-24 | 10-17 | same + `auto.sh` | `auto.sh` turns the flip (ram=2) on at boot | pending | [rtx-8](rtx-8-accelerated-desktop.md) |
+| RTX-24 | 10-17 | same + `auto.sh` | `auto.sh` turns the flip (ram=2) on at boot | **works**: mode 2 at boot, 7840 flips, 0 late, 0 failures | [rtx-8](rtx-8-accelerated-desktop.md) |
 
 Adding a test: one row here, the entry at the end of the current phase file (start a new phase file when the goal
 changes), then [../status.md](../status.md).
