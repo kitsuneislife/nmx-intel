@@ -133,3 +133,9 @@
 ### The 1401 app re-copies things
 - Toggling the AMD/Intel test driver copies `/Library/NullMoth/kexts/15/NMXGPU.kext` and the nvmtl bundle (libdrm).
   Install our libdrm **after** toggling. An app update may restore the release NMXGPU: rerun `build/install.sh`.
+
+### S3 sleep blanks the Intel display engine (RTX-22)
+- After `pmset sleepnow` and wake, TRANSCONF, PLANE_CTL, PP_STATUS/PP_CONTROL and the backlight PWM all read 0; only
+  the GGTT (in stolen memory) survives. Firmware resume does not relight the panel, and NMIntelFB only adopts the
+  firmware's mode, so the panel stays black and WindowServer stalls waiting for it (watchdog after 40 s).
+- Until NMIntelFB can light the panel itself, avoid system sleep on the RTX path (display sleep is fine).

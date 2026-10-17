@@ -340,3 +340,23 @@ Boot 10-17 09:49:03.
 blc2 … pte0 …` at each power change and offers the same line as `sysctl debug.nmintelfb_regs`. Test with
 `nvram nullmoth-accel-ram=0` (RAM scanout off) to separate the two questions: does the pipe/plane/panel power come back
 after wake at all. The backlight registers in the same line also answer brightness BL-1.
+
+## RTX-22 — display registers across sleep — **the display engine comes back blank**
+NMIntelFB `eaf67fa1`, `nullmoth-accel-ram=0` (RAM scanout off). `pmset sleepnow` 10:17:31 (DarkWake, then Sleep
+10:18:01), woken 10:18:30: panel black again, hard reboot. Same failure without the RAM scanout, so it is not 4a's.
+[measured] NMIntelFB log:
+
+| when | trans | plane | surf | pp status/control | blc ctl/freq/duty | pte0 |
+| --- | --- | --- | --- | --- | --- | --- |
+| before (10:17:28 / :31) | c0000000 | 94000008 | 0 | 80000008 / 00000067 | 80000000 / 4b00 / 4b00 | 3e800001 |
+| after wake (10:18:30) | 0 | 0 | 0 | 0 / 0 | 0 / 0 / 0 | 3e800001 |
+
+- [measured] S3 resets the whole display engine: pipe/transcoder off, plane off, panel power off, backlight PWM off.
+  The GGTT entry survives (it lives in stolen memory, in self-refresh RAM). The firmware's S3 resume does not relight
+  the panel. So WindowServer's wait on the dark display (RTX-21) follows.
+- [measured] Brightness (BL-1 answered): PWM controller 1 is the live one, enabled, period 0x4b00 (19200), duty 0x4b00
+  (100 %); controller 2 unused. Brightness = writing `BXT_BLC_PWM_DUTY1` (0xC8258).
+- Fix options: (a) relight the panel on wake (what i915's display resume does: power wells, CDCLK, DPLL, combo PHY,
+  DDI buffers, eDP link training over AUX, transcoder, pipe, plane, panel power sequence, backlight) — a mode set
+  from scratch; (b) hibernate instead of S3 (the firmware boots fully, the GOP lights the panel, NMIntelFB
+  re-adopts) — depends on hibernation working on this hackintosh; (c) no system sleep (display sleep only).

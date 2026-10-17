@@ -25,8 +25,8 @@ B works. 60 Hz is not wanted.
 Bridge plan: stages 0–3 done. Our NVAccel `41260d45` (accel-0001): the direct copy cuts ~31 % per frame (RTX-18);
 `auto.sh` turns it on at boot (RTX-19, works). **RTX-20 (stage 4a) works**: the panel scans out of RAM and the copy
 engine writes it, 2.78 → 1.44 ms per frame, no CPU copy left (NMIntelFB `6145a549`, NVAccel `a4d13738`). RTX-21: `auto.sh`
-turns it on at boot (works). **Sleep breaks the panel** (black after wake, hard reboot; WindowServer waits on a dark
-display): RTX-22 reads the display registers at sleep/wake. Then flip (4b) and the CE wait without spinning (4c).
+turns it on at boot (works). **Sleep breaks the panel**: S3 resets the Intel display engine (RTX-22: every display
+register 0 after wake) and nothing relights it; avoid system sleep. Options: relight on wake, hibernate, no sleep.
 
 ## Open problems
 
