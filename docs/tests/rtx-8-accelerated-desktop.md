@@ -315,4 +315,7 @@ Boot 10-17 09:49:03.
   through the RAM scanout), `iop_fail 0`. Lukas: normal use looks fine.
 - The log command in `auto.sh`'s header found nothing: `logger -t` does not put the tag in `eventMessage`. Fixed to
   `--predicate 'process == "logger"'`.
-- Sleep/wake with the RAM scanout on: not tried yet.
+- Sleep/wake with the RAM scanout on: lid closed ~30 s at ~09:56 and reopened, picture fine, `iop_ram_frames 21258` =
+  `iop_ok`, `iop_fail 0`. But the Mac **did not sleep** [measured]: `pmset -g log` has no Sleep/Wake entry since the
+  09:49 boot, `pmset -g` shows sleep prevented by assertions (the Claude app, runningboardd, coreaudiod, bluetoothd),
+  and NMIntelFB's trail shows no `sp0`/`sp1`, only `sc:prob` at 09:56:48. Real sleep still untested: `pmset sleepnow`.
