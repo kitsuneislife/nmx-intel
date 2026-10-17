@@ -155,4 +155,25 @@ in mHz, positive syncs) and its AGDC answers 0x921/0x711 with nullmoth's `nvk5_a
 NVRMAGDC). Log `K5 timing: …` (with `REJECTED by nvk5_timing_bad` if invalid); trail `k5-link`, `k5-caps`.
 `NMIntelFB a96fc475…`.
 
-## RTX-14 — intelfb-0015 (pending)
+## RTX-14 — intelfb-0015 — WindowServer composites on the RTX; the transaction never reaches NVAccel
+Boot 21:38; WindowServer restart 21:42:33; console stayed; power-off, boot 21:44:18.
+- [measured, kernel] `K5 timing: pclk 346486882 1920x1080 h 1968-2000/2080 v 1083-1088/1157 143975 mHz` (accepted);
+  `trail: k5-link`, `k5-caps`; further 0x711 types and 0x925 answered Unsupported (NVRMAGDC does the same).
+- [measured, WindowServer] no "capabilities … with no devices"; `Display 0x5b81c5c0 … isAcc=YES`, mode 1920x1080;
+  NVMTL: a 1920x1080 IOSurface in VRAM, GPUPass/ViewportToNDC pipelines, `surface-out -> dirty`, `the swap waits in
+  NVAccel`; login-window drawing (text textures, fixed_frag shaders) continued. Then `Transaction Target State …
+  Plane Index: 0 … Fetch - Pipe … EOTF - GPU`, `Attempting to get capabilities from plane with no gamma` and
+  **`Fallback GPU Display Pipe transaction submission failed`** — 186 times. `Invalid display 0x5b81c5c0` (SkyLight).
+- [measured, kernel] no `iop: K6` line: no transaction reached `NVDisplayPipe::performTransaction`; kernel quiet
+  after 21:42:47. Registration log: `pipe 0 active(+0x298) = 0`.
+- [measured, nullmoth 803515b] the Intel-panel copy path was only tried with a real NVIDIA head 0 beside it.
+- [inferred] the family refuses transactions on a pipe whose framebuffer resource is NULL (NVAccel returns NULL for a
+  CPU-only scanout, `phys 0`).
+
+### intelfb-0016
+`nvScanoutInfo`: NMIntelFB allocates once a VRAM block the size of the panel (its own NVKMS device) and answers its
+`phys`/size/handle, so `initFramebufferResource` creates a scanout vidmem as for an NVIDIA head; `kva` stays the Intel
+surface (performTransaction's copy target). NVAccel only records a scanout vidmem's address and never frees it;
+home flips skip non-NVIDIA framebuffers. Trail `scanres`; knob `nullmoth-intelfb-scanres=0`. `NMIntelFB 1d3ea017…`.
+
+## RTX-15 — intelfb-0016 (pending)

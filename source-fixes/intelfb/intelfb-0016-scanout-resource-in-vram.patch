@@ -1,0 +1,32 @@
+diff -ruN a/intelfb.cpp src/intelfb.cpp
+--- a/intelfb.cpp	2026-10-16 21:52:03
++++ b/intelfb.cpp	2026-10-16 21:52:03
+@@ -221,6 +221,7 @@
+     uint64_t fVramBudget = 0, fVramBytes = 0, fVramCookie = 0;
+     unsigned fVramLogged = 0;
+     IOLock *fVramLock = nullptr;
++    NVRMVramRequest fScanRes = {};   // intelfb-0016: the VRAM block that stands for this panel's scanout
+     void kapiInit();
+     void kapiFree();
+     IOReturn vramGrant(NVRMVramRequest *r);
+@@ -808,6 +809,20 @@
+         if (!fSurfMap) return kIOReturnNotReady;
+         r->kva = (void *)fSurfMap->getVirtualAddress();
+         r->phys = 0; r->actualSize = 0;
++        // intelfb-0016: with phys 0 NVAccel gave the display pipe no framebuffer resource, and WindowServer's every
++        // transaction failed before reaching NVAccel ("Fallback GPU Display Pipe transaction submission failed", 186
++        // times in RTX-14; nullmoth's copy path was only ever tried beside a real NVIDIA head). A VRAM block of our
++        // own the size of the panel stands for the scanout, so the pipe gets a resource as an NVIDIA head's does; kva
++        // stays the Intel surface, where performTransaction copies each frame. nullmoth-intelfb-scanres=0: phys 0.
++        if (fDev && ifb_knob("nullmoth-intelfb-scanres", 1)) {
++            if (!fScanRes.phys) {
++                NVRMVramRequest q = {};
++                q.version = NVRM_VRAM_ABI_VERSION; q.size = (unsigned long long)fRowBytes * fHeight;
++                if (vramGrant(&q) == kIOReturnSuccess) { fScanRes = q; ifb_trail("scanres"); IFBLOG("scanout resource: VRAM phys 0x%llx (%llu bytes)", q.phys, q.actualSize); }
++                else ifb_trail("scanres-fail");
++            }
++            if (fScanRes.phys) { r->phys = fScanRes.phys; r->actualSize = fScanRes.actualSize; r->handle = fScanRes.handle; }
++        }
+         r->width = fWidth; r->height = fHeight; r->pitch = fRowBytes;
+         return kIOReturnSuccess;
+     }
