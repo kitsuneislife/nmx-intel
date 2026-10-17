@@ -87,3 +87,29 @@ The rest (CE ~1.4 ms + ~1.3 ms CPU into the aperture) is what stage 4 removes.
 
 1 now (config only) → 0 (the gate) → 2 and 3 (small, prove the build works and halve the CPU) → 4 (the real fix) →
 5 → 7. 6 only if 4–5 leave a measurable cost.
+
+## Stage 4 plan (2026-10-17, before any code)
+
+What the code shows [measured, source]:
+- NMIntelFB answers NVAccel's scanout request (`NVRM_VRAM_FN_SCANOUT`) with `kva` = a WC map of the aperture at
+  GGTT offset `fSurf` (0 here: trail `mode-A-1920x1080-s0`); the GOP surface's PTEs cover GGTT 0..0x7e9000 and point
+  into stolen memory. BAR0 (registers + the GGTT alias at +8 MiB) is already mapped.
+- `nvrm_ce_copy_to_pages` (NVRM, `nvrm_pageoff.c`) takes any list of system pages: one CE copy per contiguous run
+  (or one scattered copy when runs are many), then **waits by spinning** `osDelayUs(10)` = `IODelay` under the RM
+  locks. So the ~1.4 ms CE wait per frame is CPU time too, not only latency.
+- NVAccel's direct path (accel-0001) already calls it with the staging pages; only the destination changes.
+
+Why not let the CE write the stolen pages the panel scans today: stolen memory (DSM) is fenced from other agents
+(i915 only reaches it through the aperture), so a peer write from the RTX would be dropped [inferred]. Hence ordinary
+RAM behind the GGTT.
+
+Steps, each one test with a live knob (sysctl, no reboot to undo):
+
+| Test | Change | Where | Removes | Risk and guard |
+| --- | --- | --- | --- | --- |
+| RTX-20 (4a) | NMIntelFB allocates one panel-sized wired buffer in RAM (contiguous if it can, so the CE makes one run), copies the current image into it, rewrites GGTT PTEs 0..size to point at it (`phys \| 1` via BAR0 + 8 MiB, then `GFX_FLSH_CNTL_GEN6` 0x101008) and exposes its page list (new NMIntelFB-only platform function, so NVRM's VRAM ABI stays as is). NVAccel `iop_direct=2`: CE copies VRAM → those pages, no CPU copy. Same GGTT offset, same `PLANE_SURF`, same aperture view, so every other path keeps working. Logs the old PTEs first (read-only). | NMIntelFB ~120 lines, NVAccel ~40 | the ~1.3 ms CPU copy into the aperture | wrong PTE = garbage on screen: a sysctl puts the saved PTEs back; the CE write might sit in a CPU cache the display does not snoop [unverified]: if stale stripes show, flush the lines (`clflush`) after the copy |
+| RTX-21 (4b) | Second buffer at another GGTT offset inside the aperture (16 MiB); after the CE copy, write its offset to `PLANE_SURF` (latched at vblank) and use the other buffer next time, only once `PLANE_SURFLIVE` (0x701AC + pipe) shows the flip landed | NMIntelFB | tearing | a frame dropped when the flip is late, never a torn one; the aperture view for CPU paths follows the front buffer |
+| RTX-22 (4c) | NVRM waits for the CE by sleeping instead of spinning (`IODelay` → short sleeps) | NVRM, needs an NVRM build (new gate, like stage 0) | the ~1.4 ms spin per frame | NVRM build must match the installed one first (as RTX-17 did for NVAccel) |
+
+Then stage 5 (real vblank) paces the flips. Sleep/wake: the firmware may rewrite the GGTT on wake, so NMIntelFB
+re-applies the PTEs on `kIOFBNotifyDidPowerOn` (checked in RTX-20 by sleeping once).
