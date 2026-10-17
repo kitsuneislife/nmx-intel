@@ -54,6 +54,8 @@ Other series:
 - `intelfb-0013` (fix/knob, RTX-12) — `NMIntelFBClaim` holds GFX0 and publishes an Intel-panel `NVRMDisplay` nub under
   NVRM; NMIntelFB runs on it (`nullmoth-intelfb-nvparent=0` = on GFX0).
 - `intelfb-0014` (fix, RTX-13) — `NMIntelFBAGDC` answers AGDC 1 and 0x980 with the panel; `sysctl debug.nmintelfb_agdc=1`.
+- `intelfb-0015` (fix, RTX-14) — `NVRMTiming` from the Intel timing; AGDC answers 0x921 (link config) and 0x711
+  (plane scaler) with nullmoth's `nvk5_answer`.
 - `source-fixes/libdrm/libdrm-0001` — Darwin node numbers from names (clone nodes). Built by `tools/libdrm/build.sh`.
 - `build/nmx-src-paths.patch` — source paths for building on this Mac (applied by `build/setup.sh`).
 

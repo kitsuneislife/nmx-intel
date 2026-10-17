@@ -138,4 +138,21 @@ Started by `sysctl debug.nmintelfb_agdc=1` (registered only when NMIntelFB runs 
 < 0 failed; trail `agdc`, first 0x980 `agdc-980`. `enable.sh`: `nvaccelfb=3` → `nmintelfb_agdc=1` (waits for 1) →
 `nvaccel_iop=1`. `NMIntelFB 937ae0fa…`.
 
-## RTX-13 — intelfb-0014 (pending)
+## RTX-13 — intelfb-0014 — the display pipe exists; no plane
+Boot 21:25; `enable.sh` 21:29:07; after `killall -9` the console stayed; power-off, boot 21:31:57.
+- [measured, kernel] `trail: agdc-980` (asked during `start`), `AGDC: UP (state 1) on PEGP`, then `iop … OPEN`.
+  Unanswered: 0x3, 0x941 (at start); from the new WindowServer 0x2001 and **0x921** (= `NVK5_CMD_LINKCONFIG`).
+- [measured, WindowServer 21:29:38–40] no more "no display pipes"; `Setting kIOWSAA to 0x80000013`; `Display id 0x0
+  -> 0x5b81c5c0 … isAcc=YES isMUX=NO isBuiltIn=YES`; `Setting mode 0x1 … 1920x1080`; then `Attempting to get
+  capabilities from capabilities with no devices`, `Attempting to get capabilities when none exist`, **`No plane
+  indices`**; `Display: 0x5b81c5c0 woke on GPU: Intel`. NVK pipelines built; still no transaction.
+- [measured, source] NVRMAGDC answers 0x921 and 0x711 (plane-scaler capability) from each framebuffer's
+  `NVRMTiming` (13 words) when `debug.nvrmfb_agdc_k5=1`, which NVRM's auto-go sets before the AGDC comes up.
+
+### intelfb-0015
+NMIntelFB publishes `NVRMTiming` from the measured Intel timing (pclk, h/v visible, sync start/end, totals, refresh
+in mHz, positive syncs) and its AGDC answers 0x921/0x711 with nullmoth's `nvk5_answer` (header copied from
+NVRMAGDC). Log `K5 timing: …` (with `REJECTED by nvk5_timing_bad` if invalid); trail `k5-link`, `k5-caps`.
+`NMIntelFB a96fc475…`.
+
+## RTX-14 — intelfb-0015 (pending)
