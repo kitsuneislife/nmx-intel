@@ -60,6 +60,8 @@ Other series:
   surface; `nullmoth-intelfb-scanres=0` = phys 0.
 - `intelfb-0017` (knob, RTX-20) — `sysctl debug.nmintelfb_ram=1`: the panel scans out of a RAM buffer (GGTT entries of
   the scanout repointed, picture copied first; `=0` restores them); page list offered as `nmIntelFBRamPages`.
+- `intelfb-0018` (diag, RTX-22) — display registers (TRANSCONF, PLANE_CTL/SURF, PP_STATUS/CONTROL, BLC PWM 1/2, PTE 0)
+  logged at each power change and readable as `sysctl debug.nmintelfb_regs`.
 - `source-fixes/accel/accel-0001` (knob/diag, RTX-18) — NVAccel (branch `nmx-accel` from nullmoth v2.1.0, worktree
   `~/nmx-build/accel/src`, tag `accel-0001`, built by `tools/accel/build.sh`): `debug.nvaccel_iop_memcpy=1` copies
   frames to a CPU scanout with `memcpy` rows; `debug.nvaccel_iop_direct=1` puts the copy engine's staging buffer on

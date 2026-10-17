@@ -319,3 +319,24 @@ Boot 10-17 09:49:03.
   `iop_ok`, `iop_fail 0`. But the Mac **did not sleep** [measured]: `pmset -g log` has no Sleep/Wake entry since the
   09:49 boot, `pmset -g` shows sleep prevented by assertions (the Claude app, runningboardd, coreaudiod, bluetoothd),
   and NMIntelFB's trail shows no `sp0`/`sp1`, only `sc:prob` at 09:56:48. Real sleep still untested: `pmset sleepnow`.
+- **Real sleep (`pmset sleepnow`, ~10:01) — fails: black panel after wake, hard reboot** [measured]:
+  - `pmset -g log`: 10:01:25 `Entering Sleep state due to 'Software Sleep'`; 10:02:13 `Wake from Normal Sleep [CDNVA]
+    : due to PWRB XDCI CNVW/User`, `Display is turned on`. Sleep notifications: `NVRM driver is slow (SetState to 0)
+    (6183 ms)`.
+  - NVRM: `sleep #1: suspending the GPU` → `rm_power_management(STANDBY) -> 0x0 in 6183 ms`; `wake #1:` … `PMC_BOOT_0 =
+    0xb77000a1 - the GPU answers` … `GPU running`. The RTX came back.
+  - NMIntelFB: only `sp1`, `sp-done` (10:02:13), then `gc:pwak`, `gc:chng` (10:02:38). No `sp0` was logged before
+    sleep. No NVAccel frame line after wake.
+  - `WindowServer_…100303.userspace_watchdog_timeout.spin` / `.ips`: the WindowServer main thread waited
+    (TH_UNINT) inside IOGraphicsFamily for 40 s; `displayState OFF`. The only thread in our kexts was NMIntelFB's VBL
+    thread in its normal wait (`vblThread+212`). Nothing of NVAccel/NVRM was on a stack.
+  - [inferred] S3 powers the iGPU's display engine down, and nothing lights it again: the firmware does not re-run the
+    GOP on resume, NMIntelFB only adopts the firmware's mode, and i915 is not running. Unrelated to the RAM scanout,
+    then; but untested without it (sleep was never tried on the RTX path before).
+  - Until fixed: avoid sleeping (screen off is fine).
+
+## RTX-22 prep — what the display looks like after sleep
+`intelfb-0018` (NMIntelFB `eaf67fa1`, on top of 0017): logs `power <0|1>: trans … plane … surf … pp …/… blc …/…/…
+blc2 … pte0 …` at each power change and offers the same line as `sysctl debug.nmintelfb_regs`. Test with
+`nvram nullmoth-accel-ram=0` (RAM scanout off) to separate the two questions: does the pipe/plane/panel power come back
+after wake at all. The backlight registers in the same line also answer brightness BL-1.

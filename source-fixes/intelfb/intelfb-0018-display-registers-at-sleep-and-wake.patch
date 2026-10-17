@@ -1,0 +1,51 @@
+diff -ruN a/intelfb.cpp src/intelfb.cpp
+--- a/intelfb.cpp
++++ b/intelfb.cpp
+@@ -236,6 +236,15 @@
+     void ramPtes(bool ours);
+ public:
+     int ramSet(bool on);
++    // intelfb-0018: the display registers that say whether the panel is lit (pipe, plane, panel power, PWM backlight,
++    // first scan-out PTE): logged at sleep and wake, and read on demand through sysctl debug.nmintelfb_regs
++    void regsInto(char *b, size_t n) {
++        if (!fRegs || fPipe < 0) { snprintf(b, n, "no registers"); return; }
++        snprintf(b, n, "trans %08x plane %08x surf %08x pp %08x/%08x blc %08x/%08x/%08x blc2 %08x/%08x/%08x pte0 %llx",
++                 rd(TRANSCONF(fPipe)), rd(PLANE_CTL(fPipe)), rd(PLANE_SURF(fPipe)), rd(0xC7200), rd(0xC7204),
++                 rd(0xC8250), rd(0xC8254), rd(0xC8258), rd(0xC8350), rd(0xC8354), rd(0xC8358),
++                 (unsigned long long)*((volatile uint64_t *)(fRegs + 0x800000) + (fSurf >> 12)));
++    }
+ private:
+     void kapiInit();
+     void kapiFree();
+@@ -368,6 +377,7 @@
+     // first WindowServer restart froze every display.
+     IOReturn setPowerState(unsigned long ordinal, IOService *) override {
+         ifb_trail(ordinal ? "sp1" : "sp0");
++        { char r[200]; regsInto(r, sizeof r); IFBLOG("power %lu: %s", ordinal, r); }
+         if (ordinal && fRamOn) ramPtes(true);   // intelfb-0017: in case the GGTT was rewritten while asleep
+         handleEvent(ordinal ? kIOFBNotifyDidPowerOn : kIOFBNotifyWillPowerOff);
+         ifb_trail("sp-done");
+@@ -1123,13 +1133,21 @@
+     gIfbRamState = fb->ramSet(v == 1);
+     gIfbRamBusy = 0;
+     return gIfbRamState < 0 ? EIO : 0;
++}
++static int ifb_regs_sysctl SYSCTL_HANDLER_ARGS
++{
++    char b[200] = "no panel";
++    if (NMIntelFB *fb = gIfbRamFB) fb->regsInto(b, sizeof b);
++    return sysctl_handle_string(oidp, b, sizeof b, req);
+ }
++SYSCTL_PROC(_debug, OID_AUTO, nmintelfb_regs, CTLTYPE_STRING | CTLFLAG_RD | CTLFLAG_LOCKED, nullptr, 0,
++            ifb_regs_sysctl, "A", "intelfb-0018: pipe, plane, panel power, backlight PWM and the first scan-out PTE");
+ SYSCTL_PROC(_debug, OID_AUTO, nmintelfb_ram, CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_LOCKED | CTLFLAG_KERN, nullptr, 0,
+             ifb_ram_sysctl, "I", "1 = the panel scans out of RAM that NVAccel's copy engine writes (0 off, < 0 failed)");
+ static void ifb_ram_register(NMIntelFB *fb)
+ {
+-    if (fb && !gIfbRamFB) { gIfbRamFB = fb; sysctl_register_oid(&sysctl__debug_nmintelfb_ram); }
+-    else if (!fb && gIfbRamFB) { sysctl_unregister_oid(&sysctl__debug_nmintelfb_ram); gIfbRamFB = nullptr; }
++    if (fb && !gIfbRamFB) { gIfbRamFB = fb; sysctl_register_oid(&sysctl__debug_nmintelfb_ram); sysctl_register_oid(&sysctl__debug_nmintelfb_regs); }
++    else if (!fb && gIfbRamFB) { sysctl_unregister_oid(&sysctl__debug_nmintelfb_ram); sysctl_unregister_oid(&sysctl__debug_nmintelfb_regs); gIfbRamFB = nullptr; }
+ }
+ 
+ #ifdef NMINTELFB_VIRTUAL
