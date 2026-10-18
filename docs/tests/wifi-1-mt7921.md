@@ -123,3 +123,24 @@ interrupts; if it still dies, the dump tells whether the RX DMA stopped (`GLO_CF
 - Also seen: a `shutdown_stall` report at 13:08 (the reboot out of WIFI-3), so the driver may not stop cleanly
   either.
 - Safety: the driver is removed with `tools/wifi/install.sh restore` before the next normal boot.
+
+## Research round 2 (2026-10-18) — native Wi-Fi menu
+Searched GitHub (all 16 forks of laobamac/SimpleMtkWlan by last push, their issues and releases), the web, Reddit and
+the forums (tonymacx86's MediaTek thread is ~315 days old, behind a bot check, older than every driver below).
+- [unverified, upstream claims] **`flxxxxddd/SimpleMtkWlan` v1.5.0** (GPL-2.0, released 10-18, 50 commits over
+  laobamac): the most complete hardware layer. Its fixes match our WIFI-1..4 symptoms: real MSI vector registered
+  instead of INTx + hand-set MSI bit; multi-mbuf TX frames linearized (WFDMA froze on the first DHCP frame); DMA-stall
+  watchdog with hard reset + firmware reload; chip recovery at attach (WFSYS reset → PCIe FLR); software CCMP for
+  group frames; TX backpressure instead of drops; sleep/wake (firmware reloaded on wake). Ships
+  **`AirportMtkWlan`** (laobamac's AirportItlwm WCL front end as adapted by pengubow): native Wi-Fi menu, Keychain,
+  private address; tested on Tahoe 26.7.1 with RZ608 `14c3:0608`; the **Sequoia 15.2+ build is "not tested on
+  hardware with this HAL yet"**; `14c3:7961` "expected to work", untested. Needs `DisableIoMapper` (ours is on,
+  `make_config.py:167`), no OCLP wireless patches, one kext only (both flavours match the card).
+- `OverlordDev` v1.1-native-wifi (10-15): native menu on Sequoia 15.8.1 on `14c3:7961` per its author, and one
+  `7961` user in laobamac#3 says they use it. Its hardware layer is the stageB we ran in WIFI-1..4 (died under load,
+  WIFI-3), without flxxxxddd's MSI/TX/stall fixes.
+- `pengubow` (native menu on Sequoia, MT7922 RZ616 only), `mnnobre` (native, RZ608 desktop; its only issue is an
+  empty "MT7921 … cannot use WiFi" report from 10-18), `luzility` (HE, idle since 10-14). laobamac upstream idle since 06-27.
+- Nothing else exists for this chip: no other kext, no commercial driver, no Apple-side support.
+- Candidate for WIFI-5: flxxxxddd `AirportMtkWlan` Sequoia, built from source with our `wifi-0001` (off on `-nvoff`
+  / `-mtkwlanoff`), DEBUG configuration (the one its hardware tests ran with), log via `mtklog.sh`.
