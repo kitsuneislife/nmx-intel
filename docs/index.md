@@ -16,6 +16,7 @@ summary block on top, linked to each other). The original Portuguese diary is pr
 | Other projects, upstream state | [knowledge/research.md](knowledge/research.md) |
 | Making the RTX → Intel bridge cheaper | [knowledge/bridge-optimization.md](knowledge/bridge-optimization.md) |
 | Panel brightness (nullmoth switch vs our Intel panel) | [knowledge/brightness.md](knowledge/brightness.md) |
+| Moving to a new nullmoth release | [knowledge/nullmoth-upgrade.md](knowledge/nullmoth-upgrade.md) |
 
 ## Map
 
@@ -35,6 +36,7 @@ knowledge/patches.md              every source fix: repo, kind, test, purpose
 knowledge/binary-patches.md       legacy byte patches 1–5
 knowledge/research.md             external projects and upstream
 knowledge/bridge-optimization.md  per-frame cost of the bridge and the staged plan (CASO shape)
+knowledge/nullmoth-upgrade.md     runbook: new nullmoth release + our NVRM/NVAccel patches on top
 knowledge/brightness.md           why nullmoth's brightness switch does not reach the Intel panel; BL-1/BL-2 plan
 archive/LOG-pt.md                 original diary (Portuguese, verbatim)
 ```

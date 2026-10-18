@@ -132,3 +132,11 @@ with 2618 errors), so 4c is a 9-byte binary patch of the installed NVRM (`tools/
 Every CPU copy is gone (CE writes the panel's RAM buffers), frames flip at vblank, and NVRM sleeps through the copy:
 kernel_task ~4 % while a video plays (RTX-16: ~37–48 %), 0 failures [measured]. Cost left: ~2.4 ms latency per frame
 (1 ms sleep steps), WindowServer's own compositing, and the RTX staying powered (path A).
+
+## After UPG-1 (nullmoth 2.3.6, 2026-10-18)
+- [measured] ~15 min after boot: `surface_gpu_wait_max_us` 17759 (was ~101 ms), `surface_gpu_timeouts` 0 (was ~148),
+  kernel_task ~5 %, `iop_fail 0`. nullmoth's 2.3.x fixes (one-refresh swap wait, no readback on window drags, busy GPU
+  kept) removed the stalls this page left to NVRM/NVMTL. `displaytrace` is gone since nullmoth 2.2.0 (stage 1 moot).
+- Decision with Lukas: CPU cost of the bridge is done. Stages 5 (real vblank) and 6 (damage only) stay optional: flips
+  are already 0 late, and the copy costs no CPU. What is left that a user would notice: sleep (S3 blanks the panel),
+  boot (first frames on the panel ~129 s after boot), battery (the RTX stays powered; stage 7 measures it).
