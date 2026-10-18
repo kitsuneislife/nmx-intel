@@ -133,6 +133,18 @@
 ### The 1401 app re-copies things
 - Toggling the AMD/Intel test driver copies `/Library/NullMoth/kexts/15/NMXGPU.kext` and the nvmtl bundle (libdrm).
   Install our libdrm **after** toggling. An app update may restore the release NMXGPU: rerun `build/install.sh`.
+- [inferred, UPG-1 prep] Since 2.3.6 `/Library/NullMoth/kexts/15/NVAccel.kext` is nullmoth's plain 2.3.6 NVAccel; a toggle
+  or the macOS-version switcher can copy it over ours (`8166045f`): rerun `sudo bash tools/accel/install.sh`.
+
+### nullmoth's boot guard and uninstall (2.3.1+)
+- [read, `kexts/NVRM/nvrm_off.h` v2.3.6] NVRM counts each start in NVRAM `nullmoth-nv-starts`; NVRMFB clears it (and
+  sets `nullmoth-nv-ok`) when a head lights or NVKMS lists connectors with no display. Two uncleared starts in a row
+  switch the whole driver off like `-nvoff`, and the install's `lastgood.sh` restores the pre-install backup and reboots.
+  After an upgrade, check that `nullmoth-nv-starts` is gone after the first boot.
+- [read, `uninstall.sh` v2.3.6] `uninstall.sh <backup dir>` only checks the directory exists and removes the driver; it
+  restores nothing. Our restore: `tools/upgrade/rollback.sh`.
+- `tools/accel/install.sh` and `tools/nvrm/install.sh` keep nullmoth's original in `~/<kext>.kext.original` only if
+  none is there: before installing a new release, move the old originals away (2.1.0's are in `~/nmx-2.1.0/`).
 
 ### S3 sleep blanks the Intel display engine (RTX-22)
 - After `pmset sleepnow` and wake, TRANSCONF, PLANE_CTL, PP_STATUS/PP_CONTROL and the backlight PWM all read 0; only

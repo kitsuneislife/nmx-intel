@@ -82,6 +82,9 @@ source-fixes/00NN-<slug>.patch`, add an `apply` line to `build/apply-fixes.sh` (
 - `tools/nvrm/build.sh` (binary patch, RTX-25) — NVRM `12fcabf3` → `f5171d7b`: the copy-engine wait in
   `nvrm_ce_copy_to_pages` sleeps 1 ms (`os_delay`) instead of spinning 10 µs (`osDelayUs`), limit 2000. NVRM cannot
   be rebuilt from the published source (needs a Darwin RM build nullmoth does not publish).
+- UPG-1 (nullmoth 2.3.6): NVRM `122b3994` → `8c8873d5` (same three patches at `0x1b778/0x1b783/0x1b788`);
+  `source-fixes/accel/v2.3.6/accel-0001..0003` = the accel series rebased on v2.3.6 (branch `nmx-accel-236`), NVAccel
+  `8166045f`. NMIntelFB unchanged (`36afddf1` from either tag).
 - `source-fixes/wifi/wifi-0001` (WIFI-1) — SimpleMtkWlan (OverlordDev fork): `probe` leaves the card alone on
   `-nvoff` or `-mtkwlanoff`. Applied by `tools/wifi/build.sh` with `git am`.
 - `source-fixes/wifi/wifi-0002` (WIFI-1) — the ring log stops with public `thread_call_cancel` + wait instead of

@@ -1,14 +1,16 @@
 #!/bin/bash
-# build.sh: builds NVAccel (nullmoth's accelerator kext) from our branch nmx-accel (based on v2.1.0, the release the
-# 1401 app installed) into ~/nmx-build/accel/out/NVAccel.kext. Needs NVIDIA open-gpu-kernel-modules at tag 610.57.04
+# build.sh: builds NVAccel (nullmoth's accelerator kext) from our branch nmx-accel-236 (worktree ~/nmx-build/accel/src-236,
+# based on v2.3.6; patches in source-fixes/accel/v2.3.6) into ~/nmx-build/accel/out/NVAccel.kext. Needs NVIDIA open-gpu-kernel-modules at tag 610.57.04
 # in ~/ogkm610 (git clone --depth 1 --branch 610.57.04 https://github.com/NVIDIA/open-gpu-kernel-modules ~/ogkm610).
 # nullmoth's build reads the RM -D flags from a Darwin RM build (_out/Darwin_x86_64/compile_cmds.sh) that is not
 # public; this writes one with the defines of upstream src/nvidia/Makefile for x86_64. Built from v2.1.0 the result
-# has the release's strings, symbols, __const and __data byte-for-byte equal in size; __text differs by 112 B (compiler).
+# has the release's strings, symbols, __const and __data byte-for-byte equal in size; __text differs by 112 B (compiler);
+# built from v2.3.6, strings and symbols are identical to the release and __text differs by 128 B. The 2.1.0 branch
+# nmx-accel (worktree ~/nmx-build/accel/src) still builds with SRC=~/nmx-build/accel/src.
 set -uo pipefail
-SRC=${SRC:-$HOME/nmx-build/accel/src}; OUT=${OUT:-$HOME/nmx-build/accel/out}; OGKM=${OGKM:-$HOME/ogkm610}
+SRC=${SRC:-$HOME/nmx-build/accel/src-236}; OUT=${OUT:-$HOME/nmx-build/accel/out}; OGKM=${OGKM:-$HOME/ogkm610}
 [ -d "$OGKM/src/nvidia" ] || { echo "missing $OGKM (open-gpu-kernel-modules 610.57.04)"; exit 1; }
-[ -d "$SRC/kexts/NVRM/accel" ] || { echo "missing $SRC (git worktree add -b nmx-accel ~/nmx-build/accel/src v2.1.0)"; exit 1; }
+[ -d "$SRC/kexts/NVRM/accel" ] || { echo "missing $SRC (git worktree add -b nmx-accel-236 ~/nmx-build/accel/src-236 v2.3.6, then git am source-fixes/accel/v2.3.6/*)"; exit 1; }
 CC=$OGKM/src/nvidia/_out/Darwin_x86_64/compile_cmds.sh
 if [ ! -f "$CC" ]; then
   mkdir -p "$(dirname "$CC")"

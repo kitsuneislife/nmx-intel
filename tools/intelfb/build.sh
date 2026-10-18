@@ -5,7 +5,7 @@
 set -euo pipefail
 HERE=$(cd "$(dirname "$0")/../.." && pwd)
 NM=${NM:-$HOME/nmx-build/nvidia-macos-driver}
-REV=${REV:-v2.1.0}
+REV=${REV:-v2.3.6}   # v2.1.0 gives the same binary (kexts/NMIntelFB unchanged)
 W=$HOME/nmx-build/intelfb
 rm -rf "$W/src" "$W/out" && mkdir -p "$W/src" "$W/out/NMIntelFB.kext/Contents/MacOS"
 git -C "$NM" archive "$REV" kexts/NMIntelFB | tar -x -C "$W/src" --strip-components 2

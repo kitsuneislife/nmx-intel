@@ -446,3 +446,29 @@ Installed NMIntelFB `36afddf1` (hash checked), rebooted. Lukas: brightness keys 
 - [measured, sysctl] brightness at half: `blc 80000000/00004b00/000024c0` (duty 9408 of 19200 = 49 %); at full
   `…/00004b00` — the duty follows the slider, through our handler.
 - [unverified] the handler's `backlight: N% -> duty` lines did not show in `log show` although the duty changed.
+
+## UPG-1 prep — nullmoth NVIDIA driver 2.1.0 → 2.3.6
+Upstream 2.3.6 (released 10-18) changes Metal and NVAccel in ways the bridge uses: window drags no longer read the
+whole window back to system memory each frame (PR #245), the cursor is moved off the cursor lock, a busy GPU no longer
+disables Metal inside WindowServer (2.3.4), each swap waits at most one refresh period (2.3.4), Metal reports the
+whole VRAM. Package `nullmoth-nvidia-2.3.6.tar.gz` `3855954d` (matches the release's SHA256SUMS; every inner file
+matches the package's own SHA256SUMS) [measured], unpacked in `~/nmx-build/pkg-2.3.6/x/pkgroot`.
+- **NVRM** `122b3994` (release) → `8c8873d5`: the RTX-25 patch ported. Same source (`nvrm_pageoff.c` unchanged), the
+  compiler now counts down from 200001: `0x1b778` 200001 → 2001, `0x1b783` 10 → 1, `0x1b788` `osDelayUs` →
+  `os_delay` (0x14160). `tools/nvrm/build.sh` takes either release by hash; 2.1.0 still gives `f5171d7b` [measured].
+- **NVAccel** `2fc93637` (release) → `8166045f`: accel-0001..0003 rebased on v2.3.6 (branch `nmx-accel-236`,
+  worktree `~/nmx-build/accel/src-236`, `source-fixes/accel/v2.3.6/`). One conflict, two sysctl registrations next
+  to the new `svdiag` one; 0002/0003 applied clean. Recipe check: plain v2.3.6 built here has the release's symbols
+  and strings identical, `__cstring/__const/__data` equal, `__text` +128 B [measured]. All sysctls `auto.sh` uses are
+  present [measured].
+- **NMIntelFB**: `kexts/NMIntelFB` and the headers it shares (`nvrm_vram_abi.h`, AGDC) are unchanged 2.1.0 → 2.3.6;
+  built from v2.3.6 it is `36afddf1`, the installed binary [measured]. Not reinstalled.
+- nullmoth's `install.sh` (does not touch the EFI or boot-args) backs up the four kexts, GPUBundles, the aux KC and
+  `/Library/NullMoth/kexts` to `/Library/NullMoth/backup-…`, installs, and adds a fallback job (`lastgood.sh`) that
+  restores that backup if the new boot guard trips. `nvrm610.conf` gets 2.3.6's defaults (`NVMTL_RES2_WS=1`, the
+  two `NVMTL_NO_NVENC` lines gone); ours had no "my settings" block.
+- Boot guard (new since 2.3.1): NVRM counts starts in `nullmoth-nv-starts`; NVRMFB clears it when a head lights or
+  when NVKMS lists connectors and none has a display (`nvrm-fb.cpp:768`). On this laptop NVRMFB enumerates with
+  `connected-displays = 0`, so it should clear [inferred]; two starts without that turn the driver off.
+- Undo: `sudo bash tools/upgrade/rollback.sh /Library/NullMoth/backup-…` (nullmoth's `uninstall.sh <dir>` only
+  removes the driver, it does not restore).
