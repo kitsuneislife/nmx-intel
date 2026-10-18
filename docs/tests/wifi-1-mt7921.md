@@ -202,3 +202,21 @@ Installed `AirportMtkWlan 3159e898` (`install.sh airport`), rebooted twice (seco
   reorder holes stall TCP for 100 ms each (the fork's README says the firmware does not deliver BAR frames), and the
   TX ring filling during the test delays TCP ACKs. 2.4 GHz HT20 on a busy channel makes both worse. Log kept in
   `~/nmx-build/wifi5/mtk-wifi5.txt` (not versioned: private addresses).
+
+## WIFI-6 prep — 5 GHz only (one variable: the band)
+Lukas, 10-18: Google's speed test gives ~5 Mbit/s down, upload never finishes; his phone in the same spot gets
+29.9 / 20 Mbit/s. Measured from this Mac on WIFI-5 (single TCP flow, curl, 25 s each) [measured]:
+- download 4.9 Mbit/s (`speed.cloudflare.com`, 15.2 MB) and 2.1 Mbit/s (`speedtest.tele2.net`); upload 0.9 Mbit/s
+  (2.9 MB of 20 MB in 25 s).
+- driver log over those transfers: **every RX frame at HT MCS 1, 1 stream, 20 MHz, STBC** (n=2827 in one 30 s
+  interval; PHY ~13 Mbit/s); no new reorder holes (`gap_timeout` stayed 83, `frame_lost` 346); during the upload
+  `txwi_free` fell to 95 of 509 (`full` 118 → 124). Right after the join the same AP sent MCS 5–8 on 2 streams.
+- Reading [inferred]: in single-flow transfers the limit is the link rate the AP chose (MCS 1, the most robust rate)
+  and a TX queue that drains slowly, both typical of a weak or crowded 2.4 GHz channel (ch 8, HT20). The phone is
+  probably on 5 GHz [unverified]. The reorder holes of WIFI-5 belong to `networkQuality`'s many parallel flows.
+- `wifi5-0003`: NVRAM knob `nullmoth-wifi-band=5` leaves the 2.4 GHz channels out of the channel table, so scans
+  (they skip channels without flags, `MtkMwx.cpp` scan request), macOS's list and WCL joins (`WCL.cpp` refuses a
+  scan with no usable channel) are 5 GHz only; Nardino then joins on ch 108. `sudo nvram -d nullmoth-wifi-band`
+  + reboot undoes it, no rebuild, no EFI change. Build `AirportMtkWlan f3742061`, knob string present.
+- Success = join on a 5 GHz channel (log `RUN peer … vht=1`, `rxrate` VHT/HT40-80), and single-flow down/up well
+  above 4.9 / 0.9 Mbit/s.

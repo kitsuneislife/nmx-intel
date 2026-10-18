@@ -97,5 +97,7 @@ source-fixes/00NN-<slug>.patch`, add an `apply` line to `build/apply-fixes.sh` (
   leaves the card alone on `-nvoff` or `-mtkwlanoff`. Applied by `tools/wifi/build-airport.sh`.
 - `source-fixes/wifi/flx-v1.5.0/wifi5-0002` (WIFI-5) — `taskq_quiesce` waits on an in-flight counter instead of private
   `thread_call_cancel_wait` (kmutil refused the kext); host test stub follows xnu's ONCE rules.
+- `source-fixes/wifi/flx-v1.5.0/wifi5-0003` (WIFI-6, knob) — NVRAM `nullmoth-wifi-band=5`: no 2.4 GHz channels
+  (scans, macOS list and joins on 5 GHz only).
 - `source-fixes/wifi/dropped-wifi-0005` (WIFI-4, **dropped**: hung the boot) — the 1 s watchdog runs the interrupt handler when `HOST_INT_STA` has
   pending bits (lost MSI) and dumps the RX DMA state after 3 s without frames.
