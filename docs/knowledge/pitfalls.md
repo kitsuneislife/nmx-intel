@@ -145,6 +145,9 @@
   restores nothing. Our restore: `tools/upgrade/rollback.sh`.
 - `tools/accel/install.sh` and `tools/nvrm/install.sh` keep nullmoth's original in `~/<kext>.kext.original` only if
   none is there: before installing a new release, move the old originals away (2.1.0's are in `~/nmx-2.1.0/`).
+- [measured, UPG-1] zsh has a builtin `log`: in scripts and tool calls use `/usr/bin/log show`, or it prints nothing.
+- [measured, UPG-1] nullmoth's 2.3.x installer drops a shader cache (`/Library/GPUBundles/nvmtl/aircache`) that other
+  users could write; the first boot then recompiles WindowServer's pipelines and feels slower.
 
 ### S3 sleep blanks the Intel display engine (RTX-22)
 - After `pmset sleepnow` and wake, TRANSCONF, PLANE_CTL, PP_STATUS/PP_CONTROL and the backlight PWM all read 0; only

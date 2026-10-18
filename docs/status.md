@@ -1,6 +1,6 @@
 # Status
 
-> Last updated: 2026-10-18, UPG-1 prep: nullmoth 2.3.6. Keep this file short: it is read at the start of every session.
+> Last updated: 2026-10-18, UPG-1: nullmoth 2.3.6 works. Keep this file short: it is read at the start of every session.
 
 ## Goal and decision
 
@@ -30,8 +30,8 @@ register 0 after wake) and nothing relights it; sleep is off for now (`pmset`). 
 `659dfa20`); RTX-24: `auto.sh` turns it on at boot (works). **RTX-25** (4c) works: NVRM `f5171d7b` (binary patch) sleeps during the copy; kernel_task ~4 %
 (RTX-16: ~40 %). Stage 4 done. **BL-2** brightness works (NMIntelFB `36afddf1`). Open:
 real vblank (5), battery numbers (7), sleep relight.
-**UPG-1 (prepared, not installed):** nullmoth NVIDIA driver 2.1.0 → 2.3.6 with our patches ported: NVRM `8c8873d5`,
-NVAccel `8166045f`, NMIntelFB unchanged. Undo: `tools/upgrade/rollback.sh`. Details: [tests/rtx-8-accelerated-desktop.md](tests/rtx-8-accelerated-desktop.md).
+**UPG-1 works:** nullmoth NVIDIA driver 2.3.6 installed with our patches: NVRM `8c8873d5`, NVAccel `8166045f`,
+NMIntelFB unchanged; open: does the new shader cache (`aircache`) fill. Undo: `tools/upgrade/rollback.sh`. Details: [tests/rtx-8-accelerated-desktop.md](tests/rtx-8-accelerated-desktop.md).
 **Wi-Fi:** WIFI-1 (MT7921, OverlordDev SimpleMtkWlan): WIFI-3 **connects** (WPA2, DHCP on en2) but dies under load; WIFI-4 hung the boot (configd panic), driver removed: [tests/wifi-1-mt7921.md](tests/wifi-1-mt7921.md).
 
 ## Open problems

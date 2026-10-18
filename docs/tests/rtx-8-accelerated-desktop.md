@@ -472,3 +472,21 @@ matches the package's own SHA256SUMS) [measured], unpacked in `~/nmx-build/pkg-2
   `connected-displays = 0`, so it should clear [inferred]; two starts without that turn the driver off.
 - Undo: `sudo bash tools/upgrade/rollback.sh /Library/NullMoth/backup-…` (nullmoth's `uninstall.sh <dir>` only
   removes the driver, it does not restore).
+
+## UPG-1 — nullmoth 2.3.6 with our patches — **works**
+Installed with nullmoth's `install.sh` (backup `/Library/NullMoth/backup-20261018-121651.SbZyeT`), then our NVRM and
+NVAccel; checkpoint `~/nmx-checkpoints/20261018-121440-antes-2.3.6`. Lukas: desktop fine, "a bit cleaner overall";
+some parts of the start felt slower.
+- [measured, kmutil] loaded NVRM/NVRMFB/NVRMAGDC `2.3.6`; NVRM UUID `49375050…` and NVAccel `8D65D43B…` = ours
+  (`8c8873d5`, `8166045f`), NMIntelFB `36afddf1`.
+- [measured, log] boot guard: 12:19:36 `start 1 without a display so far`; 12:19:42 `ENUMERATED: 0 connected
+  display(s) of 1 handle(s)` → `guard cleared: NVKMS lists this card's connectors and none has a display`.
+  `nullmoth-nv-starts` gone, `nullmoth-nv-ok=1`, `debug.nvrmfb_guard_cleared 1`.
+- [measured] bridge: `auto.sh` mode 2 / direct 2 at boot; ~10 min in `iop_ok 32859`, `iop_fail 0`, `iop_late 0`,
+  `async_drop 0`, `nmintelfb_flips` = `iop_ram_frames`.
+- [measured, log] boot timeline (from `kern.boottime`) is the same as the 2.1.0 boot at 08:17: login window +10 s
+  (was +12 s), NVKMS enumeration +20 s (+20 s), `auto.sh` on +83 s (+85 s), first frames on the panel +129 s (+129 s).
+- [measured] the installer said `aircache was writable by other users; starting it empty` (and `spvcache`): the
+  shared shader caches were dropped, so this first start recompiled every WindowServer pipeline [inferred: the slower
+  parts]. The new `aircache` (owner `_windowserver`, 755) was still empty ~5 min after boot [unverified whether it
+  fills; check next boot].
