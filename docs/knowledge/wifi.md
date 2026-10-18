@@ -61,5 +61,6 @@ fork's host tests, install, record a `WIFI-N` test.
 ## Open
 
 - University network: may be WPA2-Enterprise (802.1X) [unverified]; only WPA2-PSK is known to work with this driver.
-- wifi5-0002 and wifi5-0005 are upstream candidates for flxxxxddd (an outward action: needs Lukas's OK).
+- wifi5-0002 and wifi5-0005 offered upstream in one PR (2026-10-18, Lukas's OK): https://github.com/flxxxxddd/SimpleMtkWlan/pull/1
+  (branch `upstream-tx-kpi` of kitsuneislife/SimpleMtkWlan, credit to luzility `110c92c`). If merged, drop both at the next rebase.
 - Sleep is off on this machine (RTX-22), so Wi-Fi across sleep/wake is untested.

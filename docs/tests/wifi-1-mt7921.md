@@ -281,3 +281,6 @@ test had the same mistake.
 - Wi-Fi is done for daily use. Open: WPA2-Enterprise for the university network [unverified]; offering wifi5-0005
   and the in-flight counter (wifi5-0002) upstream to flxxxxddd needs Lukas's OK. Runbook:
   [../knowledge/wifi.md](../knowledge/wifi.md).
+
+- Note (2026-10-18): wifi5-0002 and wifi5-0005 sent upstream in https://github.com/flxxxxddd/SimpleMtkWlan/pull/1
+  (both build, the fork's `tests/run-all.sh` passes on that branch).
