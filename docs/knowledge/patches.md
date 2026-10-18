@@ -101,5 +101,7 @@ source-fixes/00NN-<slug>.patch`, add an `apply` line to `build/apply-fixes.sh` (
   (scans, macOS list and joins on 5 GHz only).
 - `source-fixes/wifi/flx-v1.5.0/wifi5-0004` (WIFI-7) — prefer 5 GHz by default: scan 5 GHz first, hide a 2.4 GHz
   beacon whose SSID is on 5 GHz within 15 RSSI points; `nullmoth-wifi-band=2` = upstream. Host scan test covers both.
+- `source-fixes/wifi/flx-v1.5.0/wifi5-0005` (WIFI-8) — TXWI: compare the unshifted frame type, so data uses firmware
+  rate adaptation instead of the fixed basic rate with BA disabled (luzility `110c92c`); EAPOL keeps the basic rate.
 - `source-fixes/wifi/dropped-wifi-0005` (WIFI-4, **dropped**: hung the boot) — the 1 s watchdog runs the interrupt handler when `HOST_INT_STA` has
   pending bits (lost MSI) and dumps the RX DMA state after 3 s without frames.

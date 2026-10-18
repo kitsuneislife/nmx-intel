@@ -244,3 +244,24 @@ finished). Phone in the same spot: 29.9 / 20.
 - Host tests: the fork's scan test now checks both orders (`2` and prefer), 128 combinations; all 11 suites pass.
   Build `AirportMtkWlan 6bb3765a`.
 - [unverified] Lukas's university network may be WPA2-Enterprise (802.1X); this driver is only known to do WPA2-PSK.
+
+## WIFI-7 result (2026-10-18) — prefer 5 GHz works, 2.4 GHz-only networks back [measured]
+`AirportMtkWlan 6bb3765a`, knob deleted. Lukas: the other networks are back in the list; Nardino joined on ch 108
+(`selbs=Nardino … chan=108 rssi=35`, `RUN peer … vht=1 chw=3`). Google: **36.8 down / 5.09 up**, ping 6 ms.
+- 65 s single-flow upload from this Mac: 5.0 Mbit/s (40.6 MB). Mid-upload stats: **`txwi_free=21` then `8` of 509,
+  `ring_free=255`** (the DMA ring empty), `full` 326 → 520, `oactive=1`; ~464 frames/s out (`opkts` +15303 in 33 s).
+  So the TXWIs are held by the firmware until its TX-free event, and frames leave slowly.
+
+## WIFI-8 prep — data frames through firmware rate adaptation (the upload cap)
+Root cause found in source [read]: `mt7921_mac_write_txwi_80211` shifts the frame type to 0..3 for the TXD fields,
+then tests `if (multicast || type != IEEE80211_FC0_TYPE_DATA)` against the unshifted constant 0x08 — always true.
+Every frame, unicast data included, gets `MT_TXD2_FIX_RATE` + `MT_TXD3_BA_DISABLE` at `mt7921_mac_tx_rate_val()`:
+`mt76_rates[0]` (CCK 1 Mbit/s) on 2.4 GHz, `mt76_rates[4]` (OFDM 6 Mbit/s) on 5 GHz. That matches every upload we
+measured: 0.9 Mbit/s on 2.4 GHz (WIFI-6 prep), 5.0–5.3 on 5 GHz (WIFI-6/7). The same function compares correctly
+a few lines above (`type == (IEEE80211_FC0_TYPE_DATA >> IEEE80211_FC0_TYPE_SHIFT)`). The control-frame header length
+test had the same mistake.
+- `wifi5-0005`: keep `fc_type` unshifted for the comparisons; EAPOL stays at the basic rate (mt76's USE_MINRATE).
+  Identical in substance to luzility/SimpleMtkWlan `110c92c` ("upload stayed at ~4 Mbps … download 70-80"), which
+  never reached flxxxxddd's tree. Other `type` comparisons in the file checked: unshifted or `NOTYET`.
+- Build `AirportMtkWlan a7bfaa40`; host tests 11/11.
+- Success = upload well above 5 Mbit/s with download unchanged (~37), `full` stops climbing during an upload.
