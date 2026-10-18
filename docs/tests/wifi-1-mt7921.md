@@ -144,3 +144,26 @@ the forums (tonymacx86's MediaTek thread is ~315 days old, behind a bot check, o
 - Nothing else exists for this chip: no other kext, no commercial driver, no Apple-side support.
 - Candidate for WIFI-5: flxxxxddd `AirportMtkWlan` Sequoia, built from source with our `wifi-0001` (off on `-nvoff`
   / `-mtkwlanoff`), DEBUG configuration (the one its hardware tests ran with), log via `mtklog.sh`.
+
+## WIFI-5 prep — AirportMtkWlan (native Wi-Fi menu), flxxxxddd v1.5.0
+One variable against WIFI-3: a different driver (flxxxxddd's hardware layer + the AirportItlwm WCL front end), so the
+card shows up as macOS's own Wi-Fi (menu bar, System Settings, Keychain), no client app, no `WiFiConfig` in the plist.
+- Source: `flxxxxddd/SimpleMtkWlan` `9a9c2ea` (tag v1.5.0), MacKernelSDK `3f75008` (its submodule commit, the same
+  we used for WIFI-1). Review: `build-macos.sh` only compiles and links (no network); no file, socket, process or
+  NVRAM calls in the kernel sources (grep of `AirportMtkWlan`, `SimpleMtkWlan`, `mtk80211`, `include`). It does not
+  use `thread_call_cancel_wait` (so `wifi-0002` is not needed).
+- `wifi5-0001` (`source-fixes/wifi/flx-v1.5.0/`): `IOPCIEDeviceWrapper::probe` returns NULL on `-nvoff` (OpenCore
+  "Start once without NVIDIA driver") or `-mtkwlanoff`, before touching the device. Same switch as `wifi-0001`.
+- `tools/wifi/build-airport.sh`: Debug configuration (the one the fork's hardware tests used), `AIRPORT_OS=sequoia`
+  (IO80211 ABI of 15.2+; the Tahoe build would panic here). Output `AirportMtkWlan.kext` (`fa59d016` this build; the
+  hash moves with each build because the commit id is compiled in), personality `IOPCIPrimaryMatch` includes
+  `0x796114c3`, `OSBundleRequired Network-Root`. The switch string is checked in the binary.
+- `tools/wifi/install.sh airport`: installs into `/Library/Extensions`, removes `SimpleMtkWlan.kext` (both match the
+  card), rebuilds the aux KC and swaps it only if `com.flxxxxddd.AirportMtkWlan` and the four nullmoth kexts are in
+  it. The kext could not be test-linked without root (kmutil skips kexts not owned by root); the installer's KC
+  build is that check.
+- Prerequisites already true: `DisableIoMapper` on, no SSDT hiding the card, no OCLP wireless patch, no
+  `IOSkywalkFamily` block. Sleep is off (`pmset`), so the fork's sleep/wake path is not exercised.
+- Log: `bash ~/nmx-build/wifi5/out/mtklog.sh > ~/mtk.txt` (the persistent `MtkDebugLog` on the PCI device, no root).
+  Success = the Wi-Fi menu lists networks, joins `Nardino` from the menu, `networkQuality` completes (WIFI-3 died
+  here), and the next reboot is clean (WIFI-4 hung).

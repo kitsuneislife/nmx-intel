@@ -70,6 +70,7 @@ phase file; open only the row you need.
 | WIFI-3 | 10-17 | SimpleMtkWlan + wifi-0004 | MCU waits poll the interrupt; join the home network | **connects** (WPA2, DHCP); dies under load (`networkQuality`) | [wifi-1](wifi-1-mt7921.md) |
 | WIFI-4 | 10-17 | SimpleMtkWlan + wifi-0005 | lost-interrupt rescue in the watchdog, silent-RX dump | **boot hang**: configd watchdog panic after link up; recovered with `-nvoff`; driver removed | [wifi-1](wifi-1-mt7921.md) |
 | UPG-1 | 10-18 | nullmoth 2.3.6 + NVRM `8c8873d5`, NVAccel `8166045f` | upgrade the NVIDIA driver 2.1.0 → 2.3.6, our patches ported | **works**: guard cleared, bridge 0 failures, same boot timeline; shader cache restarted empty | [rtx-8](rtx-8-accelerated-desktop.md) |
+| WIFI-5 | 10-18 | AirportMtkWlan (flxxxxddd v1.5.0 `9a9c2ea` + wifi5-0001) | native Wi-Fi menu driver, Sequoia IO80211 build | pending | [wifi-1](wifi-1-mt7921.md) |
 
 Adding a test: one row here, the entry at the end of the current phase file (start a new phase file when the goal
 changes), then [../status.md](../status.md).

@@ -1,0 +1,27 @@
+From fd8271de67fef9886e403d105e01eff9ad8bcc9d Mon Sep 17 00:00:00 2001
+From: kitsuneislife <kitsuneislife@users.noreply.github.com>
+Date: Sun, 18 Oct 2026 15:13:38 -0300
+Subject: [PATCH] AirportMtkWlan: leave the card alone on -nvoff or -mtkwlanoff
+
+---
+ AirportMtkWlan/IOPCIEDeviceWrapper.cpp | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/AirportMtkWlan/IOPCIEDeviceWrapper.cpp b/AirportMtkWlan/IOPCIEDeviceWrapper.cpp
+index 4416855..e73644f 100644
+--- a/AirportMtkWlan/IOPCIEDeviceWrapper.cpp
++++ b/AirportMtkWlan/IOPCIEDeviceWrapper.cpp
+@@ -48,6 +48,10 @@ IOWorkLoop *IOPCIEDeviceWrapper::getWorkLoop() const
+ IOService* IOPCIEDeviceWrapper::
+ probe(IOService *provider, SInt32 *score)
+ {
++    /* Safe boot: -nvoff (OpenCore "Start once without NVIDIA driver") or -mtkwlanoff leaves the card alone. */
++    int off = 0;
++    if (PE_parse_boot_argn("-nvoff", &off, sizeof(off)) || PE_parse_boot_argn("-mtkwlanoff", &off, sizeof(off)))
++        return NULL;
+     mtk_dbg_set_nub(provider);
+     XYLog("%s\n", __PRETTY_FUNCTION__);
+     bool isMatch = false;
+-- 
+2.39.5 (Apple Git-154)
+
