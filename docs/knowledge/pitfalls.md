@@ -148,6 +148,8 @@
 - [measured, UPG-1] zsh has a builtin `log`: in scripts and tool calls use `/usr/bin/log show`, or it prints nothing.
 - [measured, UPG-1] nullmoth's 2.3.x installer drops a shader cache (`/Library/GPUBundles/nvmtl/aircache`) that other
   users could write; the first boot then recompiles WindowServer's pipelines and feels slower.
+  The shared folder then stays empty: WindowServer caches in its own `/private/var/folders/zz/…/C/WindowServer/nvmtl`
+  (root to read), which persists, so later boots are not slower.
 
 ### S3 sleep blanks the Intel display engine (RTX-22)
 - After `pmset sleepnow` and wake, TRANSCONF, PLANE_CTL, PP_STATUS/PP_CONTROL and the backlight PWM all read 0; only

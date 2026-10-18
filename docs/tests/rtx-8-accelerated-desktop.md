@@ -490,3 +490,9 @@ some parts of the start felt slower.
   shared shader caches were dropped, so this first start recompiled every WindowServer pipeline [inferred: the slower
   parts]. The new `aircache` (owner `_windowserver`, 755) was still empty ~5 min after boot [unverified whether it
   fills; check next boot].
+- UPG-1 follow-up (10-18, after 3 boots) [measured]: the shared `/Library/GPUBundles/nvmtl/aircache` and `spvcache`
+  stay empty, but WindowServer caches in its own Darwin user cache dir:
+  `/private/var/folders/zz/…/C/WindowServer/nvmtl/aircache` = 70 MB (owner `_windowserver`), and user processes use
+  `$(getconf DARWIN_USER_CACHE_DIR)/nvmtl` (42 MB). `nvmtl_aircache_dir()` falls back there when the shared folder
+  is not writable for the process [read, `plugin/NVMTLLibraryLoad.m`]. The C dir persists across boots, so only the
+  first boot after the install recompiled; nothing to fix.
