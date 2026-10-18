@@ -17,6 +17,7 @@ summary block on top, linked to each other). The original Portuguese diary is pr
 | Making the RTX → Intel bridge cheaper | [knowledge/bridge-optimization.md](knowledge/bridge-optimization.md) |
 | Panel brightness (nullmoth switch vs our Intel panel) | [knowledge/brightness.md](knowledge/brightness.md) |
 | Moving to a new nullmoth release | [knowledge/nullmoth-upgrade.md](knowledge/nullmoth-upgrade.md) |
+| Wi-Fi (MT7921): build, install, knobs, undo | [knowledge/wifi.md](knowledge/wifi.md) |
 
 ## Map
 
@@ -29,6 +30,7 @@ tests/15-24-drm-userspace.md      fb=2: FBC/PSR, DRM opens, libdrm, RCU, watchdo
 tests/rtx-1-7-nmintelfb.md        RTX composites, Intel panel shows (parked)
 tests/25-32-framebuffer.md        NMXGPUFB on the desktop, controller fix, ghost display, mirror
 tests/rtx-8-accelerated-desktop.md RTX path resumed: own controller for NMIntelFB → accelerated desktop (current)
+tests/wifi-1-mt7921.md            Wi-Fi MT7921: SimpleMtkWlan (WIFI-1..4), AirportMtkWlan native menu (WIFI-5..8)
 knowledge/architecture.md         components and the path of a frame
 knowledge/pitfalls.md             symptom → cause → fix, by area           (highest-value file)
 knowledge/diagnostics.md          trail/beat/io tokens, knobs, tools, recovery
@@ -37,6 +39,7 @@ knowledge/binary-patches.md       legacy byte patches 1–5
 knowledge/research.md             external projects and upstream
 knowledge/bridge-optimization.md  per-frame cost of the bridge and the staged plan (CASO shape)
 knowledge/nullmoth-upgrade.md     runbook: new nullmoth release + our NVRM/NVAccel patches on top
+knowledge/wifi.md                 runbook: MT7921 native Wi-Fi driver, our patches, knobs, recovery
 knowledge/brightness.md           why nullmoth's brightness switch does not reach the Intel panel; BL-1/BL-2 plan
 archive/LOG-pt.md                 original diary (Portuguese, verbatim)
 ```

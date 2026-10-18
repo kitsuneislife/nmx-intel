@@ -265,3 +265,19 @@ test had the same mistake.
   never reached flxxxxddd's tree. Other `type` comparisons in the file checked: unshifted or `NOTYET`.
 - Build `AirportMtkWlan a7bfaa40`; host tests 11/11.
 - Success = upload well above 5 Mbit/s with download unchanged (~37), `full` stops climbing during an upload.
+
+## WIFI-8 result (2026-10-18) — upload at the line's ceiling [measured]
+`AirportMtkWlan a7bfaa40` (`kextstat`: `com.flxxxxddd.AirportMtkWlan (1.5.0)`), knob unset. Nardino on ch 108, VHT80
+(`selbs=Nardino … chan=108 rssi=35`, `RUN peer ht=1 vht=1 chw=3 … center_freq1=5530`).
+- Google speed test (Lukas): **37.10 down / 36.91 up**, ping 6 ms (WIFI-7: 36.8 / 5.09). Lukas: the same ceiling as
+  his phone; the phone's 20 up was the phone, so the line is the limit now.
+- Single-flow curl from this Mac: upload **38.2 Mbit/s** (30 MB to `speed.cloudflare.com` in ~6 s; WIFI-7: 5.0),
+  download **44.7 Mbit/s** (25 MB). `speedtest.tele2.net` (Sweden) stays ~2 Mbit/s, as on WIFI-5: distance, not us.
+- Driver log after the tests: RX all VHT 80 MHz (`rxrate n=18016 … vht=18016 … 80=18016`), `gap_timeout=3`,
+  `frame_lost=8`; mid-upload `txwi_free=3`, `ring_free=246`, idle `txwi_free=509`, `ring_free=255`. The TXWI pool
+  still empties during an upload, but the frames now leave at the negotiated rate, so it no longer caps the speed
+  [inferred]. `main work loop busy` 32 times in the log (also seen on WIFI-6), harmless so far.
+- Log kept in `~/nmx-build/wifi5/mtk-wifi8.txt` (not versioned).
+- Wi-Fi is done for daily use. Open: WPA2-Enterprise for the university network [unverified]; offering wifi5-0005
+  and the in-flight counter (wifi5-0002) upstream to flxxxxddd needs Lukas's OK. Runbook:
+  [../knowledge/wifi.md](../knowledge/wifi.md).

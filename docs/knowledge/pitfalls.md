@@ -173,3 +173,9 @@ until then the login window never appears (looks like a graphics hang). Recovery
 without NVIDIA driver" (`-nvoff`), which our Wi-Fi build honours, then `sudo bash tools/wifi/install.sh restore`.
 Never call the interrupt handler from another workloop (watchdog) without proving the locking.
 
+
+## Shifted vs unshifted 802.11 frame type (WIFI-8)
+[measured] flxxxxddd's `mt7921_mac_write_txwi_80211` shifts the frame type to 0..3 for the TXD fields, then compared
+it with `IEEE80211_FC0_TYPE_DATA` (0x08): never equal, so every data frame got the fixed basic rate (1 / 6 Mbit/s) with
+block ack off. Symptom: download fine, upload stuck at ~5 Mbit/s on 5 GHz and ~1 on 2.4 GHz, TXWI pool empty while
+the DMA ring is empty. When a Wi-Fi port's upload is far below its download, read the TX descriptor code first.
