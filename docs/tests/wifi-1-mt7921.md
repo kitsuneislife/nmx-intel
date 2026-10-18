@@ -167,3 +167,17 @@ card shows up as macOS's own Wi-Fi (menu bar, System Settings, Keychain), no cli
 - Log: `bash ~/nmx-build/wifi5/out/mtklog.sh > ~/mtk.txt` (the persistent `MtkDebugLog` on the PCI device, no root).
   Success = the Wi-Fi menu lists networks, joins `Nardino` from the menu, `networkQuality` completes (WIFI-3 died
   here), and the next reboot is clean (WIFI-4 hung).
+- **First install refused (10-18)** [measured]: `install.sh airport` → kmutil `Failed to bind '_thread_call_cancel_wait'
+  … could not find a kext which exports this symbol`; the aux KC was not changed (the kext file stayed in
+  `/Library/Extensions`, the next install replaces it). The call is in `mtk80211/openbsd/sys/_task.cpp`
+  (`taskq_quiesce`), not in `compat.cpp` where `wifi-0002` fixed it for OverlordDev's tree; my prep grep missed it
+  (zsh globbing broke `--include`). `kmutil libraries -p` showed it was the only symbol from `com.apple.kpi.private`.
+- `wifi5-0002`: `taskq_quiesce` waits for an in-flight counter instead (task_add counts each invocation
+  `thread_call_enter` schedules, `taskq_run` uncounts on return, a successful `thread_call_cancel` uncounts one;
+  bounded 5 s). Matches xnu's `THREAD_CALL_ONCE` rules (entering a running call reschedules it once and returns FALSE;
+  cancel returns TRUE when it clears that reschedule) [read, xnu `thread_call.c`]. `thread_call_isactive` was tried
+  first: not exported to kexts either. The fork's host test stub now follows the same ONCE rules; all 11 host tests
+  pass (`tests/run-all.sh`, needs a UTF-8 locale for `scan`).
+- `build-airport.sh` now fails if any undefined symbol is not exported to kexts or comes from `com.apple.kpi.private`
+  (`kmutil libraries -p`). Rebuilt: `AirportMtkWlan 3159e898`, 941 symbols from IO80211Family, IONetworkingFamily,
+  IOSkywalkFamily, IOPCIFamily, corecapture and the bsd/iokit/libkern/mach KPIs, none private [measured].

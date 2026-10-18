@@ -26,5 +26,11 @@ ditto "$W/src/build/Debug/sequoia/AirportMtkWlan.kext" "$W/out/AirportMtkWlan.ke
 codesign -f -s - "$W/out/AirportMtkWlan.kext" >/dev/null 2>&1 || true
 B=$W/out/AirportMtkWlan.kext/Contents/MacOS/AirportMtkWlan
 grep -q -a -- -mtkwlanoff "$B" || { echo "safe-boot switch missing from the binary"; exit 1; }
+# Every external symbol must come from a KPI a third-party kext may link (kmutil refuses com.apple.kpi.private:
+# WIFI-5's first install failed on thread_call_cancel_wait). _RESERVED vtable slots are bound by the kernel.
+LIBS=$(kmutil libraries -p "$W/out/AirportMtkWlan.kext" --arch x86_64 2>/dev/null)
+MISSING=$(comm -23 <(nm -u "$B" | awk '{print $1}' | sort -u) <(printf '%s\n' "$LIBS" | awk '/^\t\t/{print $1}' | sort -u) | grep -v _RESERVED || true)
+[ -z "$MISSING" ] || { echo "symbols this kernel does not export: $MISSING"; exit 1; }
+! printf '%s\n' "$LIBS" | grep -q com.apple.kpi.private || { printf '%s\n' "$LIBS" | grep kpi.private; echo "private KPI used"; exit 1; }
 cp "$W/src/tools/mtklog.sh" "$W/out/mtklog.sh"
 echo "AirportMtkWlan $(shasum -a 256 "$B" | cut -c1-8) ($(git -C "$W/src" log --oneline -1))"
