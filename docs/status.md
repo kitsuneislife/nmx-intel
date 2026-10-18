@@ -32,7 +32,7 @@ register 0 after wake) and nothing relights it; sleep is off for now (`pmset`). 
 real vblank (5), battery numbers (7), sleep relight.
 **UPG-1 works:** nullmoth NVIDIA driver 2.3.6 installed with our patches: NVRM `8c8873d5`, NVAccel `8166045f`,
 NMIntelFB unchanged; shader cache works (WindowServer keeps its own, 70 MB). Undo: `tools/upgrade/rollback.sh`. Details: [tests/rtx-8-accelerated-desktop.md](tests/rtx-8-accelerated-desktop.md).
-**Wi-Fi:** WIFI-1 (MT7921, OverlordDev SimpleMtkWlan): WIFI-3 **connects** (WPA2, DHCP on en2) but dies under load; WIFI-4 hung the boot (configd panic), driver removed. **WIFI-5 works**: flxxxxddd's AirportMtkWlan, native Wi-Fi menu, clean reboots; download very slow (open): [tests/wifi-1-mt7921.md](tests/wifi-1-mt7921.md).
+**Wi-Fi:** WIFI-1 (MT7921, OverlordDev SimpleMtkWlan): WIFI-3 **connects** (WPA2, DHCP on en2) but dies under load; WIFI-4 hung the boot (configd panic), driver removed. **WIFI-5 works**: flxxxxddd's AirportMtkWlan, native Wi-Fi menu. WIFI-6 (5 GHz): 38 down / 5.1 up. WIFI-7 prepared (prefer 5 GHz, keep 2.4-only networks); upload next: [tests/wifi-1-mt7921.md](tests/wifi-1-mt7921.md).
 
 ## Open problems
 

@@ -220,3 +220,27 @@ Lukas, 10-18: Google's speed test gives ~5 Mbit/s down, upload never finishes; h
   + reboot undoes it, no rebuild, no EFI change. Build `AirportMtkWlan f3742061`, knob string present.
 - Success = join on a 5 GHz channel (log `RUN peer … vht=1`, `rxrate` VHT/HT40-80), and single-flow down/up well
   above 4.9 / 0.9 Mbit/s.
+
+## WIFI-6 result (2026-10-18) — 5 GHz: download ×8, upload still low [measured]
+`AirportMtkWlan f3742061`, `nullmoth-wifi-band=5`. Joined Nardino on **ch 108, VHT80** (`RUN peer ht=1 vht=1 chw=3
+… center_freq1=5530`, rssi 34). Google speed test (Lukas): **38.0 down / 5.1 up**, ping 7 ms (was ~5 / never
+finished). Phone in the same spot: 29.9 / 20.
+- Driver log: RX VHT 80 MHz, 2 streams, MCS 3–5 (SGI on most), almost no reorder holes (`gap_timeout` 2).
+- Single-flow curl from this Mac: upload 5.3 Mbit/s (13.2 MB in 20 s); while it ran `full` (output paused for want
+  of a TXWI or TX ring slot) went 173 → 262 and the watchdog logged `main work loop busy` 26 times.
+- Side effect Lukas does not want: networks that are only on 2.4 GHz are gone from the list.
+- Reading [inferred], for later: with 512 TXWIs and ~440 frames/s, a frame's TXWI comes back ~1 s after it was queued.
+  TXWIs and TX ring slots are only reclaimed by the firmware's TX-free event (`mwx_mac_tx_free` → `mwx_tx_kick`);
+  the TX-done interrupt cleans the ring but does not restart output. Upload is the next test, not this one.
+
+## WIFI-7 prep — prefer 5 GHz without hiding 2.4 GHz-only networks
+`wifi5-0004` makes "prefer 5 GHz" the default when `nullmoth-wifi-band` is unset (`5` = 5 GHz only as in WIFI-6,
+`2` = upstream behaviour):
+- the scan request lists the 5 GHz channels first, then 2.4 GHz, so a dual-band SSID's 5 GHz node is in the node tree
+  before its 2.4 GHz beacon arrives;
+- `publishWCLBeacon` does not pass a 2.4 GHz beacon to macOS when the same SSID is on 5 GHz within 15 RSSI points
+  (net80211's own preference rule, `ieee80211_node.c:1394`), except the BSS we are joined to; SSIDs that exist
+  only on 2.4 GHz are shown as before.
+- Host tests: the fork's scan test now checks both orders (`2` and prefer), 128 combinations; all 11 suites pass.
+  Build `AirportMtkWlan 6bb3765a`.
+- [unverified] Lukas's university network may be WPA2-Enterprise (802.1X); this driver is only known to do WPA2-PSK.

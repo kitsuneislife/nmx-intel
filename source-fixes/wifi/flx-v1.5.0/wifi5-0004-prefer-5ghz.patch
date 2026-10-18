@@ -1,0 +1,159 @@
+From e2bab6737eb0e61c8fed7cd0d935c75df6f1f1c8 Mon Sep 17 00:00:00 2001
+From: kitsuneislife <kitsuneislife@users.noreply.github.com>
+Date: Sun, 18 Oct 2026 15:51:25 -0300
+Subject: [PATCH] nmx: prefer 5 GHz by default (scan 5 GHz first, hide 2.4 GHz
+ twins of 5 GHz SSIDs); nullmoth-wifi-band=2 restores upstream
+
+---
+ AirportMtkWlan/WCL/WCL.cpp       |  5 ++++
+ SimpleMtkWlan/hal_mwx/MtkMwx.cpp | 46 +++++++++++++++++++++++++++-----
+ tests/scan/generate.rb           | 11 +++++---
+ 3 files changed, 52 insertions(+), 10 deletions(-)
+
+diff --git a/AirportMtkWlan/WCL/WCL.cpp b/AirportMtkWlan/WCL/WCL.cpp
+index ba9ab3d..2c504d2 100644
+--- a/AirportMtkWlan/WCL/WCL.cpp
++++ b/AirportMtkWlan/WCL/WCL.cpp
+@@ -310,6 +310,8 @@ void AirportItlwmSkywalkInterface::completeWCLScan()
+         finishWCLScan(scanCompleted ? kIOReturnSuccess : kIOReturnTimeout);
+ }
+ 
++bool nmx_hide_24ghz_twin(struct ieee80211com *ic, const struct ieee80211_node *node);
++
+ void AirportItlwmSkywalkInterface::publishWCLBeacon(const ieee80211_node *node, const uint8_t *ies, size_t length)
+ {
+     if (!node || node->ni_esslen > 32 || !AirportWCL::validIEs(ies, length))
+@@ -320,6 +322,9 @@ void AirportItlwmSkywalkInterface::publishWCLBeacon(const ieee80211_node *node,
+     unsigned channel = ieee80211_chan2ieee(ic, node->ni_chan);
+     if (!channel || channel > 196)
+         return;
++    /* nmx prefer-5 GHz: keep the joined BSS's info current, hide other 2.4 GHz twins of 5 GHz SSIDs */
++    if (!(assocNotified && IEEE80211_ADDR_EQ(node->ni_bssid, joinBSSID)) && nmx_hide_24ghz_twin(ic, node))
++        return;
+     size_t size = sizeof(AirportWCL::BeaconMetadata) + length;
+     auto metadata = static_cast<AirportWCL::BeaconMetadata *>(IOMalloc(size));
+     if (!metadata)
+diff --git a/SimpleMtkWlan/hal_mwx/MtkMwx.cpp b/SimpleMtkWlan/hal_mwx/MtkMwx.cpp
+index b468301..d76170f 100644
+--- a/SimpleMtkWlan/hal_mwx/MtkMwx.cpp
++++ b/SimpleMtkWlan/hal_mwx/MtkMwx.cpp
+@@ -30,6 +30,28 @@
+ 
+ #include "MtkMwx.hpp"
+ #include <IOKit/IODeviceTreeSupport.h>
++
++char nmx_wifi_band;	/* NVRAM nullmoth-wifi-band, read at preinit: '5', '2' or 0 (prefer 5 GHz) */
++
++/* Prefer-5 GHz mode: a 2.4 GHz node is a twin to hide when the same SSID is on 5 GHz within 15 RSSI points. */
++bool
++nmx_hide_24ghz_twin(struct ieee80211com *ic, const struct ieee80211_node *node)
++{
++	struct ieee80211_node *o;
++
++	if (nmx_wifi_band == '2' || nmx_wifi_band == '5' || node->ni_esslen == 0 ||
++	    node->ni_chan == NULL || node->ni_chan == IEEE80211_CHAN_ANYC || !IEEE80211_IS_CHAN_2GHZ(node->ni_chan))
++		return false;
++	RB_FOREACH(o, ieee80211_tree, &ic->ic_tree) {
++		if (o == node || o->ni_chan == NULL || o->ni_chan == IEEE80211_CHAN_ANYC ||
++		    !IEEE80211_IS_CHAN_5GHZ(o->ni_chan) || o->ni_esslen != node->ni_esslen ||
++		    memcmp(o->ni_essid, node->ni_essid, node->ni_esslen) != 0)
++			continue;
++		if (o->ni_rssi + 15 >= node->ni_rssi)
++			return true;
++	}
++	return false;
++}
+ #ifdef AIRPORT_WCL
+ #include "WCL/WCL.hpp"
+ #endif
+@@ -2158,19 +2180,22 @@ mwx_preinit(struct mwx_softc *sc)
+ 	    sc->sc_capa.antenna_mask);
+ 
+ 	/*
+-	 * nmx knob: NVRAM nullmoth-wifi-band=5 leaves the 2.4 GHz channels out, so scans, macOS's network list and
+-	 * joins are 5 GHz only (a dual-band SSID then joins on 5 GHz). Delete the variable to get 2.4 GHz back.
++	 * nmx knob, NVRAM nullmoth-wifi-band: 5 = the 2.4 GHz channels are left out (scans, macOS's network list and
++	 * joins are 5 GHz only); 2 = upstream behaviour; unset = prefer 5 GHz: scans visit 5 GHz first and a 2.4 GHz
++	 * network whose SSID is also on 5 GHz within 15 RSSI points is not shown to macOS (nmx_hide_24ghz_twin).
+ 	 */
+-	bool only5 = false;
++	nmx_wifi_band = 0;
+ 	if (IORegistryEntry *opts = IORegistryEntry::fromPath("/options", gIODTPlane)) {
+ 		if (OSData *d = OSDynamicCast(OSData, opts->copyProperty("nullmoth-wifi-band"))) {
+-			only5 = d->getLength() >= 1 && ((const char *)d->getBytesNoCopy())[0] == '5';
++			if (d->getLength() >= 1)
++				nmx_wifi_band = ((const char *)d->getBytesNoCopy())[0];
+ 			d->release();
+ 		}
+ 		opts->release();
+ 	}
+-	if (only5 && sc->sc_capa.has_5ghz)
+-		MWX_DEV_LOG(sc, "preinit nullmoth-wifi-band=5: 2.4 GHz channels left out\n");
++	bool only5 = nmx_wifi_band == '5';
++	MWX_DEV_LOG(sc, "preinit nullmoth-wifi-band=%c: %s\n", nmx_wifi_band ? nmx_wifi_band : '-',
++	    only5 ? "5 GHz only" : nmx_wifi_band == '2' ? "no band preference" : "prefer 5 GHz");
+ 
+ 	if (sc->sc_capa.has_2ghz && !(only5 && sc->sc_capa.has_5ghz)) {
+ 		for (i = 0; i < MWX_NUM_2GHZ_CHANNELS; i++) {
+@@ -5007,7 +5032,11 @@ mt7921_mcu_hw_scan(struct mwx_softc *sc, int bgscan)
+ 	req->ssid_type_ext = n_ssids ? 1 : 0;
+ 	req->ssids_num = n_ssids;
+ 
+-	for (nchan = 0, c = &ic->ic_channels[1];
++	/* Prefer-5 GHz mode visits 5 GHz first, so a dual-band SSID's 5 GHz node is known before its 2.4 GHz beacon. */
++	bool from5 = nmx_wifi_band != '2' && nmx_wifi_band != '5';
++	nchan = 0;
++	for (int pass = 0; pass < (from5 ? 2 : 1); pass++)
++	for (c = &ic->ic_channels[1];
+ 	    c <= &ic->ic_channels[IEEE80211_CHAN_MAX] &&
+ 	    nchan < 64; c++) {
+ 		struct mt76_connac_mcu_scan_channel *chan;
+@@ -5015,6 +5044,9 @@ mt7921_mcu_hw_scan(struct mwx_softc *sc, int bgscan)
+ 
+ 		if (c->ic_flags == 0)
+ 			continue;
++		/* prefer-5 GHz: pass 0 takes the 5 GHz channels, pass 1 the 2.4 GHz ones */
++		if (from5 && (pass == 0) == IEEE80211_IS_CHAN_2GHZ(c))
++			continue;
+ #ifdef AIRPORT_WCL
+ 		if (!AirportWCL::scanChannelSelected(ic->ic_wcl_scan_channels,
+ 		    ic->ic_wcl_scan_requested && ic->ic_wcl_scan_restricted,
+diff --git a/tests/scan/generate.rb b/tests/scan/generate.rb
+index b934e46..e8a6f72 100644
+--- a/tests/scan/generate.rb
++++ b/tests/scan/generate.rb
+@@ -40,6 +40,7 @@ struct mbuf {unsigned char bytes[sizeof(mt76_connac_hw_scan_req)];};
+ #define IEEE80211_IS_CHAN_2GHZ(c) ((c)->ic_freq<100)
+ static unsigned ieee80211_mhz2ieee(unsigned freq,int){return freq;}
+ static unsigned char poison;
++static char nmx_wifi_band;
+ static bool alloc_fail;
+ static int send_error;
+ static mt76_connac_hw_scan_req captured;
+@@ -53,8 +54,8 @@ static void check(bool ok,const char*reason){if(!ok){fprintf(stderr,"FAIL: %s\n"
+ static void zeros(const void*p,size_t n,const char*reason){auto b=static_cast<const unsigned char*>(p);for(size_t i=0;i<n;i++)check(b[i]==0,reason);}
+ int main(){
+  unsigned cases=0;
+- for(unsigned seed: {0x00,0xbd,0xfb,0xff}) for(unsigned n: {0,1,14,32,33,41,64,65}) for(int bg: {0,1}) {
+-  poison=seed; mwx_softc sc={}; sc.sc_scan_seq_num=127;
++ for(char band: {'2','\0'}) for(unsigned seed: {0x00,0xbd,0xfb,0xff}) for(unsigned n: {0,1,14,32,33,41,64,65}) for(int bg: {0,1}) {
++  nmx_wifi_band=band; poison=seed; mwx_softc sc={}; sc.sc_scan_seq_num=127;
+   for(unsigned i=1;i<=n;i++){sc.sc_ic.ic_channels[i].ic_flags=1;sc.sc_ic.ic_channels[i].ic_freq=i<=14?i:100+i;}
+   check(mt7921_mcu_hw_scan(&sc,bg)==0,"scan return");
+   check(captured.scan_func==SCAN_FUNC_SPLIT_SCAN,"scan_func contains stale allocation bits");
+@@ -75,7 +76,11 @@ int main(){
+   zeros(captured.ext_ssids,sizeof(captured.ext_ssids),"unused extra SSIDs");
+   zeros(captured.random_mac,sizeof(captured.random_mac),"disabled random MAC");
+   for(auto v:captured.bssid)check(v==0xff,"wildcard BSSID");
+-  for(unsigned i=0;i<std::min(n,64u);i++) {auto c=i<32?captured.channels[i]:captured.ext_channels[i-32];check(c.band==(i<14?1:2),"band");check(c.channel_num==(i<14?i+1:101+i),"channel");}
++  // nullmoth-wifi-band=2: channel table order; unset (prefer 5 GHz): the 5 GHz channels first, then 2.4 GHz
++  unsigned exp_band[128],exp_num[128],e=0;
++  if(band=='2') for(unsigned i=1;i<=n;i++){exp_band[e]=i<=14?1:2;exp_num[e++]=i<=14?i:100+i;}
++  else {for(unsigned i=15;i<=n;i++){exp_band[e]=2;exp_num[e++]=100+i;} for(unsigned i=1;i<=n&&i<=14;i++){exp_band[e]=1;exp_num[e++]=i;}}
++  for(unsigned i=0;i<std::min(n,64u);i++) {auto c=i<32?captured.channels[i]:captured.ext_channels[i-32];check(c.band==exp_band[i],"band");check(c.channel_num==exp_num[i],"channel");}
+   cases++;
+  }
+  mwx_softc sc={};sc.sc_scan_seq_num=42;alloc_fail=true;
+-- 
+2.39.5 (Apple Git-154)
+

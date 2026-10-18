@@ -71,7 +71,8 @@ phase file; open only the row you need.
 | WIFI-4 | 10-17 | SimpleMtkWlan + wifi-0005 | lost-interrupt rescue in the watchdog, silent-RX dump | **boot hang**: configd watchdog panic after link up; recovered with `-nvoff`; driver removed | [wifi-1](wifi-1-mt7921.md) |
 | UPG-1 | 10-18 | nullmoth 2.3.6 + NVRM `8c8873d5`, NVAccel `8166045f` | upgrade the NVIDIA driver 2.1.0 → 2.3.6, our patches ported | **works**: guard cleared, bridge 0 failures, same boot timeline; shader cache restarted empty | [rtx-8](rtx-8-accelerated-desktop.md) |
 | WIFI-5 | 10-18 | AirportMtkWlan (flxxxxddd v1.5.0 `9a9c2ea` + wifi5-0001/0002) | native Wi-Fi menu driver, Sequoia IO80211 build | **native Wi-Fi works** (menu, Keychain join, clean reboot); download 0.24 Mbit/s vs upload 18.6 (BA holes, TX ring full) | [wifi-1](wifi-1-mt7921.md) |
-| WIFI-6 | 10-18 | AirportMtkWlan + wifi5-0003, NVRAM `nullmoth-wifi-band=5` | 5 GHz only (2.4 GHz at MCS 1: 4.9 down / 0.9 up) | pending | [wifi-1](wifi-1-mt7921.md) |
+| WIFI-6 | 10-18 | AirportMtkWlan + wifi5-0003, NVRAM `nullmoth-wifi-band=5` | 5 GHz only (2.4 GHz at MCS 1: 4.9 down / 0.9 up) | **38 down / 5.1 up** (VHT80 ch 108); 2.4-only networks hidden; upload limited by TX queue | [wifi-1](wifi-1-mt7921.md) |
+| WIFI-7 | 10-18 | AirportMtkWlan `6bb3765a` (+wifi5-0004), knob unset | prefer 5 GHz: 5 GHz scanned first, 2.4 GHz twins hidden, 2.4-only kept | pending | [wifi-1](wifi-1-mt7921.md) |
 
 Adding a test: one row here, the entry at the end of the current phase file (start a new phase file when the goal
 changes), then [../status.md](../status.md).
