@@ -181,3 +181,24 @@ card shows up as macOS's own Wi-Fi (menu bar, System Settings, Keychain), no cli
 - `build-airport.sh` now fails if any undefined symbol is not exported to kexts or comes from `com.apple.kpi.private`
   (`kmutil libraries -p`). Rebuilt: `AirportMtkWlan 3159e898`, 941 symbols from IO80211Family, IONetworkingFamily,
   IOSkywalkFamily, IOPCIFamily, corecapture and the bsd/iokit/libkern/mach KPIs, none private [measured].
+
+## WIFI-5 result (2026-10-18) — **native Wi-Fi works**; download very slow [measured]
+Installed `AirportMtkWlan 3159e898` (`install.sh airport`), rebooted twice (second boot 15:21, clean). Lukas joined
+`Nardino` from the macOS Wi-Fi menu, first try.
+- Loaded `com.flxxxxddd.AirportMtkWlan (1.5.0)`; `IO80211InterfaceRole = Infrastructure`; System Information: en2
+  "Card Type: Wi-Fi (0x14C3, 0x3802)", "Firmware Version: itlwm: 1.5.0bc9b48b fw: MT7921", PHY a/b/g/n/ac; DHCP
+  192.168.1.12, default route on en2. Private Wi-Fi address in use (`96:8f:cb:…`).
+- Join (log, s since load): WCL join from the Keychain at 195 s, 4-way, `RUN peer ht=1 vht=0`, re-join at 205 s, then
+  BA sessions (rx tid 0/1/2/4/7, tx tid 0/2/3). **2.4 GHz channel 8, HT20**, RSSI 41; the scans cover all 41 channels
+  and see Nardino on 5 GHz ch 108 too, but macOS picked 2.4 GHz.
+- `networkQuality`: **uplink 18.6 Mbit/s, downlink 0.24 Mbit/s**, responsiveness 1.4 s, idle latency 254 ms. Ping to
+  the gateway afterwards: 20 × 0 % loss, 10–30 ms.
+- During the test the driver log shows [measured]: RX rates MCS 5–8, 2 streams, 20 MHz (PHY ~100+ Mbit/s);
+  `ba gap_timeout` 3 → 40 → 73 and `frame_lost` 5 → 92 → 257, `below` up to 246 (reorder holes closed by the 100 ms
+  timeout, late frames dropped); `tx txwi_free=10 … full=62 oactive=1` at 275 s (TX descriptors almost exhausted,
+  output paused; back to 396–509 free a minute later, `full=92` total); repeated `watchdog: main work loop busy, poll
+  skipped`. Later the AP fell to MCS 1, 1 stream. `rx_swdec` ~1 % of `rx_hwdec` (decryption fine), `ierr=9`.
+- Reading [inferred]: the radio link is fine (rates, decryption, uplink), the download collapses in the driver: RX
+  reorder holes stall TCP for 100 ms each (the fork's README says the firmware does not deliver BAR frames), and the
+  TX ring filling during the test delays TCP ACKs. 2.4 GHz HT20 on a busy channel makes both worse. Log kept in
+  `~/nmx-build/wifi5/mtk-wifi5.txt` (not versioned: private addresses).
