@@ -179,3 +179,10 @@ Never call the interrupt handler from another workloop (watchdog) without provin
 it with `IEEE80211_FC0_TYPE_DATA` (0x08): never equal, so every data frame got the fixed basic rate (1 / 6 Mbit/s) with
 block ack off. Symptom: download fine, upload stuck at ~5 Mbit/s on 5 GHz and ~1 on 2.4 GHz, TXWI pool empty while
 the DMA ring is empty. When a Wi-Fi port's upload is far below its download, read the TX descriptor code first.
+
+## `hibernatemode 25` is ignored on this SMBIOS (SLEEP-1)
+[measured] With `hibernatemode 25` the kernel still logged `PMRD: sleep params v2, type 7` and `hibernateMode 0x0`
+and woke with "Wake from Normal Sleep": plain S3. [inferred] On x86 the sleep type comes from the platform policy
+handler (X86PlatformPlugin, `IOPlatformSystemSleepPolicy` in the board plist); MacBookPro16,1's table has no
+hibernate entry. Check `PMRD: sleep params` in the kernel log before trusting `pmset`; HibernationFixup's
+`hbfx-ahbm=1` is the usual override.

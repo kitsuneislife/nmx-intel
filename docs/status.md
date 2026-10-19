@@ -1,6 +1,6 @@
 # Status
 
-> Last updated: 2026-10-19, SLEEP-1 prepared; 10-18 WIFI-8: native Wi-Fi at full speed; UPG-1: nullmoth 2.3.6 works. Keep this file short: it is read at the start of every session.
+> Last updated: 2026-10-19, SLEEP-1 fails (S3, not hibernate), SLEEP-2 prepared; 10-18 WIFI-8: native Wi-Fi at full speed; UPG-1: nullmoth 2.3.6 works. Keep this file short: it is read at the start of every session.
 
 ## Goal and decision
 
@@ -29,7 +29,7 @@ turns it on at boot (works). **Sleep breaks the panel**: S3 resets the Intel dis
 register 0 after wake) and nothing relights it; sleep is off for now (`pmset`). **RTX-23** flip (4b) works (NMIntelFB `59c98103`, NVAccel
 `659dfa20`); RTX-24: `auto.sh` turns it on at boot (works). **RTX-25** (4c) works: NVRM `f5171d7b` (binary patch) sleeps during the copy; kernel_task ~4 %
 (RTX-16: ~40 %). Stage 4 done. **BL-2** brightness works (NMIntelFB `36afddf1`). Open:
-real vblank (5), battery numbers (7), sleep relight: **SLEEP-1** (hibernate instead of S3) prepared, `tools/sleep/hibernate.sh`, [tests/sleep-1-hibernate.md](tests/sleep-1-hibernate.md).
+real vblank (5), battery numbers (7), sleep relight: **SLEEP-1** failed (the sleep policy did S3 despite `hibernatemode 25`); **SLEEP-2** (HibernationFixup `hbfx-ahbm=1` forces hibernation) prepared, `tools/sleep/hibernate.sh`, [tests/sleep-1-hibernate.md](tests/sleep-1-hibernate.md).
 **UPG-1 works:** nullmoth NVIDIA driver 2.3.6 installed with our patches: NVRM `8c8873d5`, NVAccel `8166045f`,
 NMIntelFB unchanged; shader cache works (WindowServer keeps its own, 70 MB). Undo: `tools/upgrade/rollback.sh`. Details: [tests/rtx-8-accelerated-desktop.md](tests/rtx-8-accelerated-desktop.md).
 **Wi-Fi:** WIFI-1 (MT7921, OverlordDev SimpleMtkWlan): WIFI-3 **connects** (WPA2, DHCP on en2) but dies under load; WIFI-4 hung the boot (configd panic), driver removed. **WIFI-5 works**: flxxxxddd's AirportMtkWlan, native Wi-Fi menu. WIFI-6 (5 GHz): 38 down / 5.1 up. WIFI-7 works (prefer 5 GHz, all networks listed). **WIFI-8 works**: upload was capped by a fixed basic TX rate (wifi5-0005); now 37.1 down / 36.9 up, the line's ceiling. Runbook: [knowledge/wifi.md](knowledge/wifi.md); tests: [tests/wifi-1-mt7921.md](tests/wifi-1-mt7921.md).

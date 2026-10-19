@@ -27,3 +27,29 @@
   panel show the desktop (NMIntelFB `power 1` with `trans c0000000 plane 94000008` from the GOP)? Do the RTX, Wi-Fi and
   brightness come back?
 - Risk: if resume fails the Mac boots fresh and unsaved work is lost; nothing on disk changes beyond the sleep image.
+
+## SLEEP-1 result (10-19) — fails: macOS never hibernated, it did plain S3
+Lukas: after "hibernating" the panel did not come back (not black, just off). Evidence (`pmset -g log`, kernel log):
+- [measured] 08:37:46 `Entering Sleep state due to 'Software Sleep'`; sleep factors `0x2308c6` include
+  `HibernateForced`, yet the kernel logged `PMRD: sleep params v2, type 7, flags 0x0` and `PMRD: hibernateMode 0x0`.
+- [measured] 08:38:10 `Wake from Normal Sleep [CDNVA] : due to PWRB XDCI CNVW/User` (hibmode=25 in HibernateStats, but
+  no image was written: `IOHibernateState` 0). NMIntelFB at wake: `power 1: trans 00000000 plane 00000000 …
+  pp 00000000/00000000 blc 00000000/…`, the RTX-22 picture. 08:40:46 `SMC shutdown cause: 5` (Lukas powered off).
+- [measured] NVRM took 5668 ms to sleep (slow, but it did sleep).
+- [inferred] On x86 the sleep type comes from the platform sleep-policy handler (X86PlatformPlugin, `SLPT` table in
+  the board plist). For MacBookPro16,1 (`Mac-E1008331FDC96864`) none of the 10 entries has type 4 (hibernate) and the
+  default is 7 (deep idle = S3), so `hibernatemode 25` alone is ignored. OpenCore's `HibernateMode=Auto` was fine but
+  never used.
+
+## SLEEP-2 prep — force hibernation with HibernationFixup (`hbfx-ahbm=1`)
+- One variable: add acidanthera's **HibernationFixup 1.5.4** (Lilu plugin, release zip SHA-256 `89f50c51`, checked
+  against GitHub's asset digest) with boot-arg `hbfx-ahbm=1` (EnableAutoHibernation: "hibernate instead of regular
+  sleep"). It also stores the image key in NVRAM for boot.efi and skips IOPCIFamily `restoreMachineState` at resume
+  (its fix for black screens after hibernate).
+- `sudo bash tools/sleep/hibernate.sh on` (re-runnable): keeps the SLEEP-1 settings, copies the kext into
+  `EFI/OC/Kexts`, appends its `Kernel/Add` entry (after Lilu), appends ` hbfx-ahbm=1` to `boot-args`, checks the plist.
+  `off` restores `~/config-antes-hibernate.plist` (taken before SLEEP-1) and removes the kext.
+- Expect: `PMRD: sleep params … type 4` or `hibernateMode 0x19`, the machine powers off fully, the OpenCore picker is
+  skipped, `Wake from Hibernate`. Then the SLEEP-1 questions: panel (NMIntelFB `power 1` with the GOP's
+  `trans c0000000`), RTX, Wi-Fi, brightness.
+- Risk: resume failure = fresh boot, unsaved work lost. If the boot hangs: OpenCore picker → boot normally, then `off`.
