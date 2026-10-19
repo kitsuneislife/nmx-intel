@@ -75,7 +75,7 @@ phase file; open only the row you need.
 | WIFI-7 | 10-18 | AirportMtkWlan `6bb3765a` (+wifi5-0004), knob unset | prefer 5 GHz: 5 GHz scanned first, 2.4 GHz twins hidden, 2.4-only kept | **works**: all networks listed, Nardino on 5 GHz, 36.8 / 5.09 | [wifi-1](wifi-1-mt7921.md) |
 | WIFI-8 | 10-18 | AirportMtkWlan `a7bfaa40` (+wifi5-0005) | data frames through firmware rate adaptation (was fixed 1/6 Mbit/s, BA off) | **works**: 37.1 down / 36.9 up (phone's ceiling); curl 38 up / 45 down | [wifi-1](wifi-1-mt7921.md) |
 | SLEEP-1 | 10-19 | OpenCore HibernateMode=Auto, `hibernatemode 25` | hibernate instead of S3, so the GOP relights the panel | **fails**: sleep policy chose deep idle (S3), never hibernated | [sleep-1](sleep-1-hibernate.md) |
-| SLEEP-2 | 10-19 | + HibernationFixup 1.5.4, `hbfx-ahbm=1` | force hibernation over the platform sleep policy | pending | [sleep-1](sleep-1-hibernate.md) |
+| SLEEP-2 | 10-19 | + HibernationFixup 1.5.4, `hbfx-ahbm=1` | force hibernation over the platform sleep policy | **fails**: still type 7 (S3), panel off at wake; sleep parked | [sleep-1](sleep-1-hibernate.md) |
 
 Adding a test: one row here, the entry at the end of the current phase file (start a new phase file when the goal
 changes), then [../status.md](../status.md).

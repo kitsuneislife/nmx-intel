@@ -53,3 +53,26 @@ Lukas: after "hibernating" the panel did not come back (not black, just off). Ev
   skipped, `Wake from Hibernate`. Then the SLEEP-1 questions: panel (NMIntelFB `power 1` with the GOP's
   `trans c0000000`), RTX, Wi-Fi, brightness.
 - Risk: resume failure = fresh boot, unsaved work lost. If the boot hangs: OpenCore picker → boot normally, then `off`.
+
+## SLEEP-2 result (10-19) — fails: still S3; sleep work parked
+Lukas: the machine did not come back ("travou no boot"); he asked to park sleep/wake and go back to the safe backup.
+- [measured] Boot at 08:52 with the SLEEP-2 config: `kextstat` (next boot, same config) lists
+  `as.lvs1974.HibernationFixup (1.5.4)` after Lilu 1.7.2, and `boot-args` ends in `hbfx-ahbm=1`.
+- [measured] 09:07:38 `Entering Sleep state due to 'Software Sleep'`; kernel `PMRD: sleep params v2, type 7, flags
+  0x0 … poweroff 0` (four times) and `PMRD: hibernateMode 0x0`; 09:08:10 `Wake from Normal Sleep [CDNVA] : due to PWRB
+  XDCI CNVW/User`. Same as SLEEP-1: plain S3, no image written.
+- [measured] NMIntelFB at wake: `power 1: trans 00000000 plane 00000000 surf 00000000 pp 00000000/00000000 blc
+  00000000/…` (RTX-22 again, panel off). Before sleep it was `power 0: trans c0000000 plane 94000008 … pp 80000008`.
+- [measured] NVRM slow to sleep again (8056 ms). 09:14:18 `SMC shutdown cause: 5`, next boot 09:14:21 came up normally
+  (HibernationFixup still loaded); no panic report.
+- [inferred] `hbfx-ahbm=1` did not change the sleep type on this setup: the policy result (`type 7`) is what the
+  kernel used. Why HibernationFixup did not override it is open [unverified]; candidates: it only acts on its own
+  standby/auto-power-off path (it needs `standby`/`autopoweroff` and a timer), or the X86PlatformPlugin policy runs
+  after its hook. Reading HibernationFixup's `kern_hbfx.cpp` is the first step if this is resumed.
+
+### Decision (10-19): sleep/wake parked
+Back to the state before SLEEP-1: `sudo bash tools/sleep/hibernate.sh off` restores `~/config-antes-hibernate.plist`
+(ESP config from 08:32, before any sleep change), removes `HibernationFixup.kext` from the ESP and sets
+`hibernatemode 3`, `standby 1`, `powernap 1`, `sleep 0`, `disablesleep 1`. If resumed later, the two routes left:
+(a) a real panel relight in NMIntelFB on `power 1` (i915's eDP resume: PPS power-on, transcoder/pipe/plane, backlight
+PWM), which works whatever the sleep type; (b) understanding why the platform policy ignores hibernation.

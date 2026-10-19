@@ -185,4 +185,4 @@ the DMA ring is empty. When a Wi-Fi port's upload is far below its download, rea
 and woke with "Wake from Normal Sleep": plain S3. [inferred] On x86 the sleep type comes from the platform policy
 handler (X86PlatformPlugin, `IOPlatformSystemSleepPolicy` in the board plist); MacBookPro16,1's table has no
 hibernate entry. Check `PMRD: sleep params` in the kernel log before trusting `pmset`; HibernationFixup's
-`hbfx-ahbm=1` is the usual override.
+`hbfx-ahbm=1` is the usual override, but it did not help here (SLEEP-2: still `type 7` with the kext loaded).
