@@ -1,39 +1,56 @@
 # nmx-intel
 
-Bringing the Intel display (`8086:a7a8`, Raptor Lake-P, Xe-LP) of an Acer Nitro V15 ANV15-51 to macOS through
-**NMXGPU**, nullmoth's port of Linux i915 to xnu. The internal panel is wired to the Intel GPU and there is no MUX.
+Getting a smooth macOS desktop on the internal panel of an Acer Nitro V15 ANV15-51. The panel is wired only to the Intel
+GPU (`8086:a7a8`, Raptor Lake-P, Xe-LP) and there is no MUX, so there are two paths:
 
-Base: nullmoth `nvidia-macos-driver` 2.0.2, macOS Sequoia 15.8.1, 1401 app. The RTX 3050 runs on the stock driver and
-is not affected by anything here.
+- **Path B (the one in daily use):** the RTX 3050 composites the desktop with Metal and **NMIntelFB** puts each frame on
+  the Intel-wired panel. It starts by itself at boot (`tools/intelfb/auto.sh`).
+- **Path A (parked, fallback):** the Intel GPU through **NMXGPU**, nullmoth's port of Linux i915 to xnu. It gives a
+  stable software desktop; Intel Metal is not working yet.
+
+Base: nullmoth `nvidia-macos-driver` 2.3.6 (with our patches), macOS Sequoia 15.8.1, 1401 app.
 
 ## Status
 
 | | |
 | --- | --- |
-| i915 drives the panel (1920x1080 @ 144 Hz) through our IOFramebuffer | ✅ |
-| Stable desktop, no glitches (with `tools/mirror`) | ✅ |
+| Accelerated desktop on the internal 1080p 144 Hz panel (RTX 3050, Metal, path B) | ✅ |
+| Wallpaper, animations, transparency, YouTube | ✅ (one short stall when the session starts) |
+| Automatic at boot | ✅ |
+| Brightness | ✅ |
+| Wi-Fi (MT7921, native menu, 5 GHz, ~37 Mbit/s up and down) | ✅ |
+| i915 drives the panel through our IOFramebuffer (path A, software desktop with `tools/mirror`) | ✅ |
 | ANV (Intel Vulkan) sees the GPU | ✅ |
-| Accelerated desktop (WindowServer on the GPU) | ❌ software compositing |
+| Intel Metal (WindowServer on the Intel GPU) | ❌ parked |
+| Sleep | ❌ S3 resets the Intel display engine and nothing relights it; sleep is disabled |
+
+Open: cost per frame, booting without the 45 s delay, `Invalid display` messages in WindowServer, battery cost of
+keeping the RTX on.
 
 Details: [docs/status.md](docs/status.md). Knowledge base: [docs/index.md](docs/index.md).
 
 ## Layout
 
 ```
-build/          set up ~/nmx-build, apply fixes, build and install NMXGPU
+build/          set up ~/nmx-build, apply fixes, build and install NMXGPU (path A)
 source-fixes/   source patches: 00NN-*.patch (nullmoth and drm-kmod), intelfb/, libdrm/
 tools/
-  mirror/       mirrors the firmware's ghost display (LaunchAgent)
+  intelfb/      NMIntelFB: shows the RTX-rendered frames on the Intel panel (path B); auto.sh enables it at boot
+  accel/        NVAccel build and install (direct copy path)
+  nvrm/         NVRM build and install
+  upgrade/      nullmoth NVIDIA driver upgrade, with rollback.sh
+  wifi/         MT7921 Wi-Fi driver build and install
+  sleep/        sleep and hibernate experiments (hibernate.sh)
+  mirror/       mirrors the firmware's ghost display (LaunchAgent, path A)
   libdrm/       builds and installs the fixed libdrm
   probe/        boot-time diagnostics (/Users/Shared/nmx-probe.txt)
   vram/         reads framebuffer memory, lists WindowServer displays
-  intelfb/      nullmoth's NMIntelFB (RTX path, parked)
   binpatch/     legacy byte patches and restoring the original binary
   agent/        installs the Claude Code skills used here (graphify, ponytail, caveman)
 docs/           status, test index and phase logs, knowledge articles, archived original log
 ```
 
-## Build and install
+## Build and install (path A, NMXGPU)
 
 ```
 bash build/setup.sh                # once: sources in ~/nmx-build
@@ -46,12 +63,17 @@ Then: in the 1401 app, turn the **AMD / Intel** test driver off and on; `sudo ba
 `sudo bash tools/mirror/install.sh` (once); reboot. After boot, `nvram nullmoth-gpu-trail` and
 `nvram nullmoth-gpu-beat` show how far the driver got ([docs/knowledge/diagnostics.md](docs/knowledge/diagnostics.md)).
 
+Path B (NMIntelFB, NVAccel, NVRM) has its own installers under `tools/`; the current install state and the steps are in
+[docs/status.md](docs/status.md).
+
 ## Safety
 
 - NMXGPU only runs with `nmxintel=1`, which the app sets and removes.
 - An attach that never returns makes NMXGPU park the GPU on the next boot; toggling the driver in the app retries.
+- Forced power-offs can trip nullmoth's boot guard; `sudo nvram -d nullmoth-nv-starts` clears it.
 - OpenCore: **Space** → **Start once without NVIDIA driver** (`-nvoff`) also disables NMXGPU.
-- `sudo bash tools/binpatch/apply.sh restore` returns to the release binary.
+- `sudo bash tools/binpatch/apply.sh restore` returns to the release binary; `tools/upgrade/rollback.sh` undoes the
+  NVIDIA driver upgrade.
 - From Recovery: delete `/Library/Extensions/NMXGPU.kext`.
 
 ## License
