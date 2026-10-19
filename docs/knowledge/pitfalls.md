@@ -141,6 +141,10 @@
   sets `nullmoth-nv-ok`) when a head lights or NVKMS lists connectors with no display. Two uncleared starts in a row
   switch the whole driver off like `-nvoff`, and the install's `lastgood.sh` restores the pre-install backup and reboots.
   After an upgrade, check that `nullmoth-nv-starts` is gone after the first boot.
+- [measured, 10-19 sleep tests] Forced power-offs (black wake) can leave `nullmoth-nv-starts` at 2; the guard then
+  turns NVRM off, but NMIntelFB still claims the panel and WindowServer loops on `CGXMappedDisplayStart`
+  (`IOServiceOpen failed(0xe00002c7)`). Black boot with the drivers on file intact: check `nvram -p` for
+  `nullmoth-nv-starts`, then `sudo nvram -d nullmoth-nv-starts`.
 - [read, `uninstall.sh` v2.3.6] `uninstall.sh <backup dir>` only checks the directory exists and removes the driver; it
   restores nothing. Our restore: `tools/upgrade/rollback.sh`.
 - `tools/accel/install.sh` and `tools/nvrm/install.sh` keep nullmoth's original in `~/<kext>.kext.original` only if

@@ -76,3 +76,22 @@ Back to the state before SLEEP-1: `sudo bash tools/sleep/hibernate.sh off` resto
 `hibernatemode 3`, `standby 1`, `powernap 1`, `sleep 0`, `disablesleep 1`. If resumed later, the two routes left:
 (a) a real panel relight in NMIntelFB on `power 1` (i915's eDP resume: PPS power-on, transcoder/pipe/plane, backlight
 PWM), which works whatever the sleep type; (b) understanding why the platform policy ignores hibernation.
+
+## After `off` (10-19): two black boots — nullmoth's boot guard tripped
+Lukas ran `hibernate.sh off` and the next two boots failed; he got in with the picker's "without NVIDIA" entry.
+- [measured] `off` worked: HibernationFixup not loaded, `hibernatemode 3`, `SleepDisabled 1`, `boot-args` without
+  `hbfx-ahbm=1`. Installed kexts unchanged (NVRM `8c8873d5`, NVAccel `8166045f`, NMIntelFB `36afddf1`).
+- [measured] boot guard trail in the kernel log: every boot from 08:13 to 08:52 logged `start 1` and then
+  `boot guard cleared` at NVKMS enumeration; 09:14 logged `start 2 without a display so far` and no `cleared`;
+  09:20, 09:26 and 09:28 logged `NVRMFB: driver off`. NVRAM now `nullmoth-nv-starts %02`.
+- [measured] Failed boots: `NMIntelFB: claim: Intel-panel NVRMDisplay nub not published: no NVRMDisplay 0 after 120 s`;
+  WindowServer aborted in `CGXMappedDisplayStart` (`IOServiceOpen failed(0xe00002c7), index(0)`, "0 of 1 framebuffers
+  were successfully opened") and restarted in a loop (reports 09:21, 09:27).
+- [inferred] The 08:52 clear did not reach the firmware's NVRAM: the 09:14 boot read 1, not 0. That boot (HibernationFixup
+  loaded, after the forced power-off at the black wake) then never logged an NVKMS enumeration, so 2 stayed. Why the
+  clear was lost is [unverified]: candidates are the S3 wake/forced power-off before the NVRAM sync, or
+  HibernationFixup's NVRAM handling.
+- [inferred] When the guard turns NVRM off, NMIntelFB still claims the panel (it only checks `-nvoff` and its own
+  guard), so WindowServer finds a framebuffer it cannot open and loops on a black screen instead of using the
+  firmware framebuffer. Follow-up: NMIntelFB should also stand down when `nullmoth-nv-starts` ≥ 2.
+- Fix: `sudo nvram -d nullmoth-nv-starts`, then a normal boot.
