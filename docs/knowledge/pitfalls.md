@@ -144,7 +144,9 @@
 - [measured, 10-19 sleep tests] Forced power-offs (black wake) can leave `nullmoth-nv-starts` at 2; the guard then
   turns NVRM off, but NMIntelFB still claims the panel and WindowServer loops on `CGXMappedDisplayStart`
   (`IOServiceOpen failed(0xe00002c7)`). Black boot with the drivers on file intact: check `nvram -p` for
-  `nullmoth-nv-starts`, then `sudo nvram -d nullmoth-nv-starts`.
+  `nullmoth-nv-starts`, then `sudo nvram -d nullmoth-nv-starts`. Since `intelfb-0021` (GUARD-1) NMIntelFB stands down
+  in that case. Reading the counter alone races NVRM's own increment (written in its `start` after its check): only
+  trust a 2 when no `NVRM` instance is attached yet.
 - [read, `uninstall.sh` v2.3.6] `uninstall.sh <backup dir>` only checks the directory exists and removes the driver; it
   restores nothing. Our restore: `tools/upgrade/rollback.sh`.
 - `tools/accel/install.sh` and `tools/nvrm/install.sh` keep nullmoth's original in `~/<kext>.kext.original` only if

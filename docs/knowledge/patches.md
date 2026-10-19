@@ -66,6 +66,9 @@ Other series:
   off screen (after `PLANE_SURFLIVE` shows the last flip landed), `nmIntelFBRamFlip` sets `PLANE_SURF` to it.
 - `intelfb-0020` (BL-2) — panel brightness: "backlight" `IODisplayParameterHandler` + `getAppleSense` LCD (NVRMFB's,
   ported); level → `BXT_BLC_PWM_DUTY1`. `nvram nullmoth-intelfb-backlight=0` turns it off.
+- `intelfb-0021` (GUARD-1) — stand down when nullmoth's boot guard has NVRM off (`nullmoth-remove` set, or
+  `nullmoth-nv-starts` ≥ 2, and no NVRM instance attached): no claim, so IONDRVFramebuffer gives the firmware desktop.
+  Log `off: nullmoth's boot guard turned NVRM off`, trail `guard: NVRM off`. `nvram nullmoth-intelfb-guard=0` undoes it.
 - `source-fixes/accel/accel-0001` (knob/diag, RTX-18) — NVAccel (branch `nmx-accel` from nullmoth v2.1.0, worktree
   `~/nmx-build/accel/src`, tag `accel-0001`, built by `tools/accel/build.sh`): `debug.nvaccel_iop_memcpy=1` copies
   frames to a CPU scanout with `memcpy` rows; `debug.nvaccel_iop_direct=1` puts the copy engine's staging buffer on

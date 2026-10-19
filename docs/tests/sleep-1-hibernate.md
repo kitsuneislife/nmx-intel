@@ -95,3 +95,19 @@ Lukas ran `hibernate.sh off` and the next two boots failed; he got in with the p
   guard), so WindowServer finds a framebuffer it cannot open and loops on a black screen instead of using the
   firmware framebuffer. Follow-up: NMIntelFB should also stand down when `nullmoth-nv-starts` ≥ 2.
 - Fix: `sudo nvram -d nullmoth-nv-starts`, then a normal boot.
+
+## GUARD-1 prep (10-19): NMIntelFB stands down when the guard has NVRM off
+`intelfb-0021`, NMIntelFB `241aff3d` (on top of 0020, `36afddf1`). `ifb_pci_ok` now also returns false when
+`nullmoth-remove` is set or `nullmoth-nv-starts` ≥ 2 (the same test as nullmoth's `nvrm_driver_off`, `-nvoff` was
+already checked) **and** no `NVRM` instance is in the service plane. Why the second condition: NMIntelFB's claim probed
+~14 ms before NVRM in the 09:14 log [measured], but the order is not guaranteed; NVRM's start writes its increment
+(1 → 2) after it has passed its own check. An NVRM that is attached (attach comes before `start`) is on, so a 2 read
+then is its own increment, not a trip. With none attached, the value read is the one NVRM's probe will judge
+[inferred from `NVRM.cpp` probe/start and `nvrm_off.h`]. NVRAM not published → no change (NVRM cannot read it either).
+- Expected log on a tripped boot: `NMIntelFB: boot guard: nullmoth-remove unset, nullmoth-nv-starts 2, NVRM absent`,
+  then `off: nullmoth's boot guard turned NVRM off`; trail `guard: NVRM off (...)`; desktop on the firmware
+  framebuffer instead of a WindowServer loop.
+- Normal boot: no change (counter 0 or 1, the guard branch logs nothing). Undo without a rebuild:
+  `sudo nvram nullmoth-intelfb-guard=0`.
+- Test plan: install, normal boot (must be as before); optionally trip it on purpose with
+  `sudo nvram nullmoth-nv-starts=%02` and reboot (expect the firmware desktop, then `sudo nvram -d nullmoth-nv-starts`).

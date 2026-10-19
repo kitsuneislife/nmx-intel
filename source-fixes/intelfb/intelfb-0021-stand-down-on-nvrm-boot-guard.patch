@@ -1,0 +1,50 @@
+diff -ruN a/intelfb.cpp src/intelfb.cpp
+--- a/intelfb.cpp
++++ b/intelfb.cpp
+@@ -87,6 +87,29 @@
+     IFBLOG("trail: %s", step);
+     ifb_nv_set("nullmoth-intelfb-trail", gIfbTrail);
+ }
++// intelfb-0021: true when nullmoth's boot guard has NVRM off this boot (same test as nvrm_driver_off, minus -nvoff,
++// which ifb_pci_ok checks first) and no NVRM instance is attached anywhere
++static bool ifb_nvrm_guard_off()
++{
++    IODTNVRAM *n = ifb_nvram();
++    if (!n) return false;   // NVRAM not published: NVRM cannot read the guard either
++    OSObject *flag = n->copyProperty("nullmoth-remove");
++    OSData *d = OSDynamicCast(OSData, n->copyProperty("nullmoth-nv-starts"));
++    const unsigned starts = (d && d->getLength() >= 1) ? *(const unsigned char *)d->getBytesNoCopy() : 0;
++    if (d) d->release();
++    n->release();
++    const bool removing = flag != nullptr;
++    if (flag) flag->release();
++    const bool off = removing || starts >= 2;
++    if (!off) return false;
++    bool nvrm = false;
++    if (IORegistryIterator *it = IORegistryIterator::iterateOver(gIOServicePlane, kIORegistryIterateRecursively)) {
++        while (IORegistryEntry *e = it->getNextObject()) if (strcmp(e->getMetaClass()->getClassName(), "NVRM") == 0) { nvrm = true; break; }
++        it->release();
++    }
++    IFBLOG("boot guard: nullmoth-remove %s, nullmoth-nv-starts %u, NVRM %s", removing ? "set" : "unset", starts, nvrm ? "attached" : "absent");
++    return !nvrm;
++}
+ static uint32_t ifb_knob(const char *key, uint32_t def)
+ {
+     IODTNVRAM *n = ifb_nvram();
+@@ -615,6 +638,16 @@
+         return false;
+     }
+     if (ifb_knob("nullmoth-intelfb", 1) == 0) { IFBLOG("off: nullmoth-intelfb=0"); return false; }
++    // intelfb-0021: nullmoth's boot guard (NVRM/nvrm_off.h) turns NVRM off after two starts that never lit a display, or
++    // while "nullmoth-remove" is set. Then no NVRMDisplay ever comes, and a claim held here only keeps IONDRVFramebuffer
++    // off this GPU: WindowServer loops on a black screen instead of the firmware desktop. The counter is read before
++    // looking for NVRM: an NVRM already attached has passed its own check (it is on, and its increment is in the value),
++    // and with none attached yet the value read is the one NVRM's probe will judge. Undo: nullmoth-intelfb-guard=0
++    if (ifb_knob("nullmoth-intelfb-guard", 1) && ifb_nvrm_guard_off()) {
++        IFBLOG("off: nullmoth's boot guard turned NVRM off - leaving the firmware screen; sudo nvram -d nullmoth-nv-starts");
++        ifb_nv_set("nullmoth-intelfb-trail", "guard: NVRM off (nullmoth-nv-starts/nullmoth-remove)");
++        return false;
++    }
+     IFBLOG("8086:%04x display version %u", dev, fVer);
+     return true;
+ }
