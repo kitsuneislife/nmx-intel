@@ -244,3 +244,29 @@ scripts pass `bash -n`.
 
 Expected: `XeNG POOL`, `XeNG BLITSCRATCH2 … [0x4c0] … -> 2420005b`, flip counters, or their absence, which says which
 fixes run on Sequoia. Steps: as HYB-2; stay on the desktop at least 3 minutes before rebooting.
+
+### HYB-6 result (2026-10-21 10:10): NootedGreen's init is readable; the desktop part was not captured
+
+Timeline [measured]: boot-once ran at 10:10:27 (kernel ~15 s), put GPU-only back, wrote `dmesg-0`. The next boot's
+daemon ran at 10:11:43, so the hybrid session lasted under a minute; no `dmesg-60`, no panic, no gpuRestart report
+[measured]. A manual reboot is the likely cause [inferred]. `dmesg-0` ends at 15.4 s, before WindowServer.
+
+What `dmesg-0` proves runs on Sequoia [measured]: IOAF2 hooks (`IOAccelF2 f2 (fixed): OK`, V221 waitForStamp,
+`XeNG BLITSCRATCH2: lock/unlockForCPUAccess hooked`, NOORPHAN, `XeNG POOL: hook IOAccelCommandBufferPool2::init OK`,
+FLIP diag, V500); framebuffer (`TGL FB routes applied`, Path E, `XE-VALD … fmtBGRA=1`, keepefi kept
+`TRANS_DDI_FUNC_CTL_A=0x8a010106`, PSR off, ADL-P DMC 2.16, cdclk 0x164 sanitised); accelerator (V165 28 symbols, V111
+deviceStart, XE-FMT BGRA, XE-NOCCS3, XE-NODEPTH, NOTCF/NOTCF2, PLANES2 at IOSurface+0x98, BLITALIGN, BLIT16, NOAUX,
+V141 1/1, **V140 1/4 signatures**, V52, "Loaded AppleIntelTGLGraphics! … totalEU=96"). GAMMA_MODE_A is forced to 0
+by the xefix register filter (`kern_gen11.cpp:3565`), so the HISTORY line-138 fix is in [measured, source].
+
+Not seen yet: the runtime lines (BLITSCRATCH2 `[0x4c0]` value, POOL sizes, flip/CSB counters, hangs). They are
+written after the desktop starts.
+
+## HYB-7 (prepared 2026-10-21): HYB-6 again, with the dump refreshed during the whole session
+
+Variable: none on the GPU side. `efi.sh boot-once` now deletes old dumps, writes `dmesg-0` at boot and refreshes
+`dmesg-last.txt` every 20 s for 10 min (written to a temp file, then moved), so a manual reboot after 1 minute still
+leaves the desktop's lines. `log.sh` prints the tail of `-last`. Both pass `bash -n`.
+
+Expected: the runtime `XeNG` lines while the artifacts are on screen. Steps: as HYB-2; stay on the desktop at least
+1 minute, open Finder and Safari, then reboot.
