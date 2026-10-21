@@ -15,19 +15,22 @@ KC=/Library/KernelCollections/AuxiliaryKernelExtensions.kc
 KB=/System/Library/KernelCollections/BootKernelExtensions.kc; KS=/System/Library/KernelCollections/SystemKernelExtensions.kc
 K=/System/Library/Kernels/kernel; KARG=(--allow-missing-kdk); [ -f "$K" ] && KARG+=(--kernel "$K")
 TGLK="AppleIntelTGLGraphics.kext AppleIntelTGLGraphicsFramebuffer.kext"
+HCK=$XPS/build/HookCase.kext   # NootedGreen's symbol library: both TGL kexts depend on org.smichaud.HookCase
 TGLB="AppleIntelTGLGraphicsMTLDriver AppleIntelTGLGraphicsGLDriver AppleIntelTGLGraphicsVADriver AppleIntelTGLGraphicsVAME AppleIntelGraphicsShared"
 T=$(mktemp -d)
 put() { rm -rf "$2" && ditto "$1" "$2" && chown -R root:wheel "$2" || { echo "could not copy $1"; exit 1; }; echo "  $2"; }
 
 if [ "${1:-}" = remove ]; then
-    for k in $TGLK; do rm -rf "$EXT/$k"; done
+    for k in $TGLK HookCase.kext; do rm -rf "$EXT/$k"; done
     for b in $TGLB; do rm -rf "$EXT/$b.bundle"; done
     rm -rf "$GB/AppleIntelTGLGraphicsMTLDriver.bundle" "$GB/AppleIntelGraphicsShared.bundle" "$XE"
     echo "removed"
 else
     [ -d "$OUT/xe.bundle" ] && [ -d "$OUT/AppleIntelTGLGraphicsMTLDriver.bundle" ] || { echo "no $OUT: run zsh tools/hybrid/build.sh"; exit 1; }
+    [ -f "$HCK/Contents/MacOS/HookCase" ] || { echo "no $HCK: run zsh tools/hybrid/build.sh"; exit 1; }
     [ -d "$LE/AppleIntelTGLGraphics.kext" ] && [ -d "$SLE/AppleIntelGraphicsShared.bundle" ] || { echo "no NootedGreen sle_Internal: run zsh tools/hybrid/build.sh"; exit 1; }
     for k in $TGLK; do put "$LE/$k" "$EXT/$k"; done
+    put "$HCK" "$EXT/HookCase.kext"
     P=$EXT/AppleIntelTGLGraphics.kext/Contents/Info.plist
     # the accelerator matches the spoofed device-id (9A49) and needs a version above the stock one (Julio's installer)
     plutil -replace IOKitPersonalities.Gen7.IOPCIPrimaryMatch -string 0x9a498086 "$P" \
@@ -49,7 +52,7 @@ for k in com.nullmoth.NVRM com.nullmoth.NVRMFB com.nullmoth.NVAccel com.nullmoth
     printf '%s\n' "$INS" | grep -qw "$k" || { echo "$k is missing from the new collection; unchanged"; rm -f "$NEWKC"; exit 1; }
 done
 if [ "${1:-}" != remove ]; then
-    for k in com.xxxxx.driver.AppleIntelTGLGraphics com.xxxxx.driver.AppleIntelTGLGraphicsFramebuffer; do
+    for k in org.smichaud.HookCase com.xxxxx.driver.AppleIntelTGLGraphics com.xxxxx.driver.AppleIntelTGLGraphicsFramebuffer; do
         printf '%s\n' "$INS" | grep -qw "$k" || { tail -20 "$T/kmutil.log"; echo "kmutil left out $k; unchanged"; rm -f "$NEWKC"; exit 1; }
     done
 fi

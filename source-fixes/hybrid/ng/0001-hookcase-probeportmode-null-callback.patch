@@ -1,0 +1,24 @@
+diff --git a/HookCase-master/HookCase/HookCase.cpp b/HookCase-master/HookCase/HookCase.cpp
+index 3cd0d36..e60cb85 100755
+--- a/HookCase-master/HookCase/HookCase.cpp
++++ b/HookCase-master/HookCase/HookCase.cpp
+@@ -16914,7 +16914,8 @@ uint32_t AppleInteePortHAL::probePortMode()
+     //   ICL  (AppleIntelFramebufferController path): 0xC4030 (ICL_SHOTPLUG_CTL_DDI)
+     //   TGL:                                         0x44470
+     //   ADL-P / RPL-P:                               0x1638a0
+-    uint32_t registerValue = callback->readReg32(0x1638a0); // ADL-P/RPL-P
++    // callback is never set (HookCase::start does not assign it): read through the controller, as the FB does
++    uint32_t registerValue = callback ? callback->readReg32(0x1638a0) : bc ? bc->ReadRegister32(0x1638a0) : 0xffffffff; // ADL-P/RPL-P
+         
+         PortMode mode = kPortModeInvalid;
+         uint32_t portType = *getMember<uint32_t*>(this, 0x548);
+@@ -17106,7 +17107,8 @@ uint32_t AppleIntelPortHAL::probePortMode()
+     //   ICL  (AppleIntelFramebufferController path): 0xC4030 (ICL_SHOTPLUG_CTL_DDI)
+     //   TGL:                                         0x44470
+     //   ADL-P / RPL-P:                               0x1638a0
+-    uint32_t registerValue = callback->readReg32(0x1638a0); // ADL-P/RPL-P
++    // callback is never set (HookCase::start does not assign it): read through the controller, as the FB does
++    uint32_t registerValue = callback ? callback->readReg32(0x1638a0) : bc ? bc->ReadRegister32(0x1638a0) : 0xffffffff; // ADL-P/RPL-P
+         
+         PortMode mode = kPortModeInvalid;
+         uint32_t portType = *getMember<uint32_t*>(this, 0x548);
