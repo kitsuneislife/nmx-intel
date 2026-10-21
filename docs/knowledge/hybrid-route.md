@@ -3,8 +3,9 @@
 > **Summary.** Proposal (2026-10-21, nothing tested). Apple's Tiger Lake driver, made to run on Raptor Lake by
 > JulioNectar's NootedGreen fork, would drive the panel and WindowServer. nullmoth's driver would run headless: apps on
 > its allow-list get the RTX as their Metal device and hand finished frames to WindowServer through system memory.
-> It needs macOS Tahoe 26.7.1, so it would be a second install route next to the current GPU-only route, not a
-> replacement. Plan: phases H0–H4 below.
+> Julio's build runs on Tahoe 26.7.1 only. Lukas wants it on Sequoia 15.8.1 (24H32), and nothing in the approach
+> requires Tahoe: see "Porting to Sequoia". It would be a second install route next to GPU-only, not a replacement.
+> Plan: phases H0–H4 below.
 
 ## What exists today
 
@@ -44,6 +45,30 @@
   report there shows an app rendering on the NVIDIA card while the Intel GPU composites.
 - nullmoth is at 2.4.3 now (2026-10-20). 2.4 fixed macOS 26 icons and glass menus. Our patches are on 2.3.6.
 
+## Porting to Sequoia (decided 2026-10-21: target Sequoia, not Tahoe)
+
+Tahoe was Julio's choice, not a requirement: his HISTORY gives no technical reason, and his phase-0 work ran on
+Sequoia. Upstream NootedGreen itself targets up to `KernelVersion::Sequoia` (tested on Sonoma 14.7.1); his fork had to
+raise that limit for Tahoe. What carries over and what must be redone [inferred from reading his repo]:
+
+| Layer | Sequoia status |
+|---|---|
+| TGL Metal driver byte patches (`mtl17-patches.json`) | offsets are inside Apple's 16.0.32 binary, OS-independent: carry over |
+| TGL kext patches in NootedGreen (display 13, scheduler, CSB guard, GTFREQ, FBDPMS, BLITALIGN...) | same 16.0.32 kexts: carry over |
+| IOSurface offsets (PLANES2 `+0x98`, XE-FMT `+0x80`) | Tahoe layout; Sequoia keeps the older one (`-ngreenplanesxor` path, `+0xb0`), to re-measure on 24H32 |
+| IOAcceleratorFamily2 patches (XE-NOORPHAN, BLITSCRATCH2, pool, page-on) | byte patterns for Tahoe 25G241; `LookupPatchPlus` fails safely, so each must be re-found on Sequoia |
+| `libxedrv` (463 lines) descriptor ABI | converts Tahoe's Metal structures (misc union at `0xe0`) to the 16.0.32 layout (`0xd0`). Sequoia sits between the two; its preflight refuses to convert on a layout it does not know, so it fails safely. The gap is likely smaller on Sequoia |
+| Shader compiler adapter + LLVM bridge | Sequoia's compiler service is LLVM 32024 (his HISTORY quotes a Sequoia offset). `build-shader-compiler.sh` regenerates the libLLVM stub from the running system; the entry-point mapping needs checking |
+| nullmoth | already runs here on Sequoia |
+
+Most of the port can be done from the running GPU-only system without rebooting: disassemble Sequoia's IOSurface,
+IOAcceleratorFamily2 and Metal (his `kcsyms.py`/`kcdis.py`), compare with his Tahoe values, and fill the table above
+with measured values.
+
+Coexistence on one disk: Apple's TGL kexts in `/Library/Extensions` match only the spoofed `9A49`. Without the spoof
+and NootedGreen in the EFI they stay idle [inferred], so the switch between routes is the OpenCore config (a
+`config-hybrid.plist` next to the current one), not the macOS install.
+
 ## How the routing would work
 
 1. Process not on the allow-list (or denied with `-Name`): it sees only the Iris Xe Metal device, so it renders on
@@ -76,11 +101,11 @@
 
 | Phase | Change (one variable) | Gate |
 |---|---|---|
-| H0 | Tahoe 26.7.1 on a second APFS volume or external SSD; Sequoia keeps the GPU-only route untouched. nullmoth 2.4.3 with our patches re-applied ([nullmoth-upgrade.md](nullmoth-upgrade.md)) | GPU-only route works on Tahoe too (the README can then say so) |
-| H1 | Iris Xe alone: Julio's stack with our Acer EFI deltas (device-id, boot-args, a7a8). nullmoth off (`-nvoff`) | Metal desktop on the Iris Xe, 1 h without a GPU hang |
+| H0 | Offline port, no reboot: measure Sequoia 24H32 offsets and patterns for every Tahoe-only row above; build NootedGreen, the patched Metal driver, `libxedrv` and the compiler for Sequoia | every Tahoe-only row has a measured Sequoia value; builds verified (hash, symbols) |
+| H1 | Iris Xe alone: `config-hybrid.plist` (spoof `9A49`, NootedGreen, boot-args) with nullmoth off (`-nvoff`); first boots display-only, then the accelerator | Metal desktop on the Iris Xe, 1 h without a GPU hang |
 | H2 | nullmoth on, headless (no NMIntelFB) | `debug.nvaccel_headless` reads 1; `system_profiler` lists both GPUs with Metal; a small test tool renders on the RTX and shows on the panel; measure which device `MTLCreateSystemDefaultDevice` returns |
 | H3 | Routing: `tools/hybrid/route.sh` writes `nvmtl-allow.txt` from a short app list (browsers, Discord, video players, games → RTX); then try the `IOPCITunnelled` removable trick for Apple's own checkbox | YouTube and a game render on the RTX (`sysctl`/nvlog evidence) while WindowServer stays on the Iris Xe |
-| H4 | Repo: README gets "Choose a route" (GPU-only: stable, Sequoia/Tahoe; Hybrid: experimental, Tahoe only); `tools/hybrid/`, `docs/tests/hybrid-1.md` | a clean install from the README on the Acer |
+| H4 | Repo: README gets "Choose a route" (GPU-only: stable; Hybrid: experimental); `tools/hybrid/`, `docs/tests/hybrid-1.md` | a clean install from the README on the Acer |
 
 Repo shape: we do not copy Julio's code or Apple's binaries. `tools/hybrid/` clones his repo at a pinned commit and
 applies our Acer diffs from `source-fixes/hybrid/`, the same way `tools/intelfb/` builds NMIntelFB from nullmoth. Credit
@@ -90,6 +115,8 @@ and link him in the README, and send GT1 / Acer findings back upstream.
 
 - His stack is days old and moves daily. The GPU hang after about an hour would make the hybrid route worse than
   GPU-only for daily use until it is fixed.
-- The Tahoe upgrade is the big change for this machine. Keep Sequoia bootable until H2 passes.
+- Porting to Sequoia means re-finding Julio's Tahoe-only fixes ourselves; any we miss show up as the same panics he
+  hit (orphan pool, resolve, green YUV). His HISTORY is the map.
+- The current route must stay one config swap away: H1 boots only from `config-hybrid.plist`.
 - GT1 may not run at all with the GT2 topology NootedGreen assumes.
 - Two IOAccelerator families in one session (Apple TGL plus nullmoth) have not been seen together on any machine.
