@@ -13,13 +13,14 @@ build)
         clang -fobjc-arc -w -o "$O/xe-$t" "$X/xe-$t.m" $F || { echo "build failed: xe-$t"; exit 1; }
     done
     clang -fobjc-arc -w -o "$O/xe-tex-tests" "$X/gpu-tests/xe-tex-tests.m" $F || { echo "build failed: xe-tex-tests"; exit 1; }
+    clang -fobjc-arc -w -o "$O/xe-a8test" "$(dirname "$0")/xe-a8test.m" $F || { echo "build failed: xe-a8test"; exit 1; }
     cp "$0" "$O/gputests.sh" && ls "$O"
     ;;
 run)
     D=$2; OUT=$3
     echo "== $(date '+%F %T') $(id -un) $(sysctl -n kern.osversion)" >> "$OUT"
     # the safe copy/upload tests first; xe-tex-tests last (Julio: wu_ios hung the GPU, so it is left out)
-    for t in xe-miptest xe-f16test xe-atlastest xe-icontest xe-carender "xe-tex-tests bufu" "xe-tex-tests r8" \
+    for t in xe-a8test xe-miptest xe-f16test xe-atlastest xe-icontest xe-carender "xe-tex-tests bufu" "xe-tex-tests r8" \
              "xe-tex-tests rgba8" "xe-tex-tests amostra" "xe-tex-tests wf_plano" "xe-tex-tests wu4_tex" \
              "xe-tex-tests wu_tex" "xe-tex-tests wu_plano"; do
         echo "--- $t" >> "$OUT"; sync
