@@ -1,0 +1,52 @@
+diff --git a/macos/src/libxedrv.m b/macos/src/libxedrv.m
+index 0e6ea72..a96e4dc 100644
+--- a/macos/src/libxedrv.m
++++ b/macos/src/libxedrv.m
+@@ -43,6 +43,9 @@ static void xe_log(const char* fmt, ...) {
+ 
+ static const void* g_drv_base;   // base do AppleIntelTGLGraphicsMTLDriver (para reconhecer chamadas vindas dele)
+ static int g_layout_ok;
++// Sequoia 24H32: same field offsets as Tahoe, but the misc and attachment bitfields keep the driver's old widths
++// (alphaToCoverage b1, writeMask b4, pixelFormat b28), so only the field move is needed, not the bit conversion.
++static int g_seq_bits;
+ 
+ // ---- campo de bits "misc" (union em 0xe0 no Tahoe, 0xd0 no antigo): {pos_antiga, larg_antiga, pos_nova, larg_nova} ----
+ static const struct { int op, ow, np, nw; } MISC[21] = {
+@@ -77,7 +80,8 @@ static int from_driver(void* ra) {
+   const uint8_t* n = (const uint8_t*)real;
+   memcpy(p, n, PRIV_SZ);                          // 0x00..0xa8 iguais (até shaderValidation inclusive)
+   memcpy(p + 0xa8, n + 0xb8, 0x60);               // 0xa8..0x108 antigo <- 0xb8..0x118 novo (pula shaderValidationState/textureWriteRoundingMode)
+-  *(uint64_t*)(p + 0xd0) = misc_to_old(*(const uint64_t*)(n + 0xe0));
++  uint64_t misc = *(const uint64_t*)(n + 0xe0);
++  *(uint64_t*)(p + 0xd0) = g_seq_bits ? misc : misc_to_old(misc);
+   memcpy(p + 0x108, n + 0x198, 0x20);             // vertexBuffers, fragmentBuffers, driverCompilerOptions, gpuCompilerSPIOptions
+   memcpy(p + 0x128, n + 0x1c0, 0x20);             // pad0, pad1, pluginData, needsCustomBorderColorSamplers/maxVertexAmplificationCount
+   memcpy(p + 0x148, n + 0x1e0, 0x18);
+@@ -86,7 +90,7 @@ static int from_driver(void* ra) {
+ }
+ static void* att_wrapper(id self, SEL _cmd) {
+   void* real = ((void*(*)(id, SEL))g_orig_att)(self, _cmd);
+-  if (!real || !g_layout_ok || !from_driver(__builtin_return_address(0))) return real;
++  if (!real || !g_layout_ok || g_seq_bits || !from_driver(__builtin_return_address(0))) return real;
+   uint64_t n = *(uint64_t*)real;
+   MTLRenderPipelineColorAttachmentDescriptor* a = (MTLRenderPipelineColorAttachmentDescriptor*)self;
+   uint64_t old = (a.blendingEnabled ? 1ULL : 0ULL) | ((uint64_t)a.rgbBlendOperation << 1) | ((uint64_t)a.alphaBlendOperation << 4) |
+@@ -106,10 +110,15 @@ static int check_layout(void) {
+   const char* e = p ? ivar_getTypeEncoding(p) : NULL; const char* ae = ap ? ivar_getTypeEncoding(ap) : NULL;
+   LOG("layout: RPDInternal size=0x%zx _private@0x%tx; attInternal size=0x%zx _private@0x%tx",
+       c ? class_getInstanceSize(c) : 0, p ? ivar_getOffset(p) : -1, ac ? class_getInstanceSize(ac) : 0, ap ? ivar_getOffset(ap) : -1);
+-  int ok = e && strstr(e, "\"shaderValidation\"q\"shaderValidationState\"q\"textureWriteRoundingMode\"q") &&
+-           strstr(e, "\"alphaToCoverageEnabled\"b2\"alphaToOneEnabled\"b2") &&
+-           ae && strstr(ae, "\"blendingEnabled\"b2") && strstr(ae, "\"writeMask\"b5\"logicOpEnabled\"b1\"logicOp\"b4\"pixelFormat\"b22");
++  int base = e && strstr(e, "\"shaderValidation\"q\"shaderValidationState\"q\"textureWriteRoundingMode\"q") && ae;
++  int tahoe = base && strstr(e, "\"alphaToCoverageEnabled\"b2\"alphaToOneEnabled\"b2") &&
++              strstr(ae, "\"blendingEnabled\"b2") && strstr(ae, "\"writeMask\"b5\"logicOpEnabled\"b1\"logicOp\"b4\"pixelFormat\"b22");
++  int seq = base && strstr(e, "\"alphaToCoverageEnabled\"b1\"alphaToOneEnabled\"b1\"rasterizationEnabled\"b1\"inputPrimitiveTopology\"b2") &&
++            strstr(ae, "\"blendingEnabled\"b1\"rgbBlendOperation\"b3") && strstr(ae, "\"writeMask\"b4\"logicOpEnabled\"b1\"logicOp\"b4\"pixelFormat\"b28");
++  int ok = tahoe || seq;
++  g_seq_bits = !tahoe && seq;
+   if (!ok) { LOG("layout: encoding inesperado -> conversão DESLIGADA"); return 0; }
++  LOG("layout: bits %s", g_seq_bits ? "Sequoia (iguais ao driver, sem conversão)" : "Tahoe (convertidos)");
+   // sonda dinâmica: rasterSampleCount em +0xb8 e vertexDescriptor em +0x110
+   SEL s = sel_registerName("_descriptorPrivate");
+   MTLRenderPipelineDescriptor* d = [MTLRenderPipelineDescriptor new];
