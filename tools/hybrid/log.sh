@@ -33,6 +33,9 @@ OUT=$HOMEU/hybrid.txt
         [ -f "$f" ] && { echo "--- $f ($(wc -l < "$f") lines, $(stat -f %Sm "$f"))"; grep -E 'XeNG|NGreen|ngreen|nmx HYB|Lilu' "$f" > "$OUT.tmp"
             case $f in *-last.txt) tail -400 "$OUT.tmp" ;; *) head -400 "$OUT.tmp" ;; esac; rm -f "$OUT.tmp"; }
     done
+    echo "== Metal tests on the Iris Xe (gputests.sh, run by boot-once)"; cat /var/log/nmx-hybrid-gputests.txt 2>/dev/null
+    echo "== libxedrv logs copied from /tmp during the hybrid boot"
+    for f in /var/log/nmx-hybrid-xedrv/*.log; do [ -f "$f" ] && { echo "--- $f ($(wc -l < "$f") lines)"; tail -40 "$f"; }; done
     echo "== last panic (any time)"; ls -t /Library/Logs/DiagnosticReports/*panic* 2>/dev/null | head -3
 } > "$OUT" 2>&1
 chown "${SUDO_USER:-root}" "$OUT"

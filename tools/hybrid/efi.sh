@@ -29,8 +29,12 @@ OC=$ESP/EFI/OC; CFG=$OC/config.plist; GPU=$OC/config-gpu-only.plist; HYB=$OC/con
 is_hybrid() { grep -q '<string>NootedGreen.kext</string>' "$1"; }
 # one-boot daemon: a copy of this script outside ~/Documents (TCC blocks launchd's bash there)
 DAEMON=/Library/LaunchDaemons/com.nmx.hybrid-once.plist; ONCE=/usr/local/libexec/nmx-hybrid-efi.sh
+TESTS=/usr/local/libexec/nmx-gputests   # Metal tests run on the Iris Xe in that boot (gputests.sh build makes them)
 arm_once() {
     mkdir -p "${ONCE%/*}" && cp "$HERE/efi.sh" "$ONCE" && chmod 755 "$ONCE" || return 1
+    rm -rf "$TESTS"
+    [ -x "$HOMEU/nmx-build/hybrid/xps/build/tests/xe-miptest" ] && { cp -R "$HOMEU/nmx-build/hybrid/xps/build/tests" "$TESTS" \
+        && cp "$HERE/gputests.sh" "$TESTS/" || return 1; }
     cat > "$DAEMON" <<EOP || return 1
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -44,7 +48,7 @@ arm_once() {
 EOP
     chown root:wheel "$DAEMON" && chmod 644 "$DAEMON" && plutil -lint "$DAEMON" >/dev/null
 }
-disarm_once() { rm -f "$DAEMON" "$ONCE"; }
+disarm_once() { rm -f "$DAEMON" "$ONCE"; rm -rf "$TESTS"; }
 
 case "${1:-}" in
 hybrid|hybrid-keep)
@@ -84,12 +88,21 @@ boot-once)
     # OpenCore-injected kexts (NootedGreen) reach the unified log only as "compose failure"; the kernel message
     # buffer (msgbuf=400000) keeps their text, but only until the next reboot. -0 is taken ~15 s into boot (before
     # the desktop); -last is refreshed every 20 s for 10 min, so a manual reboot still leaves the desktop's lines
-    rm -f /var/log/nmx-hybrid-dmesg-*.txt
+    rm -rf /var/log/nmx-hybrid-dmesg-*.txt /var/log/nmx-hybrid-gputests.txt /var/log/nmx-hybrid-xedrv
     D=/var/log/nmx-hybrid-dmesg
     dmesg > "$D-0.txt" 2>&1; chmod 644 "$D-0.txt"; sync
+    if [ -x "$TESTS/gputests.sh" ]; then (
+        # wait for the login (console owned by a real user), then 30 s for the desktop to settle
+        for i in $(seq 60); do U=$(stat -f %Su /dev/console); [ "$U" != root ] && break; sleep 5; done
+        [ "$U" != root ] || exit 0
+        sleep 30; G=/var/log/nmx-hybrid-gputests.txt; touch $G; chown "$U" $G; chmod 644 $G
+        launchctl asuser "$(id -u "$U")" sudo -u "$U" /bin/bash "$TESTS/gputests.sh" run "$TESTS" $G
+    ) & fi
+    mkdir -p /var/log/nmx-hybrid-xedrv
     for i in $(seq 30); do
         sleep 20
-        dmesg > "$D-last.tmp" 2>&1 && chmod 644 "$D-last.tmp" && mv -f "$D-last.tmp" "$D-last.txt"; sync
+        dmesg > "$D-last.tmp" 2>&1 && chmod 644 "$D-last.tmp" && mv -f "$D-last.tmp" "$D-last.txt"
+        cp /tmp/xedrv-*.log /var/log/nmx-hybrid-xedrv/ 2>/dev/null; chmod -R a+rX /var/log/nmx-hybrid-xedrv; sync
     done
     exit 0
     ;;
