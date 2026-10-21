@@ -239,3 +239,13 @@ The verbose console draws into the boot framebuffer at the start of the GGTT, wh
 contexts and rings: corrupted contexts and screen artifacts (Julio's HISTORY 9.3) [measured there; HYB-3 artifacts
 match, inferred]. `hybrid-config.py` drops `-v`. `-nvoff` is honoured by AirportMtkWlan too, so a hybrid boot with it
 has no Wi-Fi [measured, HYB-3].
+
+Correction (HYB-4, 2026-10-21): without `-v` the artifacts were the same, so `-v` was not their cause here [measured].
+It stays dropped, following Julio.
+
+## `-nvoff` does not stop nullmoth's NVRM and NVAccel; drop `nvaccel=1` for a hybrid boot
+
+Only our NMIntelFB and AirportMtkWlan honour `-nvoff`. NVRM 2.3.6 and NVAccel start anyway, and NVAccel publishes a
+Metal device that WindowServer uses (`NVMTLDriver` lines) even when the panel runs on another GPU [measured, HYB-4].
+NVAccel refuses to start without `nvaccel=1`, so the hybrid config drops that argument. Also, the kernel's
+"Boot args:" log line is cut at ~227 characters; check that a late flag took effect before concluding it was lost.

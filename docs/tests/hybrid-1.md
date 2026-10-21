@@ -177,3 +177,41 @@ AirportMtkWlan ignore `-nvoff` in hybrid, which is a separate change to an insta
 
 Expected: far fewer artifacts, or none; the BCS hang may remain. Steps: as HYB-2 (`efi.sh hybrid`, reboot, wait,
 `log.sh`). The boot shows the Apple logo instead of text.
+
+### HYB-4 result (2026-10-21): boots, same artifacts; `-v` was not the cause
+
+Lukas: the boot was clean (Apple logo, desktop), but the artifacts were the same. His 16 s screen recording shows
+Terminal text with missing characters, black triangles and polygons over the wallpaper, and missing menu bar icons
+and Dock items [measured: frames from the video]. No gpuRestart, no panic [measured].
+
+Evidence (all-process log 09:49:03–09:50:49) [measured]:
+- The framebuffer errors are as in HYB-3. libxedrv reports every texture path "-> ok" and "PIPE sync ok … falhas=0".
+- **nullmoth's NVIDIA driver was running.** NVRM 2.3.6 started on `10de:25ac`, resized BAR1 and noted "boot guard:
+  start 1 without a display so far". NVAccel logged "NVIDIA display device 10de:25ac … claiming". NVRMFB refused to
+  start (no connected display), but NVAccel published the accelerator anyway.
+- **WindowServer used it.** `WindowServer[161:326] (NVMTLDriver) NullMoth: …` lines (reflection, `vkAllocateMemory`
+  refused imported host pointers). Kernel thread `0:326`, the same WindowServer thread, logged ~580 each of NVAccel
+  `newVidMemory`/`newSysMemory`/`newResource` and ~480 "REAL VRAM" allocations. `com.apple.WebKit.GPU` and
+  `mediaanalysisd` also touched the NVIDIA device.
+- `-nvoff` reached the kernel: "NMIntelFB: off: -nvoff" and AirportMtkWlan stayed off. NVRM and NVAccel ignore it in
+  this build. The "Boot args:" kernel log line stops at 227 characters, which is a log line limit; the flags at the
+  end (`-disablegfxfirmware`, `-nvoff`) took effect.
+- No NootedGreen IOLog line appears at all (no `XeNG …`, no `nmx HYB-3`), although the kext loaded
+  (`com.StezzaPilot.NootedGreen`). Still unexplained [unverified].
+
+Correction to HYB-3's analysis: `-v` was not the cause of the artifacts [measured: same artifacts without it]. It
+stays dropped, as in Julio's config.
+
+New best candidate [inferred]: WindowServer ran Metal work on the RTX through NVMTLDriver while the panel and the
+compositor's IOSurfaces lived on the Iris Xe. Content rendered on one GPU and shown by the other would explain
+missing glyphs, missing icons and black shapes. Julio's machine has no second GPU, so his stack never met this.
+
+## HYB-5 (prepared 2026-10-21): the same hybrid boot without `nvaccel=1`
+
+Variable: `hybrid-config.py` also drops `nvaccel=1` (commit `b58f5c0`). NVAccel has its own guard ("boot-arg
+nvaccel=1 absent: NOT starting"), so no NVIDIA Metal device is published and WindowServer has only the Iris Xe. NVRM
+still starts (no display, no Metal device). The GPU-only config is unchanged. Checked: the generated boot-args keep
+`-vi2c-force-polling`, `nvfb=1` and `-nvoff`, and have neither `-v` nor `nvaccel=1` [measured, self-test].
+
+Expected: no `NVAccel` or `NVMTLDriver` lines; text, icons and the Dock drawn correctly, or a different artifact
+pattern. Steps: as HYB-2 (`efi.sh hybrid`, reboot, wait, `log.sh`).
