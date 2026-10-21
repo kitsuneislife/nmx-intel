@@ -18,6 +18,7 @@ summary block on top, linked to each other). The original Portuguese diary is pr
 | Panel brightness (nullmoth switch vs our Intel panel) | [knowledge/brightness.md](knowledge/brightness.md) |
 | Moving to a new nullmoth release | [knowledge/nullmoth-upgrade.md](knowledge/nullmoth-upgrade.md) |
 | Wi-Fi (MT7921): build, install, knobs, undo | [knowledge/wifi.md](knowledge/wifi.md) |
+| Hybrid route (Iris Xe composites, RTX renders chosen apps) | [knowledge/hybrid-route.md](knowledge/hybrid-route.md) |
 
 ## Map
 
@@ -42,6 +43,7 @@ knowledge/bridge-optimization.md  per-frame cost of the bridge and the staged pl
 knowledge/nullmoth-upgrade.md     runbook: new nullmoth release + our NVRM/NVAccel patches on top
 knowledge/wifi.md                 runbook: MT7921 native Wi-Fi driver, our patches, knobs, recovery
 knowledge/brightness.md           why nullmoth's brightness switch does not reach the Intel panel; BL-1/BL-2 plan
+knowledge/hybrid-route.md         proposal: Apple TGL driver on the Iris Xe + nullmoth headless, per-app routing (H0-H4)
 archive/LOG-pt.md                 original diary (Portuguese, verbatim)
 ```
 

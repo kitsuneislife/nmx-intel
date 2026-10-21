@@ -12,6 +12,7 @@
 | WhateverGreen | patches Apple Intel drivers (≤ Ice Lake); knows ADL/RPL IDs only | no framebuffer for Xe |
 | NootedBlue | Apple drivers for unsupported iGPUs ≤ Gen11 | no |
 | NootedGreen (sgiammori, forks) | Apple **Tiger Lake** drivers on RPL-P (macOS 14.7.1) | WIP: fragmented image, WindowServer hang ~200 ms after activation; different path |
+| JulioNectar/Hackintosh-XPS13Plus-IrisXe-Tahoe (2026-10-21) | NootedGreen fork + patched TGL Metal driver on RPL-P `A7A0`, Tahoe 26.7.1 | Metal desktop works; GPU hang after ~1 h, shutdown panic. Note added 10-21, supersedes the row above for RPL-P. Basis of [hybrid-route.md](hybrid-route.md) |
 | WhateverXe (b00t0x) | Lilu plugin + OCLP fork root patch, Apple TGL drivers | Big Sur 20G1443, TGL/ADL-N, external displays only; RPL/internal on roadmap |
 | Graphify (Graphify-Labs) | knowledge graph / wiki of a corpus for agents | inspired this docs layout; run `/graphify docs --wiki` when installed |
 

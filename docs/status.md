@@ -40,4 +40,5 @@ NMIntelFB unchanged; shader cache works (WindowServer keeps its own, 70 MB). Und
    `displaytrace` (~20 %). Staged plan: [knowledge/bridge-optimization.md](knowledge/bridge-optimization.md).
 2. Boot without the 45 s delay (WindowServer accelerated from the start, no restart) — untested since RTX-7's freeze.
 3. `Invalid display 0x5b81c5c0` in WindowServer ~17/min; battery cost of the RTX always on (unmeasured).
-4. Path A (Intel Metal) parked.
+4. Path A (Intel Metal) parked. **Hybrid proposal (10-21):** Iris Xe via JulioNectar's Tahoe stack + nullmoth
+   headless with `nvmtl-allow.txt` routing; needs Tahoe; plan H0–H4 in [knowledge/hybrid-route.md](knowledge/hybrid-route.md).
