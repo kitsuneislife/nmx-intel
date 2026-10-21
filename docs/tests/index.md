@@ -86,7 +86,8 @@ phase file; open only the row you need.
 | HYB-7 | 10-21 | HYB-6; `dmesg-last` refreshed every 20 s for 10 min | runtime XeNG lines during the artifacts | BLITSCRATCH2 as on Tahoe, no hang/restart: kernel healthy, artifacts are rendering correctness | [hybrid-1](hybrid-1.md) |
 | HYB-8 | 10-21 | HYB-7; boot-once runs Julio's headless Metal tests on the Iris Xe | which Metal operation renders wrong | all pass (RGBA16F atlas 1/8); glyph atlases not covered | [hybrid-1](hybrid-1.md) |
 | HYB-9 | 10-21 | HYB-8 + `xe-a8test` (A8/R8 glyph-atlas replaceRegion) | are text glyphs lost in small-format atlas uploads | 0/12 wrong in all 32 cases: atlas theory disproved | [hybrid-1](hybrid-1.md) |
-| HYB-10 | 10-21 | HYB-9 + NootedGreen topology from the fuses (hybrid-0004) | does the hard-coded 96-EU topology break rendering on our GT1 | pending | [hybrid-1](hybrid-1.md) |
+| HYB-10 | 10-21 | HYB-9 + NootedGreen topology from the fuses (hybrid-0004) | does the hard-coded 96-EU topology break rendering on our GT1 | no-op (hook not routed); fuses measured: 3 DSS, 48 EU | [hybrid-1](hybrid-1.md) |
+| HYB-11 | 10-21 | HYB-9 + no NumSubSlices=12 patch (hybrid-0004 v2): driver uses 6 SS / 48 EU | does the real topology fix the artifacts | pending | [hybrid-1](hybrid-1.md) |
 
 Adding a test: one row here, the entry at the end of the current phase file (start a new phase file when the goal
 changes), then [../status.md](../status.md).

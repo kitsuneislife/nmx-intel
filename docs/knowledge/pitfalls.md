@@ -257,3 +257,11 @@ An injected kext (NootedGreen, Lilu) has no uuidtext on disk, so its IOLog lines
 survives in the kernel message buffer (`msgbuf=400000`): `sudo dmesg` in that boot, before rebooting. The hybrid
 one-boot daemon saves it to `/var/log/nmx-hybrid-dmesg-*.txt`. Kexts from `/Library/Extensions` (NMIntelFB, NVAccel)
 log normally.
+
+## NootedGreen's getGPUInfo hook does not run in WEG-coexist mode; the topology comes from binary patches
+
+`IntelAccelerator::getGPUInfo` is only routed when `isWEGCoexistMode()` is false. On our hybrid boot it is true, so
+code added to the hook never runs [measured, HYB-10: no log line from it]. The 96-EU topology comes from the V52
+binary patches in the RPL group (`f3b` L3 banks, `f3bb` EU/SS, `f3bbb` NumSubSlices=12). The TGL driver logs the
+real fuses and its result in the unified log: `[IGPU] HWCAPS - NumSubSlices:12 DualSubSliceCountFuse:0x7`,
+`MaxEUPerSubSlice:8 EUDisableFuses:0x0 ExecutionUnitCount:96` (`log.sh` kernel section).

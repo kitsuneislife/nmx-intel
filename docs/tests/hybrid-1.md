@@ -351,3 +351,19 @@ DSS or EUs) the 96-EU values stay. GT level (`+0x1120` = 2) and L3 banks (8) are
 
 Expected: the log line gives the measured topology (48 EU would be 3 DSS × 16, or 6 DSS × 8). If the artifacts go
 away or change, the topology was a cause; if not, the Sequoia user-space side is next.
+
+### HYB-10 result (2026-10-21 10:54): no-op, but the fuses are measured
+
+Lukas: same artifacts, maybe more [measured, visual]. The `nmx HYB-10 fuses` line is absent from both dmesg dumps:
+the `getGPUInfo` hook is not routed in WEG-coexist mode (pitfall), so HYB-10 ran the same code as HYB-9 and "more"
+is run-to-run variation [inferred]. The TGL driver's own HWCAPS lines give the topology [measured, unified log
+10:54:30, same at 10:42 in HYB-9]: `SliceCountFuse:0x1`, `DualSubSliceCountFuse:0x7` (3 DSS), `EUDisableFuses:0x0`
+(16 EU per DSS), so the hardware has **48 EU**; NootedGreen's `f3bbb` makes the driver report `NumSubSlices:12`,
+`ExecutionUnitCount:96`, `GPU Sku: TGL GT2 LP`. Metal tests as in HYB-9 (atlastest RGBA16Float 1/8 again).
+
+## HYB-11 (prepared 2026-10-21): NumSubSlices from the fuse
+
+Variable: the subslice count. `source-fixes/hybrid/0004-hyb11-subslices-from-the-fuse.patch` drops `f3bbb` from the
+RPL patch list, so the driver keeps popcount(DSS fuse) × 2 = 6 SS and 48 EU. The HYB-10 hook patch is removed (dead
+code). Unchanged: `f3bb` (EU/SS: no effect with fuse 0), `f3b` (L3 banks 8, maybe high for GT1 [unverified]),
+GPU Sku GT2. NootedGreen `d409868b`. Check: HWCAPS shows `NumSubSlices:6 … ExecutionUnitCount:48`; then the screen.
