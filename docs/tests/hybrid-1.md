@@ -385,3 +385,38 @@ mask, CATextLayer 36 and 12 pt, gradient, icon, opacity, CIGaussianBlur, rotatio
 RTX baseline [measured, 11:15]: every tile drawn correctly (PNG kept in `~/nmx-build/hybrid/xps/build/tests/`), e.g.
 `text 36 mean RGB=(235,235,235) black=5.9%`, `shape fill (249,190,185) 0.0%`, `CG draw async (172,215,179) 1.2%`.
 Expected: the tiles that differ on the Iris Xe name the broken CoreAnimation path.
+
+### HYB-12 result (2026-10-21 11:15): the bug reproduces offscreen; geometry is lost, textures are fine
+
+`xe-catest` ran on "Intel(R) TGL Unknown" and **reproduces the screen artifacts in an offscreen CARenderer texture**
+[measured, `/var/log/nmx-hybrid-catest.png`, compared with the RTX PNG]. Xe vs RTX mean RGB:
+
+| Tile | Iris Xe | RTX | Xe PNG |
+|---|---|---|---|
+| shape fill | (249,194,189) | (249,190,185) | white horizontal stripes across the triangle |
+| shape stroke | (241,244,253) | (231,236,252) | broken diagonal edges |
+| text 36 | (255,255,255) 0% black | (235,235,235) 5.9% | missing |
+| text 12 | (254,254,254) | (252,252,252) 0.2% | missing |
+| icon | (255,255,255) | (191,190,188) | missing |
+| opacity 0.5 | (255,255,255) | (205,215,250) | missing |
+| shape mask | (139,163,244) | (185,200,248) | blue square, partial triangle |
+| rotated 30 | (250,204,200) | (246,163,155) | only one triangle of the quad |
+| CG draw async | (196,228,200) | (172,215,179) | text missing, circle partial |
+
+Correct on the Xe: solid, corner radius, border, shadow, gradient, blur, CG draw sync. Reading [inferred]:
+axis-aligned quads and CPU-rasterised contents work; what CoreAnimation draws as non-axis-aligned triangles, path
+spans, glyph/icon quads or offscreen-composited layers (opacity, mask) is lost or cut. This matches the "black
+triangles / missing glyphs" on screen, and it rules out the display path (panel, framebuffer) and texture upload
+(HYB-9). Candidates: primitive topology / strips, vertex fetch, the libxedrv pipeline-descriptor move on Sequoia
+(`rasterSampleCount`@0xb8, `vertexDescriptor`@0x110), MSAA.
+
+## HYB-13 (prepared 2026-10-21): plain Metal geometry, one way per tile
+
+Variable: none on the GPU side (NootedGreen `d409868b`). New `tools/hybrid/xe-geomtest.m` (ours) draws the same
+square rotated 30° in nine 128x128 tiles: triangle list, strip, indexed 16 and 32 bit, vertex descriptor
+(`stage_in`), `setVertexBytes`, blend 0.5, 64 instanced small quads, and 4x MSAA resolved (own pass, then the other
+tiles with `LoadActionLoad`). It counts covered pixels (G<200) in each tile's left and right half, so a lost
+triangle shows as one half near zero. `gputests.sh` runs it right after `xe-catest`. RTX baseline [measured, 11:23]:
+first seven tiles `left 2480 right 2480 total 4960`, instanced `390/367 757`, msaa `2640/2532 5172` (edge pixels).
+Expected: the tile(s) that differ on the Xe name the broken geometry path; all equal points back at CoreAnimation's
+own shaders or the pipeline conversion it uses.

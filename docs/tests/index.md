@@ -88,7 +88,8 @@ phase file; open only the row you need.
 | HYB-9 | 10-21 | HYB-8 + `xe-a8test` (A8/R8 glyph-atlas replaceRegion) | are text glyphs lost in small-format atlas uploads | 0/12 wrong in all 32 cases: atlas theory disproved | [hybrid-1](hybrid-1.md) |
 | HYB-10 | 10-21 | HYB-9 + NootedGreen topology from the fuses (hybrid-0004) | does the hard-coded 96-EU topology break rendering on our GT1 | no-op (hook not routed); fuses measured: 3 DSS, 48 EU | [hybrid-1](hybrid-1.md) |
 | HYB-11 | 10-21 | HYB-9 + no NumSubSlices=12 patch (hybrid-0004 v2): driver uses 6 SS / 48 EU | does the real topology fix the artifacts | 6 SS / 48 EU reported; artifacts unchanged | [hybrid-1](hybrid-1.md) |
-| HYB-12 | 10-21 | HYB-11 + `xe-catest` (16 CoreAnimation primitives via CARenderer, PNG) | which CoreAnimation path breaks on the Xe | pending | [hybrid-1](hybrid-1.md) |
+| HYB-12 | 10-21 | HYB-11 + `xe-catest` (16 CoreAnimation primitives via CARenderer, PNG) | which CoreAnimation path breaks on the Xe | bug reproduced offscreen: rotated quad loses a triangle, path stripes, text/icon/opacity missing; textures and axis-aligned quads fine | [hybrid-1](hybrid-1.md) |
+| HYB-13 | 10-21 | HYB-12 + `xe-geomtest` (rotated square drawn 9 ways in plain Metal) | which geometry path breaks | pending | [hybrid-1](hybrid-1.md) |
 
 Adding a test: one row here, the entry at the end of the current phase file (start a new phase file when the goal
 changes), then [../status.md](../status.md).
