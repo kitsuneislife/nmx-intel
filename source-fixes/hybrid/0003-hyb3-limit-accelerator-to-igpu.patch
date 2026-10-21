@@ -1,0 +1,56 @@
+--- a/src/NootedGreen/kern_gen11.cpp
++++ b/src/NootedGreen/kern_gen11.cpp
+@@ -4974,8 +4974,6 @@
+ 
+ static void v44ScheduleBundleLog(void *accelInstance, unsigned delayMs);
+ static void v45ScheduleDelayedCheck(void *accelInstance, unsigned delayMs);
+-
+-static void *gNmxAccel = nullptr;  // nmx HYB-2: set by Gen11::start
+ 
+ unsigned long Gen11::start(void *that,void  *param_1)
+ {
+@@ -5306,10 +5304,11 @@
+ 	}
+ 
+ 	auto ret= FunctionCast(start, callback->ostart)(that,param_1);
+-	// nmx HYB-2: remember the accelerator; +0x150 is the kernel IGAccelTask that getStampMemory dereferences
+-	gNmxAccel = that;
+-	SYSLOG("ngreen", "nmx HYB-2: IntelAccelerator::start ret=%lu kernel task(+0x150)=%p", ret,
+-		   *reinterpret_cast<void **>(static_cast<uint8_t *>(that) + 0x150));
++	// nmx HYB-3: +0x150 is the kernel IGAccelTask that getStampMemory dereferences. IOLog, not SYSLOG:
++	// Lilu plugin lines never reach the unified log on this machine (HYB-2)
++	IOLog("nmx HYB-3: IntelAccelerator::start on %s ret=%lu kernel task(+0x150)=%p\n",
++		  static_cast<IOService *>(param_1)->getName(), ret,
++		  *reinterpret_cast<void **>(static_cast<uint8_t *>(that) + 0x150));
+ 
+ 	// V221: Signal waitForStamp hook that the GFX interrupt handler is now installed.
+ 	Gen11::gGfxAccelStartDone = true;
+@@ -5970,10 +5969,11 @@
+ 
+ uint8_t Gen11::deviceStart(void *that)
+ {
+-	// nmx HYB-2: without the kernel task the original faults in getStampMemory (CR2 0x288, HYB-1 panics):
+-	// fail the device open instead, so WindowServer gets an error and the boot survives with its logs
+-	if (gNmxAccel && !*reinterpret_cast<void **>(static_cast<uint8_t *>(gNmxAccel) + 0x150)) {
+-		SYSLOG("ngreen", "nmx HYB-2: IGAccelDevice::deviceStart refused: IntelAccelerator kernel task is NULL");
++	// nmx HYB-3: without the kernel task the original faults in getStampMemory (CR2 0x288, HYB-1/2 panics):
++	// fail the device open instead. IGAccelDevice+0x108 is its IntelAccelerator (get_vram_size, get_hw_caps).
++	void *accel = *reinterpret_cast<void **>(static_cast<uint8_t *>(that) + 0x108);
++	if (!accel || !*reinterpret_cast<void **>(static_cast<uint8_t *>(accel) + 0x150)) {
++		IOLog("nmx HYB-3: IGAccelDevice::deviceStart refused: accelerator %p has no kernel task\n", accel);
+ 		return false;
+ 	}
+ 	// V111: Force IGAccelDevice::deviceStart to succeed on spoofed RPL platform.
+@@ -10690,6 +10690,12 @@
+ 	dict->setObject("IOMatchCategory", mc);
+ 	dict->setObject("IOProviderClass", pv);
+ 	dict->setObject("IOPCIClassMatch", pcm);
++	// nmx HYB-3: class match alone also matched the RTX (10de:25ac) at score 1000 over NVAccel's 100 (HYB-2 log);
++	// limit it to the Intel iGPU, spoofed (9a49) or real (a7a8)
++	if (auto *pm = OSString::withCString("0x9a498086 0xa7a88086")) {
++		dict->setObject("IOPCIPrimaryMatch", pm);
++		pm->release();
++	}
+ 	dict->setObject("IOProbeScore", ps);
+ 
+ 	OSSafeReleaseNULL(bi);
