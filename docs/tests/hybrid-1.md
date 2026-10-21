@@ -299,3 +299,26 @@ every 20 s. `log.sh` prints both. All scripts pass `bash -n`.
 Baseline on the RTX (GPU-only, 10:26) [measured]: every test OK (mips, f16 rows, atlas blocks, icons opaque,
 tex-tests OK), except `xe-carender` "ícone NSImage/CGImage … linhas brancas=36/37", which is therefore not an Intel
 defect. Expected on the Iris Xe: a failing test names the broken operation.
+
+### HYB-8 result (2026-10-21 10:28): Julio's Metal tests pass on the Iris Xe
+
+The daemon ran the tests at 10:29:50 as `lukas` (so `launchctl asuser` works) [measured]. On the Iris Xe:
+- xe-miptest: every level correct (CPU and GPU mips, GPU→GPU). xe-f16test: 0 wrong rows at every size.
+- xe-atlastest: BGRA8, RGBA16Unorm, RGBA32Float 0 of 8 wrong; RGBA16Float 1 of 8 ("nível 2 pos (50,10) 10x10:
+  ERRADO", printed value equals the expected one, so another pixel of the block differs) [measured]. Minor.
+- xe-icontest: same opacity and colours as on the RTX. xe-tex-tests: all OK.
+- xe-carender: layer centres BGRA (254,0,82) against (255,51,4) on the RTX; icon rows as on the RTX. A different
+  display colour profile per GPU may explain it [unverified].
+- libxedrv logs (`/var/log/nmx-hybrid-xedrv/`): every texture and pipeline "-> ok", "falhas=0", in WindowServer,
+  Terminal, ghostty, ControlCenter. NOCOPY realigned four small RG8 textures in WindowServer.
+
+Not covered by those tests: the glyph atlases. Terminal creates an A8Unorm 576x576 managed texture and ghostty an
+R8Unorm 512x512 shared one [measured: libxedrv TEX lines]; glyphs are written into them as small CPU `replaceRegion`
+blocks at odd offsets. Missing characters in both terminals point there [inferred].
+
+## HYB-9 (prepared 2026-10-21): glyph-atlas test
+
+Variable: none on the GPU side. New `tools/hybrid/xe-a8test.m` (ours): A8/R8/RG8/BGRA8, shared and managed,
+512 and 576 wide; 12 blocks of 14x20 written by `replaceRegion` at odd offsets, read back by a compute shader (read
+and nearest sample) and checked, including the row below each block. `gputests.sh` builds it and runs it first.
+RTX baseline [measured]: 0 of 12 wrong in all 32 cases.
