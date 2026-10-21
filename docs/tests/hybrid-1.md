@@ -270,3 +270,32 @@ leaves the desktop's lines. `log.sh` prints the tail of `-last`. Both pass `bash
 
 Expected: the runtime `XeNG` lines while the artifacts are on screen. Steps: as HYB-2; stay on the desktop at least
 1 minute, open Finder and Safari, then reboot.
+
+### HYB-7 result (2026-10-21 10:18): the kernel side looks healthy; the desktop's runtime lines are readable
+
+Session 10:18:24 → reboot ~10:19:35 (a `shutdown_stall` report at 10:19:33; no panic, no gpuRestart) [measured].
+`dmesg-last` (kernel 73 s, 807 lines) holds the desktop's NootedGreen lines [measured]:
+- `XeNG BLITSCRATCH2: … size=0xd240 routed=1 ok=1 [0x4c0] 00000000 -> 2420005b (esperado 2420005b)`: the Blit3D
+  kernels are uploaded exactly as on Julio's Tahoe machine.
+- `XeNG BLIT #N … saida=L7701` every 64 blits up to #1536; `XeNG CS t=200 … (push 4625 exec 4074) … to=8 …
+  pgfix=0 resfix=0`; POSHCTX clears POSH on each new context; V509 contexts valid ("no repair needed").
+- V194 "getBlit3DContext ctx changed … (restart recovery)" alternates between a few contexts; with no gpuRestart
+  report this is per-client contexts, not restarts [inferred].
+- 210× V212 isGpuIdle override, no hang, no CSB/ring error.
+
+Conclusion [inferred]: the kernel fixes all run and the GPU executes work without hangs. The artifacts (missing
+glyphs, black triangles, missing icons) are a rendering-correctness problem: user-space Metal driver, shader
+compiler, or a texture/surface layout difference on Sequoia. Julio's headless Metal tests can tell which.
+
+## HYB-8 (prepared 2026-10-21): Julio's Metal tests run by themselves on the Iris Xe
+
+Variable: none on the GPU side. New `tools/hybrid/gputests.sh` builds Julio's headless tests (xe-miptest, xe-f16test,
+xe-atlastest, xe-icontest, xe-carender, xe-tex-tests minus `wu_ios`, which hung his GPU) into
+`~/nmx-build/hybrid/xps/build/tests` (not committed). `efi.sh hybrid` copies them to `/usr/local/libexec/nmx-gputests`;
+`boot-once` waits for the login, 30 s more, then runs them as the console user (15 s limit each, sync per test) into
+`/var/log/nmx-hybrid-gputests.txt`. It also copies libxedrv's `/tmp/xedrv-*.log` to `/var/log/nmx-hybrid-xedrv/`
+every 20 s. `log.sh` prints both. All scripts pass `bash -n`.
+
+Baseline on the RTX (GPU-only, 10:26) [measured]: every test OK (mips, f16 rows, atlas blocks, icons opaque,
+tex-tests OK), except `xe-carender` "ícone NSImage/CGImage … linhas brancas=36/37", which is therefore not an Intel
+defect. Expected on the Iris Xe: a failing test names the broken operation.
