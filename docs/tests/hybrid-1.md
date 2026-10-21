@@ -485,3 +485,22 @@ GT workarounds, `GDRST = GRDOM_FULL`, poll ≤10 ms, re-take the render ForceWak
 and after (`XeNG HYB15`, dmesg-0). Same tests as HYB-14 (catest, geomtest, catest, geomtest, catest). Expected if the
 firmware state is the cause: catest-1, before any restart, ≈ RTX like HYB-14's catest-2, and the desktop draws text
 and icons. MSAA may still hang (separate bug). Undo: drop the boot-arg in `hybrid-config.py`.
+
+### HYB-15 result (2026-10-21 12:01): kernel panic at 25 s, divide error in the timings worker
+
+[measured] `Kernel-2026-10-21-120129.panic`: `type = 0=divide error`, uptime 25.45 s, in
+`AppleIntelBaseController::hwCRTCToIODetailedTimingInformation + 0x499` called from NootedGreen's `fbTimingsWorker`
+(thread_call). Disassembly of the framebuffer binary: the fault is `divq %rcx` at 0x6c0c7 with rcx = `p->0x164`, which
+the same function first rewrites from `TRANS_LINK_N1` (`0x60044 + transcoder << 12`; transcoder 0xf when
+`port->0x548->0x8 == 0`, else `p->0x3640`). The worker's guard only checked the old `p->0x164`, so a register reading 0
+passes it. Same race as the 10-19 23:56 boot [inferred]. dmesg-0 (~15 s) has no `XeNG HYB15` line: the accelerator
+starts later, so whether the GT reset ran, and whether it made the link-N register read 0, is unknown [unverified]
+(i915 says Gen11+ GT resets leave display alone).
+
+## HYB-15b (prepared 2026-10-21): HYB-15 again, timings worker checks the register
+
+Fix (hybrid-0006, NootedGreen `ec781620`): `fbTimingsWorker` reads `TRANS_LINK_N1` for the same transcoder Apple's
+function will use and skips the pass while it is 0. Safety fix only; the variable is still `-ngreenbootgdrst`.
+Tools: `efi.sh boot-once` keeps the first 20 s refresh as `dmesg-35s.txt` (accelerator start lines), and `log.sh`
+prints every `XeNG HYB` line from all saved buffers. Expected as HYB-15. If the screen stays black or the worker never
+injects timings, the full reset touched display state: drop the boot-arg.

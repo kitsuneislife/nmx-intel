@@ -277,3 +277,10 @@ context copies is built only in `startGraphicsEngine` (`accel+0x1268`, freed onl
 from `populateResetRegisterList`, scheduler re-init) does not rebuild it [measured, disassembly]. So whatever a
 restart fixes is hardware state outside the context image, not the image itself [inferred]. NootedGreen's
 `V194 ... (restart recovery)` lines are noise: its Blit3D cache is global while Apple's context is per task.
+
+## NootedGreen's timings worker must check TRANS_LINK_N1, not the cached p->0x164
+
+[measured, HYB-15 panic] `hwCRTCToIODetailedTimingInformation` re-reads `TRANS_LINK_M1/N1` (`0x60040/0x60044 +
+transcoder << 12`) into `p->0x160/0x164` and then divides by `p->0x164`. A guard on the cached field misses a register
+that reads 0 early in boot (link not trained yet) → divide error panic. Check the register for the transcoder the
+function uses (0xf when `port->0x548->0x8 == 0`, else `p->0x3640`). Fixed in hybrid-0006.

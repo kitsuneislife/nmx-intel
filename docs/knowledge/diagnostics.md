@@ -99,5 +99,5 @@ Lukas cannot type `|`: when he runs commands, write to a file and `grep`/`tail` 
   boot; the unified log cannot show injected kexts' text).
 
 HYB-15: `-ngreenbootgdrst` (hybrid-0005) does a full GT reset (`GDRST=1`) before Apple's `start()`. dmesg-0 lines
-`XeNG HYB15 pre: RCS ctl/head/tail/ccid BCS ctl/head/tail err` and `XeNG HYB15 GDRST full done|TIMEOUT gdrst= fw=`
+`XeNG HYB15 pre: RCS ctl/head/tail/ccid BCS ctl/head/tail err` and `XeNG HYB15 GDRST full done|TIMEOUT gdrst= fw=` (they print after dmesg-0; HYB-15b keeps `dmesg-35s.txt` and `log.sh` greps `XeNG HYB` in every buffer)
 with the same registers after. Remove the boot-arg from `tools/hybrid/hybrid-config.py` to undo without a rebuild.
