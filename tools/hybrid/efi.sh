@@ -82,10 +82,14 @@ boot-once)
     cp "$GPU" "$CFG" && sync && echo "GPU-only put back for the next start" || { echo "copy failed"; exit 1; }
     diskutil unmount "$ESP" >/dev/null 2>&1   # flushes the FAT volume before a possible panic
     # OpenCore-injected kexts (NootedGreen) reach the unified log only as "compose failure"; the kernel message
-    # buffer (msgbuf=400000) keeps their text, but only until the next reboot
-    for t in 0 60 180; do
-        sleep $((t ? t - ${prev:-0} : 0)); prev=$t
-        dmesg > "/var/log/nmx-hybrid-dmesg-$t.txt" 2>&1; chmod 644 "/var/log/nmx-hybrid-dmesg-$t.txt"; sync
+    # buffer (msgbuf=400000) keeps their text, but only until the next reboot. -0 is taken ~15 s into boot (before
+    # the desktop); -last is refreshed every 20 s for 10 min, so a manual reboot still leaves the desktop's lines
+    rm -f /var/log/nmx-hybrid-dmesg-*.txt
+    D=/var/log/nmx-hybrid-dmesg
+    dmesg > "$D-0.txt" 2>&1; chmod 644 "$D-0.txt"; sync
+    for i in $(seq 30); do
+        sleep 20
+        dmesg > "$D-last.tmp" 2>&1 && chmod 644 "$D-last.tmp" && mv -f "$D-last.tmp" "$D-last.txt"; sync
     done
     exit 0
     ;;
