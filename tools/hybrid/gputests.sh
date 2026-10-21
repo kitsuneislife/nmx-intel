@@ -22,8 +22,8 @@ run)
     D=$2; OUT=$3
     echo "== $(date '+%F %T') $(id -un) $(sysctl -n kern.osversion)" >> "$OUT"
     # the safe copy/upload tests first; xe-tex-tests last (Julio: wu_ios hung the GPU, so it is left out)
-    # xe-catest: CoreAnimation primitives; its PNG goes to /tmp (boot-once copies it to /var/log)
-    for t in "xe-catest /tmp/nmx-catest.png" xe-geomtest xe-a8test xe-miptest xe-f16test xe-atlastest xe-icontest xe-carender "xe-tex-tests bufu" "xe-tex-tests r8" \
+    # xe-catest: CoreAnimation primitives, three runs (HYB-13: the broken tiles changed between boots); PNGs in /tmp/nmx-*.png, copied by boot-once
+    for t in "xe-catest /tmp/nmx-catest-1.png" xe-geomtest "xe-catest /tmp/nmx-catest-2.png" xe-geomtest "xe-catest /tmp/nmx-catest-3.png" xe-a8test xe-miptest xe-f16test xe-atlastest xe-icontest xe-carender "xe-tex-tests bufu" "xe-tex-tests r8" \
              "xe-tex-tests rgba8" "xe-tex-tests amostra" "xe-tex-tests wf_plano" "xe-tex-tests wu4_tex" \
              "xe-tex-tests wu_tex" "xe-tex-tests wu_plano"; do
         echo "--- $t" >> "$OUT"; sync

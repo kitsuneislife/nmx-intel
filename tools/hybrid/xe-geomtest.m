@@ -57,18 +57,21 @@ int main(void) { @autoreleasepool {
     id<MTLCommandBuffer> cb = [q commandBuffer];
     MTLTextureDescriptor *md = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatBGRA8Unorm width:W height:T mipmapped:NO];
     md.textureType = MTLTextureType2DMultisample; md.sampleCount = 4; md.usage = MTLTextureUsageRenderTarget; md.storageMode = MTLStorageModePrivate;
-    MTLRenderPassDescriptor *rp = [MTLRenderPassDescriptor renderPassDescriptor];   // pass 1: the MSAA tile, resolved into rt
-    rp.colorAttachments[0].texture = [dev newTextureWithDescriptor:md]; rp.colorAttachments[0].resolveTexture = rt;
+    // HYB-13 resolved the MSAA pass into rt and loaded it for the other tiles: on the Xe every tile came back dark,
+    // so a failed resolve hid the rest. Now the plain tiles have their own cleared pass and MSAA its own target.
+    id<MTLTexture> rtm = [dev newTextureWithDescriptor:td];
+    MTLRenderPassDescriptor *rp = [MTLRenderPassDescriptor renderPassDescriptor];   // pass 1: tiles 0-7 on white
+    rp.colorAttachments[0].texture = rt;
     rp.colorAttachments[0].loadAction = MTLLoadActionClear; rp.colorAttachments[0].clearColor = MTLClearColorMake(1, 1, 1, 1);
-    rp.colorAttachments[0].storeAction = MTLStoreActionMultisampleResolve;
+    rp.colorAttachments[0].storeAction = MTLStoreActionStore;
     id<MTLRenderCommandEncoder> e = [cb renderCommandEncoderWithDescriptor:rp];
-    for (int i = 0; i < NT; i++) {
-        int t = (i + NT - 1) % NT;   // the MSAA tile first, alone in pass 1
-        if (i == 1) {   // pass 2: the other tiles drawn over the resolved image
+    for (int t = 0; t < NT; t++) {
+        if (t == NT - 1) {   // pass 2: the MSAA tile, resolved into rtm
             [e endEncoding];
             MTLRenderPassDescriptor *rp2 = [MTLRenderPassDescriptor renderPassDescriptor];
-            rp2.colorAttachments[0].texture = rt; rp2.colorAttachments[0].loadAction = MTLLoadActionLoad;
-            rp2.colorAttachments[0].storeAction = MTLStoreActionStore;
+            rp2.colorAttachments[0].texture = [dev newTextureWithDescriptor:md]; rp2.colorAttachments[0].resolveTexture = rtm;
+            rp2.colorAttachments[0].loadAction = MTLLoadActionClear; rp2.colorAttachments[0].clearColor = MTLClearColorMake(1, 1, 1, 1);
+            rp2.colorAttachments[0].storeAction = MTLStoreActionMultisampleResolve;
             e = [cb renderCommandEncoderWithDescriptor:rp2];
         }
         // a square of side 0.55 T rotated 30 degrees in the middle of tile t (NDC), corners in strip order
@@ -106,16 +109,19 @@ int main(void) { @autoreleasepool {
         }
     }
     [e endEncoding];
-    id<MTLBlitCommandEncoder> b = [cb blitCommandEncoder]; [b synchronizeResource:rt]; [b endEncoding];
+    id<MTLBlitCommandEncoder> b = [cb blitCommandEncoder]; [b synchronizeResource:rt]; [b synchronizeResource:rtm]; [b endEncoding];
     [cb commit]; [cb waitUntilCompleted];
     if (cb.error) { printf("GPU error: %s\n", cb.error.description.UTF8String); return 1; }
     uint8_t *px = malloc(W * T * 4);
     [rt getBytes:px bytesPerRow:W * 4 fromRegion:MTLRegionMake2D(0, 0, W, T) mipmapLevel:0];
+    [rtm getBytes:px + (NT - 1) * T * 4 bytesPerRow:W * 4 fromRegion:MTLRegionMake2D((NT - 1) * T, 0, T, T) mipmapLevel:0];
     for (int t = 0; t < NT; t++) {   // covered = darker than white; left and right halves show a lost triangle
-        int half[2] = {0, 0};
-        for (int y = 0; y < T; y++) for (int x = t * T; x < (t + 1) * T; x++)
+        int half[2] = {0, 0}; long g = 0;
+        for (int y = 0; y < T; y++) for (int x = t * T; x < (t + 1) * T; x++) {
+            g += px[(y * W + x) * 4 + 1];
             if (px[(y * W + x) * 4 + 1] < 200) half[x - t * T >= T / 2]++;
-        printf("%-12s covered px: left %4d right %4d total %5d\n", names[t], half[0], half[1], half[0] + half[1]);
+        }
+        printf("%-12s covered px: left %4d right %4d total %5d mean G %3ld\n", names[t], half[0], half[1], half[0] + half[1], g / (T * T));
     }
     return 0;
 }}

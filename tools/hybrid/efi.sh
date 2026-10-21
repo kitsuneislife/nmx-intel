@@ -88,7 +88,7 @@ boot-once)
     # OpenCore-injected kexts (NootedGreen) reach the unified log only as "compose failure"; the kernel message
     # buffer (msgbuf=400000) keeps their text, but only until the next reboot. -0 is taken ~15 s into boot (before
     # the desktop); -last is refreshed every 20 s for 10 min, so a manual reboot still leaves the desktop's lines
-    rm -rf /var/log/nmx-hybrid-dmesg-*.txt /var/log/nmx-hybrid-gputests.txt /var/log/nmx-hybrid-xedrv /var/log/nmx-hybrid-catest.png
+    rm -rf /var/log/nmx-hybrid-dmesg-*.txt /var/log/nmx-hybrid-gputests.txt /var/log/nmx-hybrid-xedrv /var/log/nmx-hybrid-catest.png /var/log/nmx-hybrid-png
     D=/var/log/nmx-hybrid-dmesg
     dmesg > "$D-0.txt" 2>&1; chmod 644 "$D-0.txt"; sync
     if [ -x "$TESTS/gputests.sh" ]; then (
@@ -102,7 +102,7 @@ boot-once)
     for i in $(seq 30); do
         sleep 20
         dmesg > "$D-last.tmp" 2>&1 && chmod 644 "$D-last.tmp" && mv -f "$D-last.tmp" "$D-last.txt"
-        cp /tmp/xedrv-*.log /var/log/nmx-hybrid-xedrv/ 2>/dev/null; cp /tmp/nmx-catest.png /var/log/nmx-hybrid-catest.png 2>/dev/null; chmod -R a+rX /var/log/nmx-hybrid-xedrv; sync
+        cp /tmp/xedrv-*.log /var/log/nmx-hybrid-xedrv/ 2>/dev/null; mkdir -p /var/log/nmx-hybrid-png; cp /tmp/nmx-*.png /var/log/nmx-hybrid-png/ 2>/dev/null; chmod -R a+rX /var/log/nmx-hybrid-png; chmod -R a+rX /var/log/nmx-hybrid-xedrv; sync
     done
     exit 0
     ;;
