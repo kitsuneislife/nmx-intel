@@ -1,0 +1,37 @@
+diff --git a/src/NootedGreen/kern_gen11.cpp b/src/NootedGreen/kern_gen11.cpp
+index dd5bbd3..fe459e1 100755
+--- a/src/NootedGreen/kern_gen11.cpp
++++ b/src/NootedGreen/kern_gen11.cpp
+@@ -4975,6 +4975,8 @@ int Gen11::wrapHwSetupMemory(AppleIntel::AppleIntelBaseController *that, AppleIn
+ static void v44ScheduleBundleLog(void *accelInstance, unsigned delayMs);
+ static void v45ScheduleDelayedCheck(void *accelInstance, unsigned delayMs);
+ 
++static void *gNmxAccel = nullptr;  // nmx HYB-2: set by Gen11::start
++
+ unsigned long Gen11::start(void *that,void  *param_1)
+ {
+ 	// V44: Configurable scheduler type.
+@@ -5304,6 +5306,10 @@ unsigned long Gen11::start(void *that,void  *param_1)
+ 	}
+ 
+ 	auto ret= FunctionCast(start, callback->ostart)(that,param_1);
++	// nmx HYB-2: remember the accelerator; +0x150 is the kernel IGAccelTask that getStampMemory dereferences
++	gNmxAccel = that;
++	SYSLOG("ngreen", "nmx HYB-2: IntelAccelerator::start ret=%lu kernel task(+0x150)=%p", ret,
++		   *reinterpret_cast<void **>(static_cast<uint8_t *>(that) + 0x150));
+ 
+ 	// V221: Signal waitForStamp hook that the GFX interrupt handler is now installed.
+ 	Gen11::gGfxAccelStartDone = true;
+@@ -5964,6 +5970,12 @@ unsigned long Gen11::start(void *that,void  *param_1)
+ 
+ uint8_t Gen11::deviceStart(void *that)
+ {
++	// nmx HYB-2: without the kernel task the original faults in getStampMemory (CR2 0x288, HYB-1 panics):
++	// fail the device open instead, so WindowServer gets an error and the boot survives with its logs
++	if (gNmxAccel && !*reinterpret_cast<void **>(static_cast<uint8_t *>(gNmxAccel) + 0x150)) {
++		SYSLOG("ngreen", "nmx HYB-2: IGAccelDevice::deviceStart refused: IntelAccelerator kernel task is NULL");
++		return false;
++	}
+ 	// V111: Force IGAccelDevice::deviceStart to succeed on spoofed RPL platform.
+ 	// The original checks encodeFailureStack[1] which is set when BCS ring fails to
+ 	// start. On RPL hardware with TGL driver, BCS init fails (RPL uses different
