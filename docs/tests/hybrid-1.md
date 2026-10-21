@@ -367,3 +367,21 @@ Variable: the subslice count. `source-fixes/hybrid/0004-hyb11-subslices-from-the
 RPL patch list, so the driver keeps popcount(DSS fuse) × 2 = 6 SS and 48 EU. The HYB-10 hook patch is removed (dead
 code). Unchanged: `f3bb` (EU/SS: no effect with fuse 0), `f3b` (L3 banks 8, maybe high for GT1 [unverified]),
 GPU Sku GT2. NootedGreen `d409868b`. Check: HWCAPS shows `NumSubSlices:6 … ExecutionUnitCount:48`; then the screen.
+
+### HYB-11 result (2026-10-21 11:02): real topology, same artifacts
+
+HWCAPS now `NumSubSlices:6`, `ExecutionUnitCount:48` [measured, 11:02:35]. Lukas: "nada mudou, muitos bugs"
+[measured, visual]. Metal tests as before. The hard-coded 96-EU topology is not the cause; the patch stays (it is
+the real hardware). Remaining lead: the Sequoia user-space side (Metal/CoreAnimation private structures, libxedrv's
+pipeline-descriptor move, the compiler bridge), which Julio only validated on Tahoe [inferred].
+
+## HYB-12 (prepared 2026-10-21): CoreAnimation primitives one by one
+
+Variable: none on the GPU side (NootedGreen `d409868b` as HYB-11). New `tools/hybrid/xe-catest.m` (ours): CARenderer
+composes 16 tiles of 120x120, one primitive each (solid, corner radius, border, shadow, CAShapeLayer fill, stroke and
+mask, CATextLayer 36 and 12 pt, gradient, icon, opacity, CIGaussianBlur, rotation, CG drawing sync and
+`drawsAsynchronously`), prints mean RGB and the share of near-black pixels per tile, and writes the grid as a PNG.
+`gputests.sh` runs it first with `/tmp/nmx-catest.png`; `boot-once` copies it to `/var/log/nmx-hybrid-catest.png`.
+RTX baseline [measured, 11:15]: every tile drawn correctly (PNG kept in `~/nmx-build/hybrid/xps/build/tests/`), e.g.
+`text 36 mean RGB=(235,235,235) black=5.9%`, `shape fill (249,190,185) 0.0%`, `CG draw async (172,215,179) 1.2%`.
+Expected: the tiles that differ on the Iris Xe name the broken CoreAnimation path.
