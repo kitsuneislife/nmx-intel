@@ -465,3 +465,23 @@ better than the state at boot. Candidates: something the boot path sets and the 
 differently (context image, workaround/cache registers, L3 config `f3b`), or a resource or cache left stale until a
 reset. Separately, MSAA is broken and hangs the GPU. No fix is near-certain yet; next step is to make the restart
 happen early on purpose (or find what the restart path changes) and see whether the whole desktop draws right.
+
+### What the HYB-14 restart changed (analysis, 2026-10-21)
+
+- The restart was not a render hang: `IOAccelFIFOChannel2::restart(): FIFOChannel[18] indicates empty/idle - Forcing
+  restart` (81.114 s), RCS idle (HEAD = TAIL = 0x558), and the hang dump flags **BCS**, a ring Apple never enabled
+  (`RING_CTRL=0x7000`), as busy with HEAD 0xdc0 ≠ TAIL 0xe48; RCS `CCID=0x80` [measured, dmesg-last]. Both look like
+  state left by the firmware [inferred].
+- The restart path does **not** rebuild the safe image that new contexts copy, so the post-restart catest used the
+  same context template as before [measured, disassembly; see pitfalls]. What differs is engine/GT hardware state:
+  `resetGraphicsEngine` pulses `GDRST` and restores only 11 registers.
+- Linux does a full GT reset at every load on Gen11+ (`intel_gt_sanitize`); Apple's driver and NootedGreen do not
+  (V55G resets only when `ERROR_GEN6 != 0`) [measured, source].
+
+## HYB-15 (prepared 2026-10-21): full GT reset at boot, before Apple's start
+
+Variable: `-ngreenbootgdrst` (hybrid-0005, NootedGreen `51f2e23d`): in the pre-start hook, after V55 and before the
+GT workarounds, `GDRST = GRDOM_FULL`, poll ≤10 ms, re-take the render ForceWake; logs the RCS/BCS ring registers before
+and after (`XeNG HYB15`, dmesg-0). Same tests as HYB-14 (catest, geomtest, catest, geomtest, catest). Expected if the
+firmware state is the cause: catest-1, before any restart, ≈ RTX like HYB-14's catest-2, and the desktop draws text
+and icons. MSAA may still hang (separate bug). Undo: drop the boot-arg in `hybrid-config.py`.

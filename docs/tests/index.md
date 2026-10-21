@@ -91,6 +91,7 @@ phase file; open only the row you need.
 | HYB-12 | 10-21 | HYB-11 + `xe-catest` (16 CoreAnimation primitives via CARenderer, PNG) | which CoreAnimation path breaks on the Xe | bug reproduced offscreen: rotated quad loses a triangle, path stripes, text/icon/opacity missing; textures and axis-aligned quads fine | [hybrid-1](hybrid-1.md) |
 | HYB-13 | 10-21 | HYB-12 + `xe-geomtest` (rotated square drawn 9 ways in plain Metal) | which geometry path breaks | inconclusive: all tiles dark (MSAA resolve was the only clear, test flaw); catest losses changed between boots (rotated now OK, corner radius now cut) | [hybrid-1](hybrid-1.md) |
 | HYB-14 | 10-21 | HYB-13, geomtest with separate passes + catest ×3 | geometry path; in-boot variation | plain geometry = RTX; MSAA black and GPU restart; catest after the restart almost perfect (blur missing) | [hybrid-1](hybrid-1.md) |
+| HYB-15 | 10-21 | HYB-14 + full GT reset before Apple's start (`-ngreenbootgdrst`) | firmware engine state | pending | [hybrid-1](hybrid-1.md) |
 
 Adding a test: one row here, the entry at the end of the current phase file (start a new phase file when the goal
 changes), then [../status.md](../status.md).

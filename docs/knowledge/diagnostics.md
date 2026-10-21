@@ -97,3 +97,7 @@ Lukas cannot type `|`: when he runs commands, write to a file and `grep`/`tail` 
 - `sudo bash tools/hybrid/log.sh` → `~/hybrid.txt`: kernel/WindowServer log of the previous boot, reports, and the
   NootedGreen lines from `/var/log/nmx-hybrid-dmesg-{0,last}.txt` (`-0` at ~15 s, `-last` refreshed every 20 s for 10 min; HYB-6 used 0/60/180; from HYB-8 also `nmx-hybrid-gputests.txt` (Julio's Metal tests) and `nmx-hybrid-xedrv/` (libxedrv logs), from HYB-12 `nmx-hybrid-catest.png` (xe-catest grid), from HYB-14 `nmx-hybrid-png/` (every `/tmp/nmx-*.png`); the topology is in the TGL driver's `[IGPU] HWCAPS -` lines of the unified log; written by the one-boot daemon during a hybrid
   boot; the unified log cannot show injected kexts' text).
+
+HYB-15: `-ngreenbootgdrst` (hybrid-0005) does a full GT reset (`GDRST=1`) before Apple's `start()`. dmesg-0 lines
+`XeNG HYB15 pre: RCS ctl/head/tail/ccid BCS ctl/head/tail err` and `XeNG HYB15 GDRST full done|TIMEOUT gdrst= fw=`
+with the same registers after. Remove the boot-arg from `tools/hybrid/hybrid-config.py` to undo without a rebuild.

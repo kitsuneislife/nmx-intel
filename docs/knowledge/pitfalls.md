@@ -265,3 +265,15 @@ code added to the hook never runs [measured, HYB-10: no log line from it]. The 9
 binary patches in the RPL group (`f3b` L3 banks, `f3bb` EU/SS, `f3bbb` NumSubSlices=12). The TGL driver logs the
 real fuses and its result in the unified log: `[IGPU] HWCAPS - NumSubSlices:12 DualSubSliceCountFuse:0x7`,
 `MaxEUPerSubSlice:8 EUDisableFuses:0x0 ExecutionUnitCount:96` (`log.sh` kernel section).
+
+## Apple's TGL driver never resets the GT at boot; a GPU restart does not rebuild the safe image
+
+Linux i915 resets every engine at load on Gen11+ (`intel_gt_sanitize`, to scrub BIOS state). Apple's
+`IntelAccelerator::start` does not, and NootedGreen's pre-start GDRST (V55G) only runs when `ERROR_GEN6 != 0`.
+On our boot the firmware's engine state survives: at the HYB-14 hang RCS still had `CCID=0x80` and BCS (never enabled
+by Apple) was "busy" with HEAD 0xdc0 ≠ TAIL 0xe48 [measured, dmesg-last]. The golden "safe image" that every new
+context copies is built only in `startGraphicsEngine` (`accel+0x1268`, freed only in `stop`); the restart path
+(`IGHardwareRingBuffer::resetGraphicsEngine` 0x435xx: save list, `GDRST = ring mask`, restore the 11-register list
+from `populateResetRegisterList`, scheduler re-init) does not rebuild it [measured, disassembly]. So whatever a
+restart fixes is hardware state outside the context image, not the image itself [inferred]. NootedGreen's
+`V194 ... (restart recovery)` lines are noise: its Blit3D cache is global while Apple's context is per task.
