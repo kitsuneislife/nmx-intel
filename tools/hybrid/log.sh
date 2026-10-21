@@ -28,6 +28,10 @@ OUT=$HOMEU/hybrid.txt
              "$HOMEU"/Library/Logs/DiagnosticReports/WindowServer*; do
         [ -f "$f" ] && [ "$(stat -f %m "$f")" -ge $((BOOT - 1200)) ] && { echo "--- $f"; head -60 "$f"; }
     done
+    echo "== kernel message buffer saved during the hybrid boot (efi.sh boot-once)"
+    for f in /var/log/nmx-hybrid-dmesg-*.txt; do
+        [ -f "$f" ] && { echo "--- $f ($(wc -l < "$f") lines, $(stat -f %Sm "$f"))"; grep -E 'XeNG|NGreen|ngreen|nmx HYB|Lilu' "$f" | head -400; }
+    done
     echo "== last panic (any time)"; ls -t /Library/Logs/DiagnosticReports/*panic* 2>/dev/null | head -3
 } > "$OUT" 2>&1
 chown "${SUDO_USER:-root}" "$OUT"

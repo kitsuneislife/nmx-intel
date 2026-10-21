@@ -81,6 +81,12 @@ boot-once)
     [ -f "$GPU" ] && ! is_hybrid "$GPU" || { echo "no usable config-gpu-only.plist; left hybrid"; exit 1; }
     cp "$GPU" "$CFG" && sync && echo "GPU-only put back for the next start" || { echo "copy failed"; exit 1; }
     diskutil unmount "$ESP" >/dev/null 2>&1   # flushes the FAT volume before a possible panic
+    # OpenCore-injected kexts (NootedGreen) reach the unified log only as "compose failure"; the kernel message
+    # buffer (msgbuf=400000) keeps their text, but only until the next reboot
+    for t in 0 60 180; do
+        sleep $((t ? t - ${prev:-0} : 0)); prev=$t
+        dmesg > "/var/log/nmx-hybrid-dmesg-$t.txt" 2>&1; chmod 644 "/var/log/nmx-hybrid-dmesg-$t.txt"; sync
+    done
     exit 0
     ;;
 status)
