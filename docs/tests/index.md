@@ -81,7 +81,8 @@ phase file; open only the row you need.
 | HYB-2 | 10-21 | NootedGreen `9cf68511` (+hybrid-0002) | refuse the device open without the kernel task; `efi.sh hybrid` boots hybrid once | fail: same panic, guard silent; TGL accelerator probed the RTX; auto fallback worked | [hybrid-1](hybrid-1.md) |
 | HYB-3 | 10-21 | NootedGreen `3f20738f` (+hybrid-0003) | injected IntelAccelerator personality limited to the iGPU (`IOPCIPrimaryMatch`); guard via `IGAccelDevice+0x108` | pass (match): desktop on the Iris Xe, heavy artifacts, BCS hang at ~30 s, no Wi-Fi (`-nvoff`) | [hybrid-1](hybrid-1.md) |
 | HYB-4 | 10-21 | NootedGreen `3f20738f`, hybrid config without `-v` | drop the verbose console (it overwrites GGTT contexts, Julio 9.3) | fail: boots, same artifacts; WindowServer composited on the RTX (NVMTLDriver; NVRM/NVAccel ignore `-nvoff`) | [hybrid-1](hybrid-1.md) |
-| HYB-5 | 10-21 | hybrid config without `nvaccel=1` | keep nullmoth's Metal device away from WindowServer | pending | [hybrid-1](hybrid-1.md) |
+| HYB-5 | 10-21 | hybrid config without `nvaccel=1` | keep nullmoth's Metal device away from WindowServer | fail: no NVIDIA Metal device, same artifacts; NootedGreen's log is lost as "compose failure" | [hybrid-1](hybrid-1.md) |
+| HYB-6 | 10-21 | HYB-5 config; one-boot daemon saves `dmesg` at 0/60/180 s | read NootedGreen's IOLog to see which fixes run on Sequoia | pending | [hybrid-1](hybrid-1.md) |
 
 Adding a test: one row here, the entry at the end of the current phase file (start a new phase file when the goal
 changes), then [../status.md](../status.md).

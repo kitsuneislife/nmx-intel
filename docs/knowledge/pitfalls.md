@@ -249,3 +249,11 @@ Only our NMIntelFB and AirportMtkWlan honour `-nvoff`. NVRM 2.3.6 and NVAccel st
 Metal device that WindowServer uses (`NVMTLDriver` lines) even when the panel runs on another GPU [measured, HYB-4].
 NVAccel refuses to start without `nvaccel=1`, so the hybrid config drops that argument. Also, the kernel's
 "Boot args:" log line is cut at ~227 characters; check that a late flag took effect before concluding it was lost.
+
+## Logs of OpenCore-injected kexts are unreadable in the unified log; use `dmesg` in the same boot
+
+An injected kext (NootedGreen, Lilu) has no uuidtext on disk, so its IOLog lines show up as
+`(missing UUID) <compose failure [missing precomposed log]>` [measured, HYB-5: 2035 lines, no `XeNG` text]. The text
+survives in the kernel message buffer (`msgbuf=400000`): `sudo dmesg` in that boot, before rebooting. The hybrid
+one-boot daemon saves it to `/var/log/nmx-hybrid-dmesg-*.txt`. Kexts from `/Library/Extensions` (NMIntelFB, NVAccel)
+log normally.

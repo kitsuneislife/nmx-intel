@@ -1,6 +1,6 @@
 # Status
 
-> Last updated: 2026-10-21, HYB-4 same artifacts (WindowServer used the RTX), HYB-5 prepared; 10-19 sleep/wake parked (SLEEP-1/2 fail: macOS always does S3); 10-18 WIFI-8: native Wi-Fi at full speed; UPG-1: nullmoth 2.3.6 works. Keep this file short: it is read at the start of every session.
+> Last updated: 2026-10-21, HYB-5 same artifacts without the RTX Metal device; HYB-6 (NootedGreen log via dmesg) prepared; 10-19 sleep/wake parked (SLEEP-1/2 fail: macOS always does S3); 10-18 WIFI-8: native Wi-Fi at full speed; UPG-1: nullmoth 2.3.6 works. Keep this file short: it is read at the start of every session.
 
 ## Goal and decision
 
@@ -45,4 +45,4 @@ NMIntelFB unchanged; shader cache works (WindowServer keeps its own, 70 MB). Und
    `libxedrv`'s preflight needed a fix (source-fixes/hybrid/0001); `tools/hybrid/build.sh` builds it all. **HYB-1/2 fail:** panic when WindowServer
    opens the accelerator (`IntelAccelerator+0x150` NULL); NootedGreen's injected personality also matched the RTX. `efi.sh hybrid` boots hybrid
    once (auto fallback works). **HYB-3:** personality limited to the iGPU (hybrid-0003) → **first desktop on the Iris Xe**, heavy artifacts,
-   BCS hang, no Wi-Fi (`-nvoff`). **HYB-4:** no `-v`, same artifacts; WindowServer composited on the RTX (NVAccel ignores `-nvoff`). **HYB-5 ready:** no `nvaccel=1` ([tests/hybrid-1.md](tests/hybrid-1.md)).
+   BCS hang, no Wi-Fi (`-nvoff`). **HYB-4:** no `-v`, same artifacts; WindowServer composited on the RTX (NVAccel ignores `-nvoff`). **HYB-5:** no `nvaccel=1`, same artifacts (Intel side). NootedGreen's IOLog is lost in the unified log; **HYB-6 ready:** daemon saves `dmesg` ([tests/hybrid-1.md](tests/hybrid-1.md)).

@@ -215,3 +215,32 @@ still starts (no display, no Metal device). The GPU-only config is unchanged. Ch
 
 Expected: no `NVAccel` or `NVMTLDriver` lines; text, icons and the Dock drawn correctly, or a different artifact
 pattern. Steps: as HYB-2 (`efi.sh hybrid`, reboot, wait, `log.sh`).
+
+### HYB-5 result (2026-10-21): the RTX is out, the artifacts stay
+
+Lukas: no change on screen, the same artifacts. Boot at 10:01:48, boot-args without `nvaccel=1` [measured].
+
+Evidence (all-process log 10:01:40–10:03:10) [measured]:
+- NVAccel only probed and claimed the card; no allocations, no user clients. Zero `NVMTLDriver` lines. WindowServer had
+  no NVIDIA Metal device.
+- WindowServer: "Metal compositor activated"; libxedrv loaded with "layout: bits Sequoia (iguais ao driver, sem
+  conversão)", "sem compressão: dev=1 ios=1 heap=1", "nocopyfix: 1 1".
+- The shader compiler works: `MTLCompilerService (libMTLIGCCompilerPlugin) xe-adapter: parse bitcode -> bad=0` and
+  `old BuildRequestWithOptions -> 0` for iconservicesagent.
+- **Why NootedGreen never shows in our logs:** OpenCore-injected kexts have no uuidtext on disk, so the unified log
+  stores their lines as `(missing UUID) <compose failure [missing precomposed log]>` (2035 such lines in this boot).
+  Every `XeNG …` and `nmx HYB-3` IOLog was there, unreadable. This also explains HYB-3's missing start line.
+
+Conclusion: the RTX Metal device was not the cause [measured]. The artifacts come from the Intel side. Without
+NootedGreen's own log we cannot tell which of its fixes run on Sequoia (POOL, POOLALIGN, BLITSCRATCH2, FMT, PLANES,
+CSBGUARD…), and several were written against Tahoe's IOSurface/IOAF2 layout.
+
+## HYB-6 (prepared 2026-10-21): the same boot, with NootedGreen's log saved
+
+Variable: none on the GPU side (config as HYB-5). The one-boot daemon (`efi.sh boot-once`, commit `262429d`) now
+writes `dmesg` to `/var/log/nmx-hybrid-dmesg-{0,60,180}.txt` after putting GPU-only back. `msgbuf=400000` keeps the
+text of NootedGreen's IOLog lines there until the reboot. `log.sh` prints their `XeNG`/`NGreen`/`Lilu` lines. Both
+scripts pass `bash -n`.
+
+Expected: `XeNG POOL`, `XeNG BLITSCRATCH2 … [0x4c0] … -> 2420005b`, flip counters, or their absence, which says which
+fixes run on Sequoia. Steps: as HYB-2; stay on the desktop at least 3 minutes before rebooting.

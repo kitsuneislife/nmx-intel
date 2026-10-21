@@ -91,3 +91,9 @@ Lukas cannot type `|`: when he runs commands, write to a file and `grep`/`tail` 
 - nullmoth boot guard (2.3.1+): `nvram 7C436110-AB2A-4BBB-A880-FE41995C9F82:nullmoth-nv-starts` (starts not yet good; 2 = driver off next boot) and `…:nullmoth-nv-ok` (set once a start was good). Log: `NVRM: boot guard`.
 - `attaching=1` parks the GPU: toggle the AMD/Intel test driver in the 1401 app to retry.
 - Original binary: `sudo bash tools/binpatch/apply.sh restore`. Recovery: delete `/Library/Extensions/NMXGPU.kext`.
+
+## Hybrid route (NootedGreen)
+
+- `sudo bash tools/hybrid/log.sh` → `~/hybrid.txt`: kernel/WindowServer log of the previous boot, reports, and the
+  NootedGreen lines from `/var/log/nmx-hybrid-dmesg-{0,60,180}.txt` (written by the one-boot daemon during a hybrid
+  boot; the unified log cannot show injected kexts' text).
