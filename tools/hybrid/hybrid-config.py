@@ -8,7 +8,9 @@ Only these change, everything else stays as in the GPU-only config:
   Raptor Lake iGPU as Tiger Lake 9A49 so Apple's 16.0.32 TGL kexts match.
 - Kernel/Add: NootedGreen.kext after Lilu. MinKernel is left empty: Julio's 25.0.0 would skip it on Sequoia (24.x).
 - boot-args: Julio's NootedGreen arguments minus ngreenblmax (his panel's value), plus -nvoff so nullmoth and
-  NMIntelFB stay off. amfi_get_out_of_my_way, csr-active-config and AMFIPass are already in the GPU-only config.
+  NMIntelFB stay off. -v is dropped: the verbose console draws into the boot framebuffer at the start of the GGTT,
+  where the accelerator keeps contexts and rings (Julio's HISTORY 9.3; HYB-3 desktop full of artifacts).
+  amfi_get_out_of_my_way, csr-active-config and AMFIPass are already in the GPU-only config.
 """
 import plistlib
 import sys
@@ -46,7 +48,7 @@ def make(c: dict) -> dict:
     c["DeviceProperties"]["Add"][IGPU] = dict(IGPU_PROPS)
     c["Kernel"]["Add"].insert(paths.index("Lilu.kext") + 1, dict(NG_ENTRY))
     boot = c["NVRAM"]["Add"][APPLE_BOOT]
-    args = boot["boot-args"].split()
+    args = [a for a in boot["boot-args"].split() if a != "-v"]
     boot["boot-args"] = " ".join(args + [a for a in HYBRID_ARGS if a not in args])
     return c
 
