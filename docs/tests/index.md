@@ -78,7 +78,8 @@ phase file; open only the row you need.
 | SLEEP-2 | 10-19 | + HibernationFixup 1.5.4, `hbfx-ahbm=1` | force hibernation over the platform sleep policy | **fails**: still type 7 (S3), panel off at wake; sleep parked | [sleep-1](sleep-1-hibernate.md) |
 | GUARD-1 | 10-19 | NMIntelFB `241aff3d` (intelfb-0021) | stand down when nullmoth's boot guard has NVRM off | pending | [sleep-1](sleep-1-hibernate.md) |
 | HYB-1 | 10-21 | NootedGreen `356c818`+hybrid-0001, libxedrv `c37b5a4f` | hybrid H1: Iris Xe alone on Apple's TGL driver (`config-hybrid.plist`, `-nvoff`) | fail: panic, `IntelAccelerator+0x150` NULL when WindowServer opens it | [hybrid-1](hybrid-1.md) |
-| HYB-2 | 10-21 | NootedGreen `9cf68511` (+hybrid-0002) | refuse the device open without the kernel task; `efi.sh hybrid` boots hybrid once | pending | [hybrid-1](hybrid-1.md) |
+| HYB-2 | 10-21 | NootedGreen `9cf68511` (+hybrid-0002) | refuse the device open without the kernel task; `efi.sh hybrid` boots hybrid once | fail: same panic, guard silent; TGL accelerator probed the RTX; auto fallback worked | [hybrid-1](hybrid-1.md) |
+| HYB-3 | 10-21 | NootedGreen `3f20738f` (+hybrid-0003) | injected IntelAccelerator personality limited to the iGPU (`IOPCIPrimaryMatch`); guard via `IGAccelDevice+0x108` | pending | [hybrid-1](hybrid-1.md) |
 
 Adding a test: one row here, the entry at the end of the current phase file (start a new phase file when the goal
 changes), then [../status.md](../status.md).

@@ -215,3 +215,20 @@ guard must run before the original `deviceStart` (HYB-2). The cause of the missi
 `grep -q` exits at the first match and closes the pipe; the writer (`nm`) gets SIGPIPE, and `set -o pipefail` turns
 that into a failure, so `nm … | grep -q sym` can report a present symbol as missing [measured, HYB-2 build]. Capture
 the output once into a variable and match on it.
+
+## NootedGreen's injected accelerator personality matches the NVIDIA dGPU (HYB-2)
+
+`injectAcceleratorPersonality` matches on `IOPCIClassMatch 0x03000000&0xff000000` with `IOProbeScore 1000` and no
+`IOPCIPrimaryMatch`, so Apple's `IntelAccelerator` probes every VGA device, including the RTX `10de:25ac` [measured,
+HYB-2 log]. Any personality we inject on this two-GPU machine needs a vendor/device match.
+
+## Lilu plugin SYSLOG lines do not reach the unified log here; use IOLog
+
+NootedGreen's `SYSLOG("ngreen", ...)` lines never appear in `log show`, while Apple's kext IOLogs do [measured, HYB-2].
+Diagnostics we add to Lilu plugins must call `IOLog` directly.
+
+## Reading the previous boot: `--last boot` is the current one; parse `kern.boottime` carefully
+
+After a panic the evidence is in the boot before the current one: use `log show --start ... --end <boottime>`. In zsh,
+`log` is a builtin: call `/usr/bin/log`. `sed 's/.*sec = ...'` on `kern.boottime` matches `usec` (greedy); anchor it:
+`sed 's/^{ sec = \([0-9]*\).*/\1/'` [measured].

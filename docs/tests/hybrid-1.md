@@ -102,3 +102,43 @@ Steps (the macOS side is on disk from HYB-1; NootedGreen `9cf68511` is already b
 1. `sudo bash ~/Documents/Projetos/nmx-intel/tools/hybrid/efi.sh hybrid`
 2. Reboot; wait 2–3 minutes even if the panel is black, then hold the power button if needed.
 3. Back on GPU-only: `sudo bash ~/Documents/Projetos/nmx-intel/tools/hybrid/log.sh` → `~/hybrid.txt`.
+
+### HYB-2 result (2026-10-21): fail, same panic; the fallback worked
+
+The once-only daemon worked [measured]: after the panic the Mac restarted into GPU-only by itself, no Recovery.
+The driver variable did not help: `Kernel-2026-10-21-092659.panic` is the HYB-1 panic again (uptime ~40 s, WindowServer
+pid 434, `getStampMemory+0x11` ← `IOAccelDevice2::deviceStart+0x20` ← `IGAccelDevice::deviceStart+0x16` ←
+NootedGreen `Gen11::deviceStart+0x2a`). RDI = the accelerator, RAX = 0 [measured]. The guard did not fire: it relied on
+a pointer set in the `IntelAccelerator::start` hook, which was evidently not set for this accelerator [inferred].
+None of NootedGreen's SYSLOG lines (V-numbered or "nmx HYB-2") are in the unified log, while Apple's `[IGPU]` IOLogs are
+[measured], so that hook's logging is invisible here.
+
+The kernel log of the hybrid boot (read with an explicit `--start/--end` window) shows why [measured]:
+
+    09:25:11.868 (AppleIntelTGLGraphics) [IGPU] IntelAccelerator::probe: Found device with ID 0x9a498086 ... at PCI 0:2:0
+    09:25:11.984 (AppleIntelTGLGraphics) [IGPU] IntelAccelerator::probe: Found device with ID 0x25ac10de ... at PCI 1:0:0
+    09:25:11.984 (NVAccel) NVAccel: probe(PEGP) score 100 ... claiming
+    09:25:11.988 (AppleIntelTGLGraphics) [IGPU] Detecting Pre-Si/Si Mode ... [Si]
+
+The Intel accelerator probed the RTX 3050. The only start line ("Pre-Si/Si", early in `IntelAccelerator::start`) is on
+that thread. NootedGreen's `injectAcceleratorPersonality` adds an IntelAccelerator personality with
+`IOPCIClassMatch 0x03000000&0xff000000` and `IOProbeScore 1000` but no `IOPCIPrimaryMatch` [measured, source], so it
+matches every VGA device and beats NVAccel (100) on the RTX. The working theory is that an IntelAccelerator was
+started on NVIDIA hardware, never built its kernel task, and WindowServer opened that one [inferred]. Whether the iGPU
+instance started too is unknown. `log.sh` missed all of this: it read only the current (GPU-only) boot, and its
+`kern.boottime` parse took `usec` instead of `sec` (greedy sed), so its "since boot" report filter matched everything.
+
+## HYB-3 (prepared 2026-10-21): the accelerator matches the iGPU only
+
+Variable: `source-fixes/hybrid/0003` adds `IOPCIPrimaryMatch "0x9a498086 0xa7a88086"` to the injected personality.
+Safety net in the same patch (it only acts where HYB-2 would have panicked): the `deviceStart` guard now reads the
+accelerator from the device itself (`IGAccelDevice+0x108`, as `get_vram_size` and `get_hw_caps` do) and refuses the
+open when its `+0x150` is NULL. The start hook and the guard log with `IOLog` ("nmx HYB-3: ..."), which does reach the
+unified log; the start line names the provider (`IGPU` or `PEGP`). NootedGreen `3f20738f`; HookCase, libxedrv and the
+Metal driver unchanged. Strings checked. `log.sh` now also reads the 20 minutes before the current boot and keeps
+only panic and WindowServer reports.
+
+Expected: no IntelAccelerator probe line for `0x25ac10de`; one "nmx HYB-3: IntelAccelerator::start on IGPU" line with a
+non-NULL kernel task. If the iGPU task is NULL too, the guard should refuse the open and the boot should survive.
+
+Steps: as HYB-2 (`efi.sh hybrid`, reboot, wait, `log.sh`).
