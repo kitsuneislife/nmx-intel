@@ -35,7 +35,7 @@ IGPU_PROPS = {
 }
 DROP_ARGS = {"-v", "nvaccel=1"}
 HYBRID_ARGS = ("IGLogLevel=3 msgbuf=400000 -ngreentglwithgfx -allow3d -disablegfxfirmware ngreen-dmc=adlp -ngreenv189 "
-               "-ngreenkeepefi -ngreenxefix -ngreenfixbootmode ngreenSched=4 ngreenV142=3 -nvoff").split()
+               "-ngreenkeepefi -ngreenxefix -ngreenfixbootmode ngreenSched=4 ngreenV142=3 -nvoff -ngreenbootgdrst").split()
 NG_ENTRY = {
     "Arch": "x86_64", "BundlePath": "NootedGreen.kext", "Comment": "hybrid route: Apple TGL driver on the Iris Xe",
     "Enabled": True, "ExecutablePath": "Contents/MacOS/NootedGreen", "MaxKernel": "", "MinKernel": "",

@@ -1,0 +1,39 @@
+diff --git a/src/NootedGreen/kern_gen11.cpp b/src/NootedGreen/kern_gen11.cpp
+index 228eee5..acf9f0d 100755
+--- a/src/NootedGreen/kern_gen11.cpp
++++ b/src/NootedGreen/kern_gen11.cpp
+@@ -5189,6 +5189,34 @@ unsigned long Gen11::start(void *that,void  *param_1)
+ 		}
+ 	}
+ 	
++	// HYB-15: full GT reset before Apple's start, as i915's intel_gt_sanitize() does on every Gen11+ load, to scrub
++	// engine state the firmware left behind (HYB-14: RCS CCID=0x80 and BCS busy on a stale ring; a GPU restart, which
++	// resets the engines, made rendering right). Apple's start programs the rings afterwards. Opt-in: -ngreenbootgdrst.
++	if (!NGreen::callback->isRealTGL && checkKernelArgument("-ngreenbootgdrst")) {
++		auto rr = [](uint32_t o) { return NGreen::callback->readReg32(o); };
++		IOLog("XeNG HYB15 pre: RCS ctl=%x head=%x tail=%x ccid=%x BCS ctl=%x head=%x tail=%x err=%x\n",
++			rr(RING_CTL(RENDER_RING_BASE)), rr(RING_HEAD(RENDER_RING_BASE)), rr(RING_TAIL(RENDER_RING_BASE)),
++			rr(RING_CCID(RENDER_RING_BASE)), rr(RING_CTL(BLT_RING_BASE)), rr(RING_HEAD(BLT_RING_BASE)),
++			rr(RING_TAIL(BLT_RING_BASE)), rr(ERROR_GEN6));
++		NGreen::callback->writeReg32(GEN6_GDRST, GEN6_GRDOM_FULL);
++		uint32_t gdrst = GEN6_GRDOM_FULL;
++		uint64_t now = 0, deadline = 0;
++		clock_interval_to_deadline(10, kMillisecondScale, &deadline);
++		for (clock_get_uptime(&now); (gdrst & GEN6_GRDOM_FULL) && now < deadline; clock_get_uptime(&now))
++			gdrst = rr(GEN6_GDRST);
++		// the reset drops the render ForceWake this function took above: take it again before the writes below
++		NGreen::callback->writeReg32(FORCEWAKE_RENDER_GEN9, (1 << 16) | 1);
++		uint32_t ack = 0;
++		clock_interval_to_deadline(50, kMillisecondScale, &deadline);
++		for (clock_get_uptime(&now); !(ack & 1) && now < deadline; clock_get_uptime(&now))
++			ack = rr(FORCEWAKE_ACK_RENDER_GEN9);
++		IOLog("XeNG HYB15 GDRST full %s gdrst=%x fw=%x: RCS ctl=%x head=%x tail=%x ccid=%x BCS ctl=%x head=%x tail=%x err=%x\n",
++			(gdrst & GEN6_GRDOM_FULL) ? "TIMEOUT" : "done", gdrst, ack,
++			rr(RING_CTL(RENDER_RING_BASE)), rr(RING_HEAD(RENDER_RING_BASE)), rr(RING_TAIL(RENDER_RING_BASE)),
++			rr(RING_CCID(RENDER_RING_BASE)), rr(RING_CTL(BLT_RING_BASE)), rr(RING_HEAD(BLT_RING_BASE)),
++			rr(RING_TAIL(BLT_RING_BASE)), rr(ERROR_GEN6));
++	}
++
+ 	// GT workarounds
+ 	uint32_t misccpctl = NGreen::callback->readReg32(GEN7_MISCCPCTL);
+ 	misccpctl &= ~GEN12_DOP_CLOCK_GATE_RENDER_ENABLE;
