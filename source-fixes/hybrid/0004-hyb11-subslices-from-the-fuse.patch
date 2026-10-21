@@ -1,0 +1,12 @@
+--- a/src/NootedGreen/kern_gen11.cpp
++++ b/src/NootedGreen/kern_gen11.cpp
+@@ -2160,7 +2160,8 @@
+ 				LookupPatchPlus const patchesRPL[] = {
+ 					{activeKext, f3b, r3b, arrsize(f3b),	1},      // L3BankCount=8
+ 					{activeKext, f3bb, r3bb, arrsize(f3bb),	1},    // MaxEU/SS=8
+-					{activeKext, f3bbb, r3bbb, arrsize(f3bbb),	1},// NumSubSlices=12
++					// nmx HYB-11: no NumSubSlices=12 hardcode. The Acer's a7a8 is GT1 (DualSubSliceCountFuse 0x7 = 3 DSS, 48 EU),
++					// so the driver keeps its own popcount(DSS fuse) * 2 = 6.
+ 					{activeKext, f_devstart, m_devstart, r_devstart, rm_devstart, arrsize(f_devstart), 1}, // BCS bypass
+ 				};
+ 				PANIC_COND(!LookupPatchPlus::applyAll(patcher, patchesRPL, address, size), "ngreen",
