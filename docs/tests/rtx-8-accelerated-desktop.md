@@ -496,3 +496,37 @@ some parts of the start felt slower.
   `$(getconf DARWIN_USER_CACHE_DIR)/nvmtl` (42 MB). `nvmtl_aircache_dir()` falls back there when the shared folder
   is not writable for the process [read, `plugin/NVMTLLibraryLoad.m`]. The C dir persists across boots, so only the
   first boot after the install recompiled; nothing to fix.
+
+## UPG-2 prep — nullmoth NVIDIA driver 2.3.6 → 2.5.0 (GPU-only route)
+Releases read (`CHANGELOG.md` at v2.5.0, `git log v2.3.6..v2.5.0`, 53 commits) [measured]:
+- **2.4**: hardware H.264/HEVC encode on RTX 20/30; security hardening (bounded caller values, each client
+  serialised, no kernel addresses/registers/firmware published to user space); macOS 26 icons and glass; install from
+  a root-owned private copy of the package; NVRM reports mains/battery to the GSP; stale shader cache cleared; a boot
+  counts as good once the desktop is up (`com.nullmoth.bootguard` job: WindowServer up 45 s → clears
+  `nullmoth-nv-starts`, sets `nullmoth-nv-ok`). **2.4.1/2.4.2**: black-screen fixes for 2.4 (outdated NVRMFB, missing
+  display interface). **2.4.3**: NVRMFB runs vblank/cursor callbacks one at a time (thread_call cap panic, #295);
+  AIR digest reused. **2.4.4**: GTX 16 encode; HEVC past frame 2; Metal offered ~8 s after start on Intel/AMD-screen
+  laptops; WindowServer Vulkan crash on dead binding handles; app freeze on a lost completion mark (#322, Terminal);
+  function-table shaders; WoW; wgpu apps. **2.5.0**: NVIDIA 615.78.08 RM/display/GSP (from 610.57.04); T400–T1200;
+  GPU identity from the PDI; `nvregdwords=` boot-arg (NVIDIA's RegistryDwords); `nvmaxbpc=12`.
+- What touches our route: (1) `0cd7c49` early Metal hand-off says in its message the Intel panel driver (NMIntelFB,
+  published as a head of the accelerator) never takes the early path → no change for us [read]. (2) `1321113`
+  security pass keeps `nvkms-kapi`/`gpu-id`/`phys-for-va` on the `NVRMDisplay` nub (`NVRM.cpp:78-80`); the
+  `NVRM_GPUVA_FN_HANDLES`/`NVRM_VRAM_FN_*` calls NMIntelFB makes are unchanged [measured, git grep]. (3) the 615 move
+  changes NVKMS's KAPI header (`checkLutNotifier` removed, new fields in layer/head configs) — NMIntelFB uses that
+  function table. (4) the new boot-guard job may make our GUARD-1 stand-down moot [inferred].
+Package `nullmoth-nvidia-2.5.0.tar.gz` `80f33166` (matches SHA256SUMS; inner files match) [measured], unpacked in
+`~/nmx-build/pkg-2.5.0/x/pkgroot`; its `install.sh` equals `package/install.sh` at v2.5.0, touches no EFI/boot-args.
+- **NVRM** `aca96ea6` (release) → `7da4dc21`: the RTX-25 patch ported. `nvrm_pageoff.c` unchanged v2.3.6 → v2.5.0;
+  second `osDelayUs` in `_nvrm_ce_copy_to_pages`: `0x1bda8` 200001 → 2001, `0x1bdb3` 10 → 1, `0x1bdb8` `osDelayUs`
+  (0x2df680) → `os_delay` (0x141f0, still `IOSleep(ms)`); `otool` shows `callq _os_delay` [measured].
+- **NVAccel** `70e36f61` (release, `kexts/15`) → `410790ed`: accel-0001..0003 applied clean with `git am -3` on
+  v2.5.0 (branch `nmx-accel-250`, worktree `~/nmx-build/accel/src-250`, `source-fixes/accel/v2.5.0/`, same diff
+  content as v2.3.6). Recipe check: plain v2.5.0 built here `402ab903`: symbols and strings identical to the
+  release, data sections equal, `__text` +144 B; built against `~/ogkm610` or `~/ogkm615` it is byte-identical
+  [measured]. All `debug.nvaccel_*` sysctls `auto.sh` uses are present [measured].
+- **NMIntelFB**: `kexts/NMIntelFB` unchanged; built from v2.5.0 with the 610 KAPI headers and with the 615 ones it is
+  byte-identical, `241aff3d` = the installed binary [measured] → the KAPI members it uses did not move. Not
+  reinstalled. `tools/intelfb/build.sh` now defaults to v2.5.0 / 615.78.08.
+- Unknowns for the test: 615's GSP firmware and RM on this RTX 3050 (boot guard, display enumeration), the NVRMFB
+  callback serialisation under our flip rate, and whether the shader cache is cleared again.

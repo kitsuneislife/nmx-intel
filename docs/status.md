@@ -1,6 +1,6 @@
 # Status
 
-> Last updated: 2026-10-21, HYB-15 panicked at 25 s (fbTimingsWorker divide by zero), HYB-15b prepared with the guard fixed; full GT reset at boot (the HYB-14 restart fixed CoreAnimation; firmware engine state is the suspect); 10-19 sleep/wake parked (SLEEP-1/2 fail: macOS always does S3); 10-18 WIFI-8: native Wi-Fi at full speed; UPG-1: nullmoth 2.3.6 works. Keep this file short: it is read at the start of every session.
+> Last updated: 2026-10-21, UPG-2 (nullmoth 2.5.0) prepared; HYB-15 panicked at 25 s (fbTimingsWorker divide by zero), HYB-15b prepared with the guard fixed; full GT reset at boot (the HYB-14 restart fixed CoreAnimation; firmware engine state is the suspect); 10-19 sleep/wake parked (SLEEP-1/2 fail: macOS always does S3); 10-18 WIFI-8: native Wi-Fi at full speed; UPG-1: nullmoth 2.3.6 works. Keep this file short: it is read at the start of every session.
 
 ## Goal and decision
 
@@ -31,7 +31,9 @@ register 0 after wake) and nothing relights it; sleep is off for now (`pmset`). 
 (RTX-16: ~40 %). Stage 4 done. **BL-2** brightness works (NMIntelFB `36afddf1`). Open:
 real vblank (5), battery numbers (7), sleep relight: **parked 10-19**: SLEEP-1 (`hibernatemode 25`) and SLEEP-2 (HibernationFixup `hbfx-ahbm=1`) both still did S3 (`type 7`); sleep disabled again (`hibernate.sh off`; the forced power-offs tripped nullmoth's boot guard, fix `sudo nvram -d nullmoth-nv-starts`; GUARD-1 prep: NMIntelFB `241aff3d` stands down then, pending); next idea is a real relight in NMIntelFB, `tools/sleep/hibernate.sh`, [tests/sleep-1-hibernate.md](tests/sleep-1-hibernate.md).
 **UPG-1 works:** nullmoth NVIDIA driver 2.3.6 installed with our patches: NVRM `8c8873d5`, NVAccel `8166045f`,
-NMIntelFB unchanged; shader cache works (WindowServer keeps its own, 70 MB). Undo: `tools/upgrade/rollback.sh`. Details: [tests/rtx-8-accelerated-desktop.md](tests/rtx-8-accelerated-desktop.md).
+NMIntelFB unchanged; shader cache works (WindowServer keeps its own, 70 MB). Undo: `tools/upgrade/rollback.sh`.
+**UPG-2 prepared (10-21):** nullmoth 2.5.0 (NVIDIA 615) with our patches: NVRM `7da4dc21`, NVAccel `410790ed`, NMIntelFB
+unchanged (`241aff3d`, same with 615 KAPI headers); pending install (GPU-only boot). Details: [tests/rtx-8-accelerated-desktop.md](tests/rtx-8-accelerated-desktop.md).
 **Wi-Fi:** WIFI-1 (MT7921, OverlordDev SimpleMtkWlan): WIFI-3 **connects** (WPA2, DHCP on en2) but dies under load; WIFI-4 hung the boot (configd panic), driver removed. **WIFI-5 works**: flxxxxddd's AirportMtkWlan, native Wi-Fi menu. WIFI-6 (5 GHz): 38 down / 5.1 up. WIFI-7 works (prefer 5 GHz, all networks listed). **WIFI-8 works**: upload was capped by a fixed basic TX rate (wifi5-0005); now 37.1 down / 36.9 up, the line's ceiling. Runbook: [knowledge/wifi.md](knowledge/wifi.md); tests: [tests/wifi-1-mt7921.md](tests/wifi-1-mt7921.md).
 
 ## Open problems

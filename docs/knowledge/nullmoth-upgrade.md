@@ -4,7 +4,7 @@
 > and re-apply our two changes on top: the RTX-25 NVRM byte patch and the NVAccel accel series (bridge stage 4).
 > NMIntelFB is ours and only needs a rebuild when `kexts/NMIntelFB` or the headers it shares change. This page is the
 > runbook; UPG-1 (2.1.0 → 2.3.6) in [../tests/rtx-8-accelerated-desktop.md](../tests/rtx-8-accelerated-desktop.md)
-> is the worked example.
+> is the worked example; UPG-2 (2.3.6 → 2.5.0, NVIDIA 610 → 615) the one with an OGKM change.
 
 ## What we carry on top of a release
 
@@ -24,7 +24,14 @@ git diff --stat v<old> v<new> -- kexts/NVRM kexts/NMIntelFB kexts/NVRMFB kexts/N
 ```
 Look for: new boot or install behaviour (guards, fallback jobs), ABI headers (`nvrm_surfshare_abi.h`,
 `nvrm_vram_abi.h`), a new OGKM tag in `kexts/NVRM/patches/README.md` (then `~/ogkm610` and the NMIntelFB KAPI
-headers change too), and anything that touches the EFI or boot-args in `install.sh`.
+headers change too), and anything that touches the EFI or boot-args in `install.sh`. The OGKM tag is also named in
+the release notes ("Built on NVIDIA's …") and in `package/install.sh`; `kexts/NVRM/patches/README.md` can lag.
+
+**When the OGKM tag changes** (UPG-2): clone the new tree (`git clone --depth 1 --branch <tag> …open-gpu-kernel-modules
+~/ogkm<NNN>`), build the plain NVAccel against old and new trees and NMIntelFB with `OGKM_TAG=<old>` and `<new>`
+KAPI headers: identical binaries prove the RM/KAPI members we use did not move. If NMIntelFB differs, read the
+`NvKmsKapiFunctionsTable` diff before installing: NMIntelFB calls that table by offset through the `nvkms-kapi` nub
+property, so a moved member is a wrong call, not a build error.
 
 ## 2. Download and verify
 
