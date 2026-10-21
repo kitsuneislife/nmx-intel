@@ -1,6 +1,6 @@
 # Status
 
-> Last updated: 2026-10-21, HYB-2 failed (accelerator matched the RTX), HYB-3 prepared; 10-19 sleep/wake parked (SLEEP-1/2 fail: macOS always does S3); 10-18 WIFI-8: native Wi-Fi at full speed; UPG-1: nullmoth 2.3.6 works. Keep this file short: it is read at the start of every session.
+> Last updated: 2026-10-21, HYB-3 reached the desktop on the Iris Xe (artifacts), HYB-4 prepared; 10-19 sleep/wake parked (SLEEP-1/2 fail: macOS always does S3); 10-18 WIFI-8: native Wi-Fi at full speed; UPG-1: nullmoth 2.3.6 works. Keep this file short: it is read at the start of every session.
 
 ## Goal and decision
 
@@ -44,4 +44,5 @@ NMIntelFB unchanged; shader cache works (WindowServer keeps its own, 70 MB). Und
    headless with `nvmtl-allow.txt` routing; target Sequoia (port Julio's Tahoe-only parts); plan H0–H4 in [knowledge/hybrid-route.md](knowledge/hybrid-route.md). **H0 done:** Sequoia offsets measured, only
    `libxedrv`'s preflight needed a fix (source-fixes/hybrid/0001); `tools/hybrid/build.sh` builds it all. **HYB-1/2 fail:** panic when WindowServer
    opens the accelerator (`IntelAccelerator+0x150` NULL); NootedGreen's injected personality also matched the RTX. `efi.sh hybrid` boots hybrid
-   once (auto fallback works). **HYB-3 ready:** personality limited to the iGPU (hybrid-0003) ([tests/hybrid-1.md](tests/hybrid-1.md)).
+   once (auto fallback works). **HYB-3:** personality limited to the iGPU (hybrid-0003) → **first desktop on the Iris Xe**, heavy artifacts,
+   BCS hang, no Wi-Fi (`-nvoff`). **HYB-4 ready:** no `-v` ([tests/hybrid-1.md](tests/hybrid-1.md)).

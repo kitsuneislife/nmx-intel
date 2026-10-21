@@ -232,3 +232,10 @@ Diagnostics we add to Lilu plugins must call `IOLog` directly.
 After a panic the evidence is in the boot before the current one: use `log show --start ... --end <boottime>`. In zsh,
 `log` is a builtin: call `/usr/bin/log`. `sed 's/.*sec = ...'` on `kern.boottime` matches `usec` (greedy); anchor it:
 `sed 's/^{ sec = \([0-9]*\).*/\1/'` [measured].
+
+## No `-v` with Apple's accelerated Intel driver; `-nvoff` also turns off our Wi-Fi
+
+The verbose console draws into the boot framebuffer at the start of the GGTT, where Apple's TGL accelerator places
+contexts and rings: corrupted contexts and screen artifacts (Julio's HISTORY 9.3) [measured there; HYB-3 artifacts
+match, inferred]. `hybrid-config.py` drops `-v`. `-nvoff` is honoured by AirportMtkWlan too, so a hybrid boot with it
+has no Wi-Fi [measured, HYB-3].

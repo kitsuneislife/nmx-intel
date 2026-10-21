@@ -79,7 +79,8 @@ phase file; open only the row you need.
 | GUARD-1 | 10-19 | NMIntelFB `241aff3d` (intelfb-0021) | stand down when nullmoth's boot guard has NVRM off | pending | [sleep-1](sleep-1-hibernate.md) |
 | HYB-1 | 10-21 | NootedGreen `356c818`+hybrid-0001, libxedrv `c37b5a4f` | hybrid H1: Iris Xe alone on Apple's TGL driver (`config-hybrid.plist`, `-nvoff`) | fail: panic, `IntelAccelerator+0x150` NULL when WindowServer opens it | [hybrid-1](hybrid-1.md) |
 | HYB-2 | 10-21 | NootedGreen `9cf68511` (+hybrid-0002) | refuse the device open without the kernel task; `efi.sh hybrid` boots hybrid once | fail: same panic, guard silent; TGL accelerator probed the RTX; auto fallback worked | [hybrid-1](hybrid-1.md) |
-| HYB-3 | 10-21 | NootedGreen `3f20738f` (+hybrid-0003) | injected IntelAccelerator personality limited to the iGPU (`IOPCIPrimaryMatch`); guard via `IGAccelDevice+0x108` | pending | [hybrid-1](hybrid-1.md) |
+| HYB-3 | 10-21 | NootedGreen `3f20738f` (+hybrid-0003) | injected IntelAccelerator personality limited to the iGPU (`IOPCIPrimaryMatch`); guard via `IGAccelDevice+0x108` | pass (match): desktop on the Iris Xe, heavy artifacts, BCS hang at ~30 s, no Wi-Fi (`-nvoff`) | [hybrid-1](hybrid-1.md) |
+| HYB-4 | 10-21 | NootedGreen `3f20738f`, hybrid config without `-v` | drop the verbose console (it overwrites GGTT contexts, Julio 9.3) | pending | [hybrid-1](hybrid-1.md) |
 
 Adding a test: one row here, the entry at the end of the current phase file (start a new phase file when the goal
 changes), then [../status.md](../status.md).

@@ -142,3 +142,38 @@ Expected: no IntelAccelerator probe line for `0x25ac10de`; one "nmx HYB-3: Intel
 non-NULL kernel task. If the iGPU task is NULL too, the guard should refuse the open and the boot should survive.
 
 Steps: as HYB-2 (`efi.sh hybrid`, reboot, wait, `log.sh`).
+
+### HYB-3 result (2026-10-21): pass for the match, first desktop on the Iris Xe
+
+Lukas: the hybrid boot reached the desktop, with very many visual bugs; network did not work, so he rebooted (the
+daemon had already put GPU-only back). No panic [measured: no new `.panic`].
+
+Evidence (kernel log 09:38:40–09:42:04) [measured]:
+- `IntelAccelerator::probe` ran only for `0x9a498086` at PCI 0:2:0; the RTX line is gone. "Pre-Si/Si" and the HWCAPS
+  block ("TGL GT2 LP", 96 EU, Host Preemptive scheduler, "Graphics firmware disabled via NVRAM") follow on the same
+  thread, so the accelerator started on the iGPU.
+- The "nmx HYB-3" IOLog lines are absent, both start and guard. The guard did not need to act. Why the start line is
+  missing is open [unverified].
+- `Kernel_2026-10-21-093915….gpuRestart` (~30 s after the accelerator start): "Intel GPU Hang Summary", hardware
+  context 6. BCS "busy - in the ring, Appears hung" (HEAD `0xd4`, TAIL `0xd8`, START `0x402e8000`). RCS, CCS, VCS0 and
+  VECS0 were "NOT enabled".
+- Framebuffer: "Insufficient stolen memory", repeated "FB0: Insufficient link bandwidth to support bpc 24", "Flip
+  called without enabling VBL", "DBUF 2 power down timeout".
+- Network: the boot-args carry `-nvoff`, which also keeps our AirportMtkWlan off the card by design (wifi patches). So
+  no Wi-Fi in hybrid is expected. `en0` (RTL8111) shows "Has Wired Ethernet Link: false" in this boot and in the
+  GPU-only one, i.e. no cable link either time.
+
+Cause of the artifacts, best candidate [inferred]: the hybrid config keeps `-v` from the GPU-only config. Julio found
+that the verbose console draws into the boot framebuffer at the start of the GGTT, the same range as the accelerator's
+contexts and rings. Booting without `-v` gave his first executed GPU work, and he banned `-v` from the accelerated
+config (`docs/HISTORY.md` 9.3 in his repo). His own boot-args have no `-v`.
+
+## HYB-4 (prepared 2026-10-21): the same hybrid boot without `-v`
+
+Variable: `hybrid-config.py` drops `-v` from the hybrid boot-args (everything else as in HYB-3; NootedGreen `3f20738f`
+unchanged). `efi.sh hybrid` regenerates `config-hybrid.plist`, so no rebuild is needed. Checked: the generated
+boot-args have no `-v` and still have `-vi2c-force-polling`. Wi-Fi stays off (`-nvoff`). Fixing it means letting
+AirportMtkWlan ignore `-nvoff` in hybrid, which is a separate change to an installed kext.
+
+Expected: far fewer artifacts, or none; the BCS hang may remain. Steps: as HYB-2 (`efi.sh hybrid`, reboot, wait,
+`log.sh`). The boot shows the Apple logo instead of text.
