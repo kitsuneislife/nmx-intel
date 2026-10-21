@@ -420,3 +420,27 @@ triangle shows as one half near zero. `gputests.sh` runs it right after `xe-cate
 first seven tiles `left 2480 right 2480 total 4960`, instanced `390/367 757`, msaa `2640/2532 5172` (edge pixels).
 Expected: the tile(s) that differ on the Xe name the broken geometry path; all equal points back at CoreAnimation's
 own shaders or the pipeline conversion it uses.
+
+### HYB-13 result (2026-10-21 11:27): geomtest inconclusive (test flaw), catest changed between boots
+
+`xe-geomtest` on the Xe [measured]: all nine tiles `left 8192 right 8192 total 16384`, i.e. every pixel of every tile
+darker than G 200. Test flaw (ours): the MSAA pass was the only clear, it resolved into the shared target and the
+other tiles loaded it, so a failed or skipped MSAA resolve leaves the whole target dark and hides tiles 0-7. Reading:
+the 4x MSAA resolve (or multisample clear) likely fails on the Xe [inferred, to confirm in HYB-14]; the plain tiles
+are unmeasured.
+
+`xe-catest`, same binaries and driver as HYB-12 [measured, PNG]: `rotated 30` now complete (246,163,155 = RTX) and
+`CG draw async` now has the text and full circle (172,215,179 = RTX), while `corner radius` is now cut (half the
+rounded square plus a stray triangle) and `shape mask` shows stripes. Text 36/12, icon and opacity are still missing,
+shape fill still striped. So the lost geometry **varies from run to run** [measured, 2 boots]: a race, cache or
+synchronisation fault is more likely than a deterministic compile or state-conversion error [inferred]. Search for
+an existing fix: none found for NootedGreen artifacts on Sequoia or on a GT1 SKU [unverified, one web search].
+
+## HYB-14 (prepared 2026-10-21): geomtest fixed, catest three times
+
+Variable: none on the GPU side (NootedGreen `d409868b`). `xe-geomtest`: tiles 0-7 in their own cleared pass, the MSAA
+tile resolved into a separate texture, mean G printed per tile. RTX baseline [measured]: tiles 0-5 `4960 mean G 177`,
+blend `4960 G 216`, instanced `757 G 243`, msaa `2532/2532 5064 G 177`. `gputests.sh` runs catest, geomtest, catest,
+geomtest, catest, so in-boot variation shows; PNGs go to `/tmp/nmx-catest-{1,2,3}.png` and `boot-once` copies
+`/tmp/nmx-*.png` to `/var/log/nmx-hybrid-png/`. Expected: geomtest names the broken path (MSAA alone, or also the
+plain draws); three catest grids tell whether the losses change within one boot.
