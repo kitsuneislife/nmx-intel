@@ -166,3 +166,12 @@ Watch in H1:
 - GT1 `a7a8` against NootedGreen's 6-DSS GT2 topology.
 - Link training of the 144 Hz eDP panel on the TGL framebuffer.
 - The GPU hang after about an hour that Julio sees on Tahoe.
+
+## H1 prepared (2026-10-21)
+
+`tools/hybrid/install.sh` installs the macOS side next to nullmoth's (it refuses an aux collection without nullmoth's
+kexts, NMIntelFB or the Wi-Fi kext); `tools/hybrid/efi.sh` keeps `config-gpu-only.plist` and `config-hybrid.plist` on
+the ESP and copies one over `config.plist`, so the route switch is one command, or one file copy from Windows or
+Recovery. The hybrid config differs from the GPU-only one in three places only (iGPU DeviceProperties, NootedGreen
+after Lilu with no MinKernel, NootedGreen boot-args plus `-nvoff`). Test record and steps:
+[../tests/hybrid-1.md](../tests/hybrid-1.md).

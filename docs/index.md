@@ -33,6 +33,7 @@ tests/25-32-framebuffer.md        NMXGPUFB on the desktop, controller fix, ghost
 tests/rtx-8-accelerated-desktop.md RTX path resumed: own controller for NMIntelFB → accelerated desktop (current)
 tests/wifi-1-mt7921.md            Wi-Fi MT7921: SimpleMtkWlan (WIFI-1..4), AirportMtkWlan native menu (WIFI-5..8)
 tests/sleep-1-hibernate.md        sleep: hibernation instead of S3 so the GOP relights the panel (SLEEP-1)
+tests/hybrid-1.md                 hybrid route: Iris Xe on Apple's TGL driver (HYB-1 = H1)
 knowledge/architecture.md         components and the path of a frame
 knowledge/pitfalls.md             symptom → cause → fix, by area           (highest-value file)
 knowledge/diagnostics.md          trail/beat/io tokens, knobs, tools, recovery
