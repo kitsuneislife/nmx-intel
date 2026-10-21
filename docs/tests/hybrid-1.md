@@ -46,3 +46,17 @@ Install steps given to Lukas (2026-10-21):
 4. Reboot.
 5. After the boot (or the next boot back on GPU-only): `sudo bash ~/Documents/Projetos/nmx-intel/tools/hybrid/log.sh`
    → `~/hybrid.txt`.
+
+Note (2026-10-21, first install attempt): `install.sh` stopped at `kmutil create` with KMErrorDomain 71, "'com.xxxxx.
+driver.AppleIntelTGLGraphicsFramebuffer' names a dependency on 'org.smichaud.HookCase', which was not found"; the
+collection was left unchanged [measured]. Both TGL kexts list `org.smichaud.HookCase 1.0` in `OSBundleLibraries`, and the
+framebuffer imports 11 symbols from it (`AppleIntelBaseController::{Read,Write}Register{32,64}`, `hwSetupDSBMemory`,
+`getPMTNow`, `AppleIntelPortHAL::probePortMode`, `AppleIntelDisplayPath::DSBEngineBusyStatus`, `strnstr`, plus
+`gpu_accumulate_time`/`gpu_describe` from the accelerator) [measured, `nm -u`]. HookCase is NootedGreen's symbol
+library (its `kern_start` does nothing); Julio's installer copies it from `le/` when present, his `build-hookcase.sh` is
+not in the public repo. Fix: `build.sh` now builds `HookCase.kext` from NootedGreen's `HookCase-master` without Xcode,
+with no IOKit personality, and with `source-fixes/hybrid/ng/0001` (`probePortMode` dereferenced the never-assigned
+`callback`; it now reads `0x1638a0` through the controller, the same `ReadRegister32` the framebuffer imports).
+`install.sh` copies it to `/Library/Extensions` and refuses a collection without `org.smichaud.HookCase`. A non-root
+`kmutil libraries --undef-symbols` resolves every kernel symbol of the three kexts; the HookCase link itself is only
+checked by `kmutil create` as root [inferred]. HookCase `2034240a`.

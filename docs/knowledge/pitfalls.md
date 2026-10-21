@@ -192,3 +192,8 @@ and woke with "Wake from Normal Sleep": plain S3. [inferred] On x86 the sleep ty
 handler (X86PlatformPlugin, `IOPlatformSystemSleepPolicy` in the board plist); MacBookPro16,1's table has no
 hibernate entry. Check `PMRD: sleep params` in the kernel log before trusting `pmset`; HibernationFixup's
 `hbfx-ahbm=1` is the usual override, but it did not help here (SLEEP-2: still `type 7` with the kext loaded).
+
+- **Apple's TGL kexts from NootedGreen need HookCase.kext** (hybrid route, 2026-10-21). `sle_Internal/le`'s
+  `AppleIntelTGLGraphics{,Framebuffer}.kext` depend on `org.smichaud.HookCase`, which exports the framebuffer's register
+  and DSB helpers; without it `kmutil create` fails with KMErrorDomain 71 [measured]. Built by `tools/hybrid/build.sh`.
+  Upstream HookCase's `probePortMode` dereferences a NULL `callback`: patched in `source-fixes/hybrid/ng/0001`.
