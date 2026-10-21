@@ -5,7 +5,7 @@
 set -euo pipefail
 HERE=$(cd "$(dirname "$0")/../.." && pwd)
 NM=${NM:-$HOME/nmx-build/nvidia-macos-driver}
-REV=${REV:-v2.3.6}   # v2.1.0 gives the same binary (kexts/NMIntelFB unchanged)
+REV=${REV:-v2.5.0}   # v2.1.0 and v2.3.6 give the same binary (kexts/NMIntelFB unchanged)
 W=$HOME/nmx-build/intelfb
 rm -rf "$W/src" "$W/out" && mkdir -p "$W/src" "$W/out/NMIntelFB.kext/Contents/MacOS"
 git -C "$NM" archive "$REV" kexts/NMIntelFB | tar -x -C "$W/src" --strip-components 2
@@ -15,8 +15,9 @@ for p in "$HERE"/source-fixes/intelfb/intelfb-*.patch; do
   echo "patch: $(basename "$p")"
 done
 # intelfb-0011 needs NVKMS's kernel API headers, from NVIDIA's open-gpu-kernel-modules at the tag NVRM is built from
-# (MIT/GPL; fetched once, not versioned here)
-KAPI=$W/kapi-hdr; OGKM_TAG=610.57.04
+# (MIT/GPL; fetched once per tag, not versioned here). 2.5.0 moved NVRM to 615.78.08; the 610 and 615 headers give
+# the same NMIntelFB binary (the members we use did not move).
+OGKM_TAG=${OGKM_TAG:-615.78.08}; KAPI=$W/kapi-hdr-$OGKM_TAG
 if [ ! -s "$KAPI/nvkms-kapi.h" ]; then
   mkdir -p "$KAPI"
   for f in nvidia-modeset/kapi/interface/nvkms-kapi.h common/sdk/nvidia/inc/nvtypes.h common/inc/nv_mig_types.h \
