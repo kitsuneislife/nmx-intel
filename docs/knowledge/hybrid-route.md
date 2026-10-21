@@ -120,3 +120,49 @@ and link him in the README, and send GT1 / Acer findings back upstream.
 - The current route must stay one config swap away: H1 boots only from `config-hybrid.plist`.
 - GT1 may not run at all with the GT2 topology NootedGreen assumes.
 - Two IOAccelerator families in one session (Apple TGL plus nullmoth) have not been seen together on any machine.
+
+## H0 results: Sequoia 24H32 (2026-10-21)
+
+> **Summary.** Done offline on the running GPU-only system, no reboot. Every Tahoe-only row of "Porting to Sequoia"
+> now has a measured Sequoia value. Only `libxedrv`'s layout preflight needed a change (source-fixes/hybrid/0001); the
+> kernel plugin, the Metal driver patches and the compiler stack build unchanged. `tools/hybrid/build.sh` rebuilds it
+> all from pinned commits. Nothing installed yet.
+
+Correction to the IOSurface row above [measured]: Sequoia 24H32 uses the **same** offsets as Tahoe, not the older
+`+0xb0` layout. `IOSurface::getPixelFormat` reads `[rdi+0x80]` and `getPlaneCount` reads `[rdi+0x98]`
+(BootKernelExtensions.kc). PLANES2, XE-FMT and XE-VALD apply unchanged.
+
+| Layer | Sequoia 24H32 value | Result |
+|---|---|---|
+| IOSurface | `+0x80` pixel format, `+0x98` plane count [measured] | same as Tahoe |
+| IOAcceleratorFamily2 hook symbols (11: waitForStamp, lock/unlockForCPUAccess, OrphanedMemoryPool::getMemory, CommandBufferPool2::init/getBufferPtrNoInc, 4 IOAccelDisplayPipe transaction functions, IOAccelLegacySurface::set_id_mode) | all present in SystemKernelExtensions.kc [measured] | hooks resolve by symbol |
+| IOFramebuffer symbols used by the plugin | both present [measured] | — |
+| Command buffer pool (POOLALIGN) | `getBufferPtrNoInc`: current `+0x1858`, limit `+0x1850`, index `+0x1842`, buffer *i* at `+0x40+24*i` [measured] | same as Tahoe |
+| `set_id_mode` mask pattern (f2) | 3 matches: `IOAccel2DContext2::set_surface+0xa`, `IOAccelSurfaceMTL::set_id_mode+0xa`, `IOAccelSurface::set_id_mode+0xa`; count=2 patches the first two [measured]; same functions as the Sonoma notes [inferred from spacing] | unchanged |
+| PAGESYNC vtable slot | `IOAccelEventMachineFast2` `+0x188` = `finishEvent` [measured] | same |
+| TGL kext and Metal driver byte patches | inside Apple's 16.0.32 binaries [measured: patch-mtl17.py applies] | OS-independent |
+| NootedGreen OS gate | `kern_start` accepts Ventura through Tahoe [measured, source] | builds unchanged |
+| Metal descriptors (`libxedrv`) | `MTLRenderPipelineDescriptorInternal` size `0x2a8`, `_private@0x30`; `sampleCount@0xb8`, `vertexDescriptor@0x110`, vertexBuffers `0x198`, binaryArchives `0x1e0`: Tahoe's field offsets. The misc and color-attachment **bitfields keep the 16.0.32 widths** (alphaToCoverage b1, blendingEnabled b1, writeMask b4, pixelFormat b28) [measured with a probe reading the ivar encodings] | Julio's preflight refused this layout; 0001 adds a Sequoia case: move the fields, skip the bit conversion |
+| Shader compiler | GPUCompiler `32023`; MTLCompiler `32023`/`32024`; the ICL plugin exports `_MTLCompilerBuildRequestWithSerializedBitcode`, Create, Delete, ReleaseReply (same entry as Tahoe); the 4 LLVM symbols the bridge needs are in Sequoia's libLLVM [measured] | builds unchanged; runs [inferred] |
+| DYLD CoreDisplay patches (isRemovable guard, V187 AccessComplete, V189) | 0 matches in Sequoia's shared cache; their bytes are from Sonoma 14.7.1 [measured] | inert here (probably on Tahoe too [inferred]) |
+
+Probe of the patched `libxedrv` loaded into a scratch process [measured]: `layout: bits Sequoia`, `sampleCount@0xb8=4
+vertexDescriptor@0x110 ok`, `layout=1`.
+
+Build (`zsh tools/hybrid/build.sh`, Julio `356c818`, NootedGreen `95f8189`) [measured]: `libxedrv.dylib` `c37b5a4f`,
+patched `AppleIntelTGLGraphicsMTLDriver` `8e36e035` (both reproducible), `libMTLIGCCompilerPlugin` `7edf3bab`,
+`libLLVMbridge` `25d01914`. `NootedGreen.kext` changes hash on every build (670 bytes differ between two builds of the
+same source), so compare its strings, not its hash.
+
+Julio's `macos/install-macos.sh` has nothing Tahoe-specific beyond its header: it copies `le/` and `sle/` to
+`/Library/Extensions`, the Metal bundles to `/Library/GPUBundles` and `xe.bundle` to `/System/Library/Caches`
+(a firmlink, writable on Sequoia too) [measured]. `/Library/GPUBundles` already holds nullmoth's NVIDIA bundles and
+`nvmtl-allow.txt`; the TGL bundles sit next to them.
+
+Watch in H1:
+
+- WindowServer asserts in CoreDisplay (isRemovable) or an AccessComplete crash: the guards Julio's fork patches do not
+  exist in Sequoia's form.
+- GT1 `a7a8` against NootedGreen's 6-DSS GT2 topology.
+- Link training of the 144 Hz eDP panel on the TGL framebuffer.
+- The GPU hang after about an hour that Julio sees on Tahoe.

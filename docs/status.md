@@ -1,6 +1,6 @@
 # Status
 
-> Last updated: 2026-10-19, sleep/wake parked (SLEEP-1/2 fail: macOS always does S3); 10-18 WIFI-8: native Wi-Fi at full speed; UPG-1: nullmoth 2.3.6 works. Keep this file short: it is read at the start of every session.
+> Last updated: 2026-10-21, hybrid H0 done (Sequoia port builds); 10-19 sleep/wake parked (SLEEP-1/2 fail: macOS always does S3); 10-18 WIFI-8: native Wi-Fi at full speed; UPG-1: nullmoth 2.3.6 works. Keep this file short: it is read at the start of every session.
 
 ## Goal and decision
 
@@ -41,4 +41,5 @@ NMIntelFB unchanged; shader cache works (WindowServer keeps its own, 70 MB). Und
 2. Boot without the 45 s delay (WindowServer accelerated from the start, no restart) — untested since RTX-7's freeze.
 3. `Invalid display 0x5b81c5c0` in WindowServer ~17/min; battery cost of the RTX always on (unmeasured).
 4. Path A (Intel Metal) parked. **Hybrid proposal (10-21):** Iris Xe via JulioNectar's Tahoe stack + nullmoth
-   headless with `nvmtl-allow.txt` routing; target Sequoia (port Julio's Tahoe-only parts); plan H0–H4 in [knowledge/hybrid-route.md](knowledge/hybrid-route.md).
+   headless with `nvmtl-allow.txt` routing; target Sequoia (port Julio's Tahoe-only parts); plan H0–H4 in [knowledge/hybrid-route.md](knowledge/hybrid-route.md). **H0 done:** Sequoia offsets measured, only
+   `libxedrv`'s preflight needed a fix (source-fixes/hybrid/0001); `tools/hybrid/build.sh` builds it all. Next: H1 (needs OK).
