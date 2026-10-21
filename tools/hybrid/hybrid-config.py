@@ -10,6 +10,9 @@ Only these change, everything else stays as in the GPU-only config:
 - boot-args: Julio's NootedGreen arguments minus ngreenblmax (his panel's value), plus -nvoff so nullmoth and
   NMIntelFB stay off. -v is dropped: the verbose console draws into the boot framebuffer at the start of the GGTT,
   where the accelerator keeps contexts and rings (Julio's HISTORY 9.3; HYB-3 desktop full of artifacts).
+  nvaccel=1 is dropped too: nullmoth's NVRM and NVAccel ignore -nvoff, so without this WindowServer composited
+  through the RTX Metal driver (NVMTLDriver) while the panel was on the Iris Xe (HYB-4). NVAccel does not start
+  without nvaccel=1.
   amfi_get_out_of_my_way, csr-active-config and AMFIPass are already in the GPU-only config.
 """
 import plistlib
@@ -30,6 +33,7 @@ IGPU_PROPS = {
     "model": "Intel Iris Xe Graphics",
     "rps-control": bytes.fromhex("01000000"),
 }
+DROP_ARGS = {"-v", "nvaccel=1"}
 HYBRID_ARGS = ("IGLogLevel=3 msgbuf=400000 -ngreentglwithgfx -allow3d -disablegfxfirmware ngreen-dmc=adlp -ngreenv189 "
                "-ngreenkeepefi -ngreenxefix -ngreenfixbootmode ngreenSched=4 ngreenV142=3 -nvoff").split()
 NG_ENTRY = {
@@ -48,7 +52,7 @@ def make(c: dict) -> dict:
     c["DeviceProperties"]["Add"][IGPU] = dict(IGPU_PROPS)
     c["Kernel"]["Add"].insert(paths.index("Lilu.kext") + 1, dict(NG_ENTRY))
     boot = c["NVRAM"]["Add"][APPLE_BOOT]
-    args = [a for a in boot["boot-args"].split() if a != "-v"]
+    args = [a for a in boot["boot-args"].split() if a not in DROP_ARGS]
     boot["boot-args"] = " ".join(args + [a for a in HYBRID_ARGS if a not in args])
     return c
 
