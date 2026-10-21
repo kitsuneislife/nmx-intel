@@ -3,6 +3,9 @@
 #   sudo bash tools/hybrid/log.sh
 [ "$(id -u)" = 0 ] || { echo "run with sudo"; exit 1; }
 HOMEU=$(eval echo "~${SUDO_USER:-root}")
+BOOT=$(sysctl -n kern.boottime | sed 's/^{ sec = \([0-9]*\).*/\1/')
+# The hybrid boot usually panics and the next boot is GPU-only: read the 20 minutes before this boot too.
+PREV="--start '$(date -r $((BOOT - 1200)) '+%Y-%m-%d %H:%M:%S')' --end '$(date -r "$BOOT" '+%Y-%m-%d %H:%M:%S')'"
 OUT=$HOMEU/hybrid.txt
 {
     echo "== $(date) $(sw_vers -productVersion) $(sw_vers -buildVersion)"
@@ -12,16 +15,18 @@ OUT=$HOMEU/hybrid.txt
     ioreg -r -c IOPCIDevice -n GFX0 -d 1 -w0 2>/dev/null | grep -E '"(device-id|model)"'
     echo "== accelerators and framebuffers"; ioreg -l -w0 2>/dev/null | grep -E '"(MetalPluginName|IOClass)" = "(Intel|AppleIntel|IntelAccel|AppleIntelFramebuffer)' | sort -u
     echo "== displays"; system_profiler SPDisplaysDataType 2>/dev/null
-    echo "== kernel log (NootedGreen / TGL)"
-    /usr/bin/log show --last boot --style compact --predicate 'process == "kernel"' 2>/dev/null \
-        | grep -E 'NootedGreen|ngreen|XeNG|AppleIntelTGL|IntelAccelerator|AppleIntelFramebuffer|IGPU' | head -1500
+    for W in "$PREV" "--last boot"; do
+        echo "== kernel log (NootedGreen / TGL), $W"
+        eval /usr/bin/log show $W --style compact --predicate "'process == \"kernel\"'" 2>/dev/null \
+            | grep -E 'nmx HYB|NootedGreen|ngreen|XeNG|AppleIntelTGL|IntelAccelerator|AppleIntelFramebuffer|IGPU|NVAccel: probe' | head -1500
+    done
     echo "== WindowServer log"
     /usr/bin/log show --last boot --style compact --predicate 'process == "WindowServer"' 2>/dev/null \
         | grep -iE 'fault|assert|abort|CoreDisplay|Metal|AccessComplete|isRemovable|watchdog' | head -300
-    echo "== crash and panic reports since boot"
-    BOOT=$(sysctl -n kern.boottime | sed 's/.*sec = \([0-9]*\).*/\1/')
-    for f in /Library/Logs/DiagnosticReports/* "$HOMEU"/Library/Logs/DiagnosticReports/*; do
-        [ -f "$f" ] && [ "$(stat -f %m "$f")" -ge "$BOOT" ] && { echo "--- $f"; head -60 "$f"; }
+    echo "== panic and WindowServer reports from the previous boot on"
+    for f in /Library/Logs/DiagnosticReports/*.panic /Library/Logs/DiagnosticReports/WindowServer* \
+             "$HOMEU"/Library/Logs/DiagnosticReports/WindowServer*; do
+        [ -f "$f" ] && [ "$(stat -f %m "$f")" -ge $((BOOT - 1200)) ] && { echo "--- $f"; head -60 "$f"; }
     done
     echo "== last panic (any time)"; ls -t /Library/Logs/DiagnosticReports/*panic* 2>/dev/null | head -3
 } > "$OUT" 2>&1
