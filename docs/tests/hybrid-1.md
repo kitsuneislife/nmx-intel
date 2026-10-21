@@ -322,3 +322,32 @@ Variable: none on the GPU side. New `tools/hybrid/xe-a8test.m` (ours): A8/R8/RG8
 512 and 576 wide; 12 blocks of 14x20 written by `replaceRegion` at odd offsets, read back by a compute shader (read
 and nearest sample) and checked, including the row below each block. `gputests.sh` builds it and runs it first.
 RTX baseline [measured]: 0 of 12 wrong in all 32 cases.
+
+### HYB-9 result (2026-10-21 10:42): glyph atlases upload correctly
+
+`xe-a8test` on "Intel(R) TGL Unknown" at 10:42:57: 0 of 12 wrong blocks in all 32 cases (A8/R8/RG8/BGRA8, shared
+and managed, 512 and 576, read and sample) [measured]. The other tests match HYB-8. The glyph-atlas upload theory is
+disproved: small-format `replaceRegion` uploads and texture reads work. What still fails on screen goes through paths
+the headless tests do not use: CoreAnimation/CoreText render pipelines (blending, path and glyph shaders) [inferred].
+
+Why our machine differs from Julio's, with the same CPU family (Raptor Lake-P, Xe-LP):
+- GPU SKU: ours is `a7a8`, RPL-P **GT1** (i5-13420H, UHD, 48 EU per Intel's spec sheet [unverified on this unit]);
+  his is `A7A0` GT2 with 96 EU. NootedGreen hard-codes the 96-EU topology (12 SS × 8 EU) both in binary patches of
+  the TGL driver's `getGPUInfo` and in its `getGPUInfo` hook (`kern_gen11.cpp`, "topology override for RPL"); the
+  TGL driver itself would read it from the fuses. Work sized or dispatched for subslices that are fused off is a
+  plausible cause of shader-only corruption [inferred].
+- macOS: his user-space pieces (libxedrv's private-structure conversion, mtl17 patches, IGC bridge) were built and
+  validated on Tahoe 26.7.1; we run Sequoia 15.8.1 (V140 matched 1/4 signatures in HYB-6).
+- Panel: 1080p 144 Hz eDP vs his 3840x2400 60 Hz.
+
+## HYB-10 (prepared 2026-10-21): topology from the fuses
+
+Variable: the GPU topology NootedGreen reports. `source-fixes/hybrid/0004-hyb10-topology-from-fuses.patch`: the
+`getGPUInfo` hook reads GEN11_GT_SLICE_ENABLE `0x9138`, GEN12_GT_GEOMETRY_DSS_ENABLE `0x913c` and GEN11_EU_DISABLE
+`0x9134` as i915's `gen12_sseu_info_init` does, logs them with the driver's own values (`nmx HYB-10 fuses: …`), and
+sets NumSubSlices = 2 × DSS and MaxEU/SS = enabled EU pairs. If the reads look wrong (slice mask ≠ 1, all ones, zero
+DSS or EUs) the 96-EU values stay. GT level (`+0x1120` = 2) and L3 banks (8) are unchanged. NootedGreen
+`f483e0d9` (was `3f20738f`); the string is present. Same tests as HYB-9.
+
+Expected: the log line gives the measured topology (48 EU would be 3 DSS × 16, or 6 DSS × 8). If the artifacts go
+away or change, the topology was a cause; if not, the Sequoia user-space side is next.

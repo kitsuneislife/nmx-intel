@@ -85,7 +85,8 @@ phase file; open only the row you need.
 | HYB-6 | 10-21 | HYB-5 config; one-boot daemon saves `dmesg` at 0/60/180 s | read NootedGreen's IOLog to see which fixes run on Sequoia | partial: init readable (all fixes hooked, V140 1/4); session <1 min, no runtime lines | [hybrid-1](hybrid-1.md) |
 | HYB-7 | 10-21 | HYB-6; `dmesg-last` refreshed every 20 s for 10 min | runtime XeNG lines during the artifacts | BLITSCRATCH2 as on Tahoe, no hang/restart: kernel healthy, artifacts are rendering correctness | [hybrid-1](hybrid-1.md) |
 | HYB-8 | 10-21 | HYB-7; boot-once runs Julio's headless Metal tests on the Iris Xe | which Metal operation renders wrong | all pass (RGBA16F atlas 1/8); glyph atlases not covered | [hybrid-1](hybrid-1.md) |
-| HYB-9 | 10-21 | HYB-8 + `xe-a8test` (A8/R8 glyph-atlas replaceRegion) | are text glyphs lost in small-format atlas uploads | pending | [hybrid-1](hybrid-1.md) |
+| HYB-9 | 10-21 | HYB-8 + `xe-a8test` (A8/R8 glyph-atlas replaceRegion) | are text glyphs lost in small-format atlas uploads | 0/12 wrong in all 32 cases: atlas theory disproved | [hybrid-1](hybrid-1.md) |
+| HYB-10 | 10-21 | HYB-9 + NootedGreen topology from the fuses (hybrid-0004) | does the hard-coded 96-EU topology break rendering on our GT1 | pending | [hybrid-1](hybrid-1.md) |
 
 Adding a test: one row here, the entry at the end of the current phase file (start a new phase file when the goal
 changes), then [../status.md](../status.md).
