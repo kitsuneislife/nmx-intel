@@ -102,6 +102,7 @@ boot-once)
     for i in $(seq 30); do
         sleep 20
         dmesg > "$D-last.tmp" 2>&1 && chmod 644 "$D-last.tmp" && mv -f "$D-last.tmp" "$D-last.txt"
+        [ "$i" = 1 ] && cp "$D-last.txt" "$D-35s.txt"   # kept: accelerator start lines (after -0, gone from -last later)
         cp /tmp/xedrv-*.log /var/log/nmx-hybrid-xedrv/ 2>/dev/null; mkdir -p /var/log/nmx-hybrid-png; cp /tmp/nmx-*.png /var/log/nmx-hybrid-png/ 2>/dev/null; chmod -R a+rX /var/log/nmx-hybrid-png; chmod -R a+rX /var/log/nmx-hybrid-xedrv; sync
     done
     exit 0

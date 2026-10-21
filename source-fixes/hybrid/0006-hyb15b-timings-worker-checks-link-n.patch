@@ -1,0 +1,20 @@
+diff --git a/src/NootedGreen/kern_gen11.cpp b/src/NootedGreen/kern_gen11.cpp
+index acf9f0d..da0522e 100755
+--- a/src/NootedGreen/kern_gen11.cpp
++++ b/src/NootedGreen/kern_gen11.cpp
+@@ -898,6 +898,15 @@ static void fbTimingsWorker(thread_call_param_t, thread_call_param_t) {
+ 					{
+ 						auto *pp = getMember<uint8_t *>(fb, getMember<int32_t>(fb, 0x3fd8) != -1 ? 0x4a08 : 0x49f0);
+ 						if (!pp || *reinterpret_cast<volatile uint32_t *>(pp + 0x164) == 0) continue;
++						// HYB-15b: p->0x164 is only a stale copy; the function re-reads it from TRANS_LINK_N1
++						// (0x60044 + transcoder << 12, transcoder 0xf when port->0x548->0x8 == 0) and divides by it.
++						// That register read 0 at 25 s on the HYB-15 boot -> divide error. Check the register itself.
++						// shortcut: a few microseconds remain between this read and Apple's; fine for a 50 ms poller.
++						auto *port = *reinterpret_cast<uint8_t **>(pp + 0x3648);
++						auto *pcfg = port ? *reinterpret_cast<uint8_t **>(port + 0x548) : nullptr;
++						if (!pcfg) continue;
++						uint32_t trans = *reinterpret_cast<uint32_t *>(pcfg + 0x8) == 0 ? 0xf : *reinterpret_cast<uint32_t *>(pp + 0x3640);
++						if (NGreen::callback->readReg32(0x60044 + (trans << 12)) == 0) continue;
+ 					}
+ 					IODetailedTimingInformationV2 t;
+ 					bzero(&t, sizeof(t));
