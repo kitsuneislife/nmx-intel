@@ -197,3 +197,21 @@ hibernate entry. Check `PMRD: sleep params` in the kernel log before trusting `p
   `AppleIntelTGLGraphics{,Framebuffer}.kext` depend on `org.smichaud.HookCase`, which exports the framebuffer's register
   and DSB helpers; without it `kmutil create` fails with KMErrorDomain 71 [measured]. Built by `tools/hybrid/build.sh`.
   Upstream HookCase's `probePortMode` dereferences a NULL `callback`: patched in `source-fixes/hybrid/ng/0001`.
+
+## A hybrid config left in `config.plist` locks you out (HYB-1)
+
+`efi.sh hybrid` made the hybrid config the default, so a deterministic panic repeated on every start and only macOS
+Recovery got back to GPU-only [measured, HYB-1]. Safe Mode was not practical. Boot experimental configs once: since
+HYB-2 `efi.sh hybrid` installs a LaunchDaemon that restores `config-gpu-only.plist` early in the hybrid boot.
+
+## Apple's TGL accelerator can publish without its kernel task on RPL (HYB-1)
+
+`IntelAccelerator+0x150` (kernel `IGAccelTask`) was NULL; WindowServer's first `IOServiceOpen` faulted in
+`getStampMemory` (CR2 `0x288`) inside Apple's `deviceStart`, before NootedGreen's V111 force-true runs [measured]. A
+guard must run before the original `deviceStart` (HYB-2). The cause of the missing task is open [unverified].
+
+## `grep -q` on a pipe under `pipefail` fails at random (build.sh)
+
+`grep -q` exits at the first match and closes the pipe; the writer (`nm`) gets SIGPIPE, and `set -o pipefail` turns
+that into a failure, so `nm … | grep -q sym` can report a present symbol as missing [measured, HYB-2 build]. Capture
+the output once into a variable and match on it.

@@ -60,3 +60,45 @@ with no IOKit personality, and with `source-fixes/hybrid/ng/0001` (`probePortMod
 `install.sh` copies it to `/Library/Extensions` and refuses a collection without `org.smichaud.HookCase`. A non-root
 `kmutil libraries --undef-symbols` resolves every kernel symbol of the three kexts; the HookCase link itself is only
 checked by `kmutil create` as root [inferred]. HookCase `2034240a`.
+
+## Result (2026-10-21): fail, deterministic panic when WindowServer opens the accelerator
+
+Lukas: after the install the hybrid boot showed the Apple logo and loading bar, then froze and restarted, about three
+times; every start used the hybrid `config.plist` again, so he had to put the GPU-only plist back from macOS Recovery.
+
+Evidence [measured]: two panic reports, `/Library/Logs/DiagnosticReports/Kernel-2026-10-21-085600.panic` and
+`…-085756.panic` (the third boot left none). Both: page fault, CR2 `0x288`, uptime ~37 s and ~41 s, process
+WindowServer (pid 416). Backtrace: `IntelAccelerator::getStampMemory+0x11` ← `IOAccelDevice2::deviceStart+0x20` ←
+`IGAccelDevice::deviceStart+0x16` ← NootedGreen `Gen11::deviceStart+0x10` ← `IOAccelDevice2::start` ←
+`IOGraphicsAccelerator2::newUserClient` ← `is_io_service_open_extended`. Loaded: `org.smichaud.HookCase 8.0.1`,
+`com.xxxxx.driver.AppleIntelTGLGraphics 16.0.2`, so HookCase and both TGL kexts loaded and the framebuffer reached the
+login phase. No unified log of those boots survived (kernel lines stop at 08:51).
+
+`getStampMemory` is `movq 0x150(%rdi),%rax; movq 0x288(%rax),%rdi`: `IntelAccelerator+0x150` was NULL. That field is
+the accelerator's kernel `IGAccelTask` (`IntelAccelerator::start` calls `IGAccelTask::getStamps` on it after
+`initHardwareStatusPageMemory`) [measured, disassembly]. So the accelerator was published without its kernel task, and
+the first user client crashed inside Apple's code, before NootedGreen's V111 "force deviceStart true" could act.
+Why the task is missing (start failed part-way, or skipped it with `ngreenSched=4`) is unknown [unverified]; the
+logs that would say (NootedGreen's V221 `start() complete ret=`, Apple's `encodeFailureStack`) died with the panic.
+Safe Mode was not a practical way back.
+
+## HYB-2 (prepared 2026-10-21): survive the boot to read why, and fall back by itself
+
+One variable on the driver: `source-fixes/hybrid/0002` makes NootedGreen record the accelerator in its
+`IntelAccelerator::start` hook (logging `ret` and the `+0x150` pointer) and makes its `IGAccelDevice::deviceStart`
+hook refuse the open, without calling Apple's code, when that pointer is NULL. Expected: no panic; WindowServer gets an
+error and runs without Metal (software or black panel), and the logs say why the task is missing. NootedGreen
+`9cf68511` (HookCase `2034240a`, libxedrv `c37b5a4f`, Metal driver `8e36e035` unchanged). Strings checked.
+
+Safety net (not a driver variable): `efi.sh hybrid` now boots hybrid **once**. It installs a LaunchDaemon
+(`com.nmx.hybrid-once`, a copy of `efi.sh` in `/usr/local/libexec`) that, early in the hybrid boot, copies
+`config-gpu-only.plist` back over `config.plist` and unmounts the ESP (flushes FAT). A freeze or panic after launchd
+starts therefore restarts into GPU-only with no key presses. `efi.sh hybrid-keep` skips the daemon once hybrid is
+stable; `efi.sh gpu-only` removes it. Log: `/var/log/nmx-hybrid.log`. Checked on a fake ESP (arm, status, boot-once);
+not yet on the real boot. A panic before launchd (during kext load) is not covered: Recovery, or Windows, as before.
+
+Steps (the macOS side is on disk from HYB-1; NootedGreen `9cf68511` is already built, `efi.sh` copies it to the ESP):
+
+1. `sudo bash ~/Documents/Projetos/nmx-intel/tools/hybrid/efi.sh hybrid`
+2. Reboot; wait 2–3 minutes even if the panel is black, then hold the power button if needed.
+3. Back on GPU-only: `sudo bash ~/Documents/Projetos/nmx-intel/tools/hybrid/log.sh` → `~/hybrid.txt`.
