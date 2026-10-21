@@ -95,5 +95,5 @@ Lukas cannot type `|`: when he runs commands, write to a file and `grep`/`tail` 
 ## Hybrid route (NootedGreen)
 
 - `sudo bash tools/hybrid/log.sh` → `~/hybrid.txt`: kernel/WindowServer log of the previous boot, reports, and the
-  NootedGreen lines from `/var/log/nmx-hybrid-dmesg-{0,last}.txt` (`-0` at ~15 s, `-last` refreshed every 20 s for 10 min; HYB-6 used 0/60/180; from HYB-8 also `nmx-hybrid-gputests.txt` (Julio's Metal tests) and `nmx-hybrid-xedrv/` (libxedrv logs); written by the one-boot daemon during a hybrid
+  NootedGreen lines from `/var/log/nmx-hybrid-dmesg-{0,last}.txt` (`-0` at ~15 s, `-last` refreshed every 20 s for 10 min; HYB-6 used 0/60/180; from HYB-8 also `nmx-hybrid-gputests.txt` (Julio's Metal tests) and `nmx-hybrid-xedrv/` (libxedrv logs); from HYB-10 the `nmx HYB-10 fuses:` line (slice/DSS/EU fuses and the topology the TGL driver computed); written by the one-boot daemon during a hybrid
   boot; the unified log cannot show injected kexts' text).

@@ -1,0 +1,27 @@
+--- a/src/NootedGreen/kern_gen11.cpp
++++ b/src/NootedGreen/kern_gen11.cpp
+@@ -6068,7 +6068,23 @@
+ 	unsigned int numSlices        = 1;
+ 	unsigned int numSubSlices     = 12;  // 6 DSS × 2 = 12 traditional SS
+ 	unsigned int maxEUPerSubSlice = 8;   // 16 EU/DSS ÷ 2 SS/DSS = 8 EU/SS
+-	unsigned int totalEU          = maxEUPerSubSlice * numSubSlices; // = 96
++
++	// nmx HYB-10: the Acer's a7a8 is RPL-P GT1, not the XPS's 96-EU GT2. Take the topology from the fuses as i915's
++	// gen12_sseu_info_init does: GEN12_GT_GEOMETRY_DSS_ENABLE 0x913c (one bit per DSS) and GEN11_EU_DISABLE 0x9134
++	// (one bit per EU pair in every DSS). The 96-EU values stay if the reads look wrong.
++	{
++		const uint32_t sEn = NGreen::callback->readReg32(0x9138), dssEn = NGreen::callback->readReg32(0x913c),
++		               euDis = NGreen::callback->readReg32(0x9134);
++		const unsigned dss = __builtin_popcount(dssEn & 0x3f), euPairs = __builtin_popcount(~euDis & 0xff);
++		SYSLOG("ngreen", "nmx HYB-10 fuses: slice_en=0x%x dss_en=0x%x eu_dis=0x%x -> %u DSS, %u EU/DSS; driver had SS=%u EU/SS=%u EU=%u GT=%u",
++			   sEn, dssEn, euDis, dss, euPairs * 2, getMember<UInt32>(that, 0x1158), getMember<UInt32>(that, 0x116c),
++			   getMember<UInt32>(that, 0x1124), getMember<UInt32>(that, 0x1120));
++		if ((sEn & 0xff) == 1 && dssEn != 0xffffffff && dss >= 1 && euPairs >= 1) {
++			numSubSlices = dss * 2;      // TGL counts traditional SS: 2 per DSS
++			maxEUPerSubSlice = euPairs;  // 2 EU per pair per DSS = 1 per pair per SS
++		}
++	}
++	unsigned int totalEU          = maxEUPerSubSlice * numSubSlices;
+ 	
+ 	getMember<UInt32>(that, 0x115c) = numSlices;
+ 	getMember<UInt32>(that, 0x1158) = numSubSlices;
