@@ -444,3 +444,24 @@ blend `4960 G 216`, instanced `757 G 243`, msaa `2532/2532 5064 G 177`. `gputest
 geomtest, catest, so in-boot variation shows; PNGs go to `/tmp/nmx-catest-{1,2,3}.png` and `boot-once` copies
 `/tmp/nmx-*.png` to `/var/log/nmx-hybrid-png/`. Expected: geomtest names the broken path (MSAA alone, or also the
 plain draws); three catest grids tell whether the losses change within one boot.
+
+### HYB-14 result (2026-10-21 11:35): plain geometry is fine; MSAA hangs the GPU; after the restart CA draws almost right
+
+- `xe-geomtest` [measured, 11:35]: tiles 0-7 identical to the RTX (`4960 mean G 177`, blend `G 216`, instanced
+  `757 G 243`). Plain triangle lists, strips, indexed draws, vertex descriptors, vertex bytes, blending and instancing
+  all work. The 4x MSAA tile is `16384 mean G 0`: the resolve target stays black, not even the white clear lands.
+- Right after it, a GPU hang and restart [measured]: dmesg-last `[81.8 s] V194: getBlit3DContext ctx changed …
+  (restart recovery)`, `DumpGPURestart` at 82.4 s, WindowServer `userspace_watchdog_timeout` at 11:36:50, and a new
+  WindowServer at 11:37:29 / 11:37:51. The MSAA draw as the trigger is [inferred] from the timing (tests started
+  11:35:40, boot 11:34:42 + 81.8 s ≈ 11:36:04).
+- `xe-catest` run 1 (before the restart) [measured]: broken as before (text, icon, opacity missing, shape stripes,
+  CG tiles white this time). Run 2 (after the restart): marked `HUNG (>15 s)` with its output lost, but its PNG
+  `nmx-catest-2.png` is **almost identical to the RTX**: text 36 and 12, icon, opacity, mask, shape fill and
+  stroke, corner radius, rotation and both CG tiles correct; only the blur tile is empty [measured, visual]. Run 3
+  never ran (the boot's test window ended).
+
+Reading [inferred]: the geometry engine is fine; the losses depend on GPU state, and the state after a restart is
+better than the state at boot. Candidates: something the boot path sets and the restart path re-initialises
+differently (context image, workaround/cache registers, L3 config `f3b`), or a resource or cache left stale until a
+reset. Separately, MSAA is broken and hangs the GPU. No fix is near-certain yet; next step is to make the restart
+happen early on purpose (or find what the restart path changes) and see whether the whole desktop draws right.
