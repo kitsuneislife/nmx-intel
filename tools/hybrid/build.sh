@@ -54,8 +54,9 @@ clang++ -arch x86_64 -mkernel -nostdlib -static -Xlinker -kext -Xlinker -export_
 sed -e 's/$(PRODUCT_BUNDLE_IDENTIFIER)/org.smichaud.HookCase/g' -e 's/$(EXECUTABLE_NAME)/HookCase/g' \
     -e 's/$(PRODUCT_NAME[^)]*)/HookCase/g' -e 's/$(MODULE_VERSION)/8.0.1/g' $HC/Info.plist > $HCK/Contents/Info.plist
 plutil -remove IOKitPersonalities $HCK/Contents/Info.plist
+HCX=$(nm -gU $HCK/Contents/MacOS/HookCase)   # once: grep -q on a pipe can SIGPIPE nm and trip pipefail
 for s in __ZN17AppleIntelPortHAL13probePortModeEv __ZN24AppleIntelBaseController14ReadRegister32Em _strnstr _gpu_describe; do
-  nm -gU $HCK/Contents/MacOS/HookCase | grep -q " $s\$" || { echo "HookCase does not export $s"; exit 1; }
+  [[ $HCX == *" $s"$'\n'* || $HCX == *" $s" ]] || { echo "HookCase does not export $s"; exit 1; }
 done
 codesign -f -s - $HCK >/dev/null 2>&1 || true
 rm -rf $T
