@@ -93,7 +93,7 @@ phase file; open only the row you need.
 | HYB-14 | 10-21 | HYB-13, geomtest with separate passes + catest ×3 | geometry path; in-boot variation | plain geometry = RTX; MSAA black and GPU restart; catest after the restart almost perfect (blur missing) | [hybrid-1](hybrid-1.md) |
 | HYB-15 | 10-21 | HYB-14 + full GT reset before Apple's start (`-ngreenbootgdrst`) | firmware engine state | panic 25 s: divide error in fbTimingsWorker (link N = 0) | [hybrid-1](hybrid-1.md) |
 | HYB-15b | 10-21 | HYB-15 + timings worker checks TRANS_LINK_N1 (hybrid-0006) | firmware engine state | pending | [hybrid-1](hybrid-1.md) |
-| UPG-2 | 10-21 | nullmoth 2.5.0 + NVRM `7da4dc21`, NVAccel `410790ed` | upgrade the NVIDIA driver 2.3.6 → 2.5.0 (NVIDIA 615), our patches ported | pending | [rtx-8](rtx-8-accelerated-desktop.md) |
+| UPG-2 | 10-21 | nullmoth 2.5.0 + NVRM `7da4dc21`, NVAccel `410790ed` | upgrade the NVIDIA driver 2.3.6 → 2.5.0 (NVIDIA 615), our patches ported | **fails**: black blinks; iop_blank 141, copy 2.93 ms/frame (was 1.44), GPU-wait timeouts; rolled back | [rtx-8](rtx-8-accelerated-desktop.md) |
 
 Adding a test: one row here, the entry at the end of the current phase file (start a new phase file when the goal
 changes), then [../status.md](../status.md).

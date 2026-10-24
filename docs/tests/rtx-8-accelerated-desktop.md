@@ -530,3 +530,16 @@ Package `nullmoth-nvidia-2.5.0.tar.gz` `80f33166` (matches SHA256SUMS; inner fil
   reinstalled. `tools/intelfb/build.sh` now defaults to v2.5.0 / 615.78.08.
 - Unknowns for the test: 615's GSP firmware and RM on this RTX 3050 (boot guard, display enumeration), the NVRMFB
   callback serialisation under our flip rate, and whether the shader cache is cleared again.
+
+## UPG-2 — nullmoth 2.5.0 with our patches — **fails** (black flashes), rolled back
+Installed 10-21 19:03 (backup `/Library/NullMoth/backup-20261021-190353.RdbhPk`), our NVRM `7da4dc21` and NVAccel
+`410790ed` on top, rebooted 19:12. Lukas: many dropped frames, the screen blinks black. Rolled back with
+`tools/upgrade/rollback.sh` (10-24: loaded NVRM/NVRMFB/NVRMAGDC `2.3.6`, NVRM `8c8873d5`, NVAccel `8166045f`) [measured].
+- [measured, sysctl, ~minutes after boot] `iop_ok 11498`, `iop_fail 0`, `iop_late 0`, `async_drop 0`; but
+  `iop_blank 141`, `iop_copy_skip 208`; `iop_copy_us / iop_direct_frames` = 33571428 / 11446 ≈ **2.93 ms per frame**
+  (RTX-20/UPG-1: ~1.44 ms); `surface_gpu_timeouts 4`, `surface_gpu_wait_max_us 101108`; `nmintelfb_flips` =
+  `iop_ram_frames` (11446), `flip_late 0`; `nvrmfb_guard_cleared 1`.
+- [inferred] the blinks are the `iop_blank` frames and/or the 100 ms GPU-wait timeouts; the copy got twice as slow on
+  615's RM. Not isolated (one boot).
+- Before the reboot System Settings and `system_profiler` crashed (`KERN_MEMORY_ERROR` in AppleSystemInfo's text)
+  for ~1 min right after `install.sh`; `system_profiler` ran fine minutes later [measured]; cause unknown.
