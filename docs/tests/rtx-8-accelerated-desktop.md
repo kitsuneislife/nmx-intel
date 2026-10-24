@@ -601,3 +601,20 @@ Lukas: the black blinking started, then stopped by itself after a while.
 its environment (`ps eww`), note `iop_blank`, use the desktop 5 min, read it again. Undone by a reboot (or
 `launchctl unsetenv`). If the blinks go, make it permanent in auto.sh; if not, the next step is in our kernel side:
 skip a flip for a lone one-colour frame (ram=2 writes the back buffer first, so the check costs nothing).
+- **Result (09:18) [measured]:** blinks continue; `iop_blank` 294 → 381 (+87, much of it presumably the
+  WindowServer restart, as at boot) → 383; `surface_gpu_timeouts` 5. `ps eww` showed no environment for
+  WindowServer at all (macOS hides it), so whether the variable reached it is **unverified**; the test is
+  inconclusive and is not pursued (WindowServer's launchd plist is SIP-protected). Load at 09:18 was 34 (1-min):
+  Claude 153 %, WindowServer 74 %, trustd 51 %, Steam helpers.
+
+## UPG-4 prep — accel-0004: keep a short run of one-colour frames off the panel
+In flip mode (`nmintelfb_ram=2`, auto.sh's default) NMIntelFB hands NVAccel the buffer that is **not** on screen
+and flips to it only on `nmIntelFBRamFlip` (intelfb-0019) [read]. So a one-colour frame can simply not be flipped:
+the panel keeps the last picture and the next frame rewrites the same buffer. `accel-0004-hold-blank-frames`
+(branch `nmx-accel-254` `349a6e6`): the RAM path already samples 64 pixels (`nvIopVaried`); up to
+`debug.nvaccel_iop_blank_hold` (default 3, RW) one-colour frames in a row are not flipped, counted in
+`debug.nvaccel_iop_blank_held`; a longer run is a real one-colour screen and is shown; any varied frame resets the
+run. `hold=0` is the old behaviour. With `nmintelfb_ram=1` the flip call is ignored anyway, so it changes nothing
+there (the counter still counts). NVAccel `b56b0440`, both sysctl names in the binary [measured].
+This hides the symptom; the cause (composites reported ready before their pixels are in VRAM on 2.5.x) stays open.
+Expect: `blank_held` ≈ the new `iop_blank`, no blinks; a real black screen (e.g. a fade) shows ~40 ms late.
