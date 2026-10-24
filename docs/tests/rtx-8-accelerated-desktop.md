@@ -584,3 +584,20 @@ Lukas: the black blinking started, then stopped by itself after a while.
   A/B ended, which also left `nmintelfb_ram=1` (no flip) instead of auto.sh's `2`.
 - Next (one variable, no reboot): `sudo sysctl -w debug.nmintelfb_ram=2` and watch `iop_blank` for 5 min; then
   one more reboot to see whether the blinking window repeats or was a first-boot cost.
+- 09:11–09:16 with `nmintelfb_ram=2` (flip, auto.sh's mode) [measured]: `iop_blank` 291 → 294, `copy_skip`
+  1135 → 1152, `surface_gpu_timeouts` still 4, `flip_late 0`; load `2.47 8.10 8.05`. Lukas: fewer blinks, but some
+  remain. So the flip mode is not the cause; the residue is a 2.5.x regression (2.3.6: `iop_blank` ~100 at boot,
+  then flat, nothing seen on screen — RTX-20/21).
+- Reading the blank path [read, `nvrm-accel.cpp` v2.5.4 + accel series]: a copied frame first waits in
+  `nvSurfWaitReady` for the surface's GPU work, and the direct path only copies when the resource's valid bit says
+  the VRAM copy is current; a one-colour frame with the timeouts flat means the readiness signal said "ready" while
+  the pixels were not there yet [inferred]. The one change between 2.5.0 and 2.5.4 near that is #296 (`8d6f418`,
+  Metal plugin): CPU-drawn surfaces are now uploaded by the copy engine from their own pages instead of by the CPU;
+  it has an env switch `NVMTL_SURFIN_UPLOAD=cpu` that restores the old CPU upload. 2.5.0 already blinked, so #296 is
+  not the only cause, but it is the cheapest single variable to try [inferred].
+
+## UPG-3b — WindowServer with `NVMTL_SURFIN_UPLOAD=cpu` (no rebuild)
+`sudo launchctl setenv NVMTL_SURFIN_UPLOAD cpu`, then restart WindowServer so it inherits it; check the variable in
+its environment (`ps eww`), note `iop_blank`, use the desktop 5 min, read it again. Undone by a reboot (or
+`launchctl unsetenv`). If the blinks go, make it permanent in auto.sh; if not, the next step is in our kernel side:
+skip a flip for a lone one-colour frame (ram=2 writes the back buffer first, so the check costs nothing).
