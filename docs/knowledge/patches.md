@@ -91,6 +91,8 @@ source-fixes/00NN-<slug>.patch`, add an `apply` line to `build/apply-fixes.sh` (
 - UPG-2 (nullmoth 2.5.0, NVIDIA 615.78.08): NVRM `aca96ea6` → `7da4dc21` (patches at `0x1bda8/0x1bdb3/0x1bdb8`);
   `source-fixes/accel/v2.5.0/accel-0001..0003` (branch `nmx-accel-250`, applied clean), NVAccel `410790ed`.
   NMIntelFB unchanged (`241aff3d` with 610 or 615 KAPI headers).
+- UPG-3 (nullmoth 2.5.4, NVIDIA 615.78.08): NVRM `4591c5bd` → `cb2748c5` (patches at `0x1c208/0x1c213/0x1c218`);
+  NVAccel `2e2bad29` → `8a251750` (`source-fixes/accel/v2.5.4/`, same diffs); NMIntelFB unchanged `241aff3d`.
 - `source-fixes/wifi/wifi-0001` (WIFI-1) — SimpleMtkWlan (OverlordDev fork): `probe` leaves the card alone on
   `-nvoff` or `-mtkwlanoff`. Applied by `tools/wifi/build.sh` with `git am`.
 - `source-fixes/wifi/wifi-0002` (WIFI-1) — the ring log stops with public `thread_call_cancel` + wait instead of

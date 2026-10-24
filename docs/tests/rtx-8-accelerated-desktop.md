@@ -543,3 +543,26 @@ Installed 10-21 19:03 (backup `/Library/NullMoth/backup-20261021-190353.RdbhPk`)
   615's RM. Not isolated (one boot).
 - Before the reboot System Settings and `system_profiler` crashed (`KERN_MEMORY_ERROR` in AppleSystemInfo's text)
   for ~1 min right after `install.sh`; `system_profiler` ran fine minutes later [measured]; cause unknown.
+
+## UPG-3 prep — nullmoth NVIDIA driver 2.3.6 → 2.5.4 (GPU-only route)
+Goal: see whether 2.5.1–2.5.4 fix UPG-2's black blinks. Releases read (`CHANGELOG.md`, `git log v2.5.0..v2.5.4`,
+23 commits) [measured]: **2.5.1** CPU-drawn surfaces uploaded from their own pages through the copy engine (#296,
+Metal plugin), extended-range formats, HiDPI/scaled modes through the head scaler (615 viewport patch), sRGB writes,
+GPU temperature in PerformanceStatistics (NVAccel reads BAR0 `0x20460` every 250 ms); **2.5.2** boot hold for slow
+GSP bring-up (`nvrmholdcap`), opt-in deferred flip verification (`debug.nvrmfb_flip_latch=2`), per-allocation logs only
+with `-nvaccelverbose`, HDMI audio codec association; **2.5.3** `nvregdwords=` no longer stops the boot; **2.5.4**
+NVIDIA-only desktops with no head keep `MetalPluginName` withheld (the check exempts `owner == "NMIntelFB"`, so our
+route is untouched [read, `nvrm-accel.cpp`]), Discord/ANGLE, sandboxed video decode, installer messages, licence texts.
+Nothing names blank frames on an Intel-panel laptop; #296 is the only change near our copy path [inferred].
+Package `nullmoth-nvidia-2.5.4.tar.gz` `648280be` (matches SHA256SUMS; inner SHA256SUMS all OK), `~/nmx-build/pkg-2.5.4`;
+`install.sh` = `package/install.sh` at v2.5.4, only NullMoth NVRAM keys, no EFI [measured]. OGKM still 615.78.08.
+- **NVRM** `4591c5bd` → `cb2748c5`: `nvrm_pageoff.c` unchanged since v2.5.0; same three patches 0x460 later
+  (`0x1c208/0x1c213/0x1c218`, `_osDelayUs` 0x2dfae0, `_os_delay` 0x14650, same call bytes); `otool` shows
+  `callq _os_delay` [measured].
+- **NVAccel** `2e2bad29` (release, `kexts/15`) → `8a251750`: accel-0001..0003 apply clean with `git am -3`
+  (branch `nmx-accel-254`, `~/nmx-build/accel/src-254`, `source-fixes/accel/v2.5.4/`, same diff content). Plain
+  v2.5.4 built here `586c4117`: symbols and strings identical to the release, data sections equal, `__text` +128 B
+  [measured].
+- **NMIntelFB** unchanged, `241aff3d` from v2.5.4 [measured]; not reinstalled.
+- If it blinks again: `sudo bash tools/accel/ab.sh ram` (A/B of the copy modes) separates our copy-into-RAM path
+  from nullmoth's change before rolling back.

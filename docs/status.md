@@ -1,6 +1,6 @@
 # Status
 
-> Last updated: 2026-10-21, UPG-2 (nullmoth 2.5.0) prepared; HYB-15 panicked at 25 s (fbTimingsWorker divide by zero), HYB-15b prepared with the guard fixed; full GT reset at boot (the HYB-14 restart fixed CoreAnimation; firmware engine state is the suspect); 10-19 sleep/wake parked (SLEEP-1/2 fail: macOS always does S3); 10-18 WIFI-8: native Wi-Fi at full speed; UPG-1: nullmoth 2.3.6 works. Keep this file short: it is read at the start of every session.
+> Last updated: 2026-10-24, UPG-2 (2.5.0) fails with black blinks, UPG-3 (2.5.4) prepared; HYB-15 panicked at 25 s (fbTimingsWorker divide by zero), HYB-15b prepared with the guard fixed; full GT reset at boot (the HYB-14 restart fixed CoreAnimation; firmware engine state is the suspect); 10-19 sleep/wake parked (SLEEP-1/2 fail: macOS always does S3); 10-18 WIFI-8: native Wi-Fi at full speed; UPG-1: nullmoth 2.3.6 works. Keep this file short: it is read at the start of every session.
 
 ## Goal and decision
 
@@ -33,7 +33,7 @@ real vblank (5), battery numbers (7), sleep relight: **parked 10-19**: SLEEP-1 (
 **UPG-1 works:** nullmoth NVIDIA driver 2.3.6 installed with our patches: NVRM `8c8873d5`, NVAccel `8166045f`,
 NMIntelFB unchanged; shader cache works (WindowServer keeps its own, 70 MB). Undo: `tools/upgrade/rollback.sh`.
 **UPG-2 fails (10-21):** nullmoth 2.5.0 + our patches blinks black (`iop_blank 141`, copy 2.93 ms/frame vs 1.44, GPU-wait
-timeouts); rolled back to 2.3.6. UPG-3 (2.5.4) next. Details: [tests/rtx-8-accelerated-desktop.md](tests/rtx-8-accelerated-desktop.md).
+timeouts); rolled back to 2.3.6. **UPG-3 prepared (10-24):** 2.5.4 + NVRM `cb2748c5`, NVAccel `8a251750`, pending install. Details: [tests/rtx-8-accelerated-desktop.md](tests/rtx-8-accelerated-desktop.md).
 **Wi-Fi:** WIFI-1 (MT7921, OverlordDev SimpleMtkWlan): WIFI-3 **connects** (WPA2, DHCP on en2) but dies under load; WIFI-4 hung the boot (configd panic), driver removed. **WIFI-5 works**: flxxxxddd's AirportMtkWlan, native Wi-Fi menu. WIFI-6 (5 GHz): 38 down / 5.1 up. WIFI-7 works (prefer 5 GHz, all networks listed). **WIFI-8 works**: upload was capped by a fixed basic TX rate (wifi5-0005); now 37.1 down / 36.9 up, the line's ceiling. Runbook: [knowledge/wifi.md](knowledge/wifi.md); tests: [tests/wifi-1-mt7921.md](tests/wifi-1-mt7921.md).
 
 ## Open problems
