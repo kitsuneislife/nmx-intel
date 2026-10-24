@@ -566,3 +566,21 @@ Package `nullmoth-nvidia-2.5.4.tar.gz` `648280be` (matches SHA256SUMS; inner SHA
 - **NMIntelFB** unchanged, `241aff3d` from v2.5.4 [measured]; not reinstalled.
 - If it blinks again: `sudo bash tools/accel/ab.sh ram` (A/B of the copy modes) separates our copy-into-RAM path
   from nullmoth's change before rolling back.
+
+## UPG-3 — nullmoth 2.5.4 with our patches — blinks for the first minutes, then stops (first boot)
+Installed 10-24, booted 09:04:56, desktop (NMIntelFB pipe A up) 09:05:24, login 09:06:30 [measured, kernel log].
+Lukas: the black blinking started, then stopped by itself after a while.
+- `ab.sh ram` 09:08:05–09:10:25 [measured]: direct=1 33 fps, 4619 us/frame, **blank 86**; direct=2 ram=1 71 fps,
+  2612 us/frame, **blank 45**; fail 0 in both. So the blank frames are not our copy-into-RAM path: direct=1 has
+  them too.
+- Totals at 09:11 [measured]: `iop_blank 291` (≈160 before the A/B, 131 during), then **+0** over the next ~3 min
+  (09:11:09, 09:11:29, +30 s sample); `iop_copy_skip 1135`, flat; `surface_gpu_timeouts 4` (early, flat),
+  `surface_gpu_wait_max_us 101007`. Steady state after it stopped: ~72 fps at **~2.4 ms/frame** (2.3.6: ~1.44 ms).
+- Load average at 09:11 was `6.07 17.80 10.36` (5-min 17.8): heavy start-up work during the blinking window; the
+  kernel log has its burst of NVAccel/NMIntelFB lines at 09:06–09:07 (22 `surfvram pageoff` staged uploads, all ok)
+  [measured]. Nothing in the log names a timeout or failure.
+- [inferred] the blinks are tied to the first minutes after boot (start-up load: probably the shader cache that
+  2.4+ clears being rebuilt, Spotlight), not to a copy mode. Not separated yet: the blinking stopped about when the
+  A/B ended, which also left `nmintelfb_ram=1` (no flip) instead of auto.sh's `2`.
+- Next (one variable, no reboot): `sudo sysctl -w debug.nmintelfb_ram=2` and watch `iop_blank` for 5 min; then
+  one more reboot to see whether the blinking window repeats or was a first-boot cost.
