@@ -618,3 +618,19 @@ run. `hold=0` is the old behaviour. With `nmintelfb_ram=1` the flip call is igno
 there (the counter still counts). NVAccel `b56b0440`, both sysctl names in the binary [measured].
 This hides the symptom; the cause (composites reported ready before their pixels are in VRAM on 2.5.x) stays open.
 Expect: `blank_held` ≈ the new `iop_blank`, no blinks; a real black screen (e.g. a fade) shows ~40 ms late.
+
+## UPG-4 — accel-0004 on 2.5.4 — **does not remove the blinks**; they are not one-colour frames
+Booted ~09:22; auto.sh turned RAM scanout on in mode 2 at 09:22:44, before the first real frame (`iop_ok 7` at
+09:23:36) [measured, logger + kernel log]. At 09:25 (up 3 min, load `47.04 25.30 10.49`) [measured]:
+`iop_blank 134`, `iop_blank_held 3`, `iop_ok 4917`, `iop_ram_frames` = `direct_frames` 4872, `nmintelfb_flips`
+4869, `flip_late 0`, `copy_skip 181`, `surface_gpu_timeouts 4`. Lukas: still blinking, but it seems to calm down
+sooner.
+- Only 45 frames took another path, so ≥ 89 blanks were RAM-path frames, yet just 3 were held: they came as **one
+  long run** (the hold covers the first 3 of a run), i.e. the start-up black before the desktop, as the ~100 boot
+  blanks on 2.3.6 (RTX-19/20) [inferred]. After that run no one-colour frame reached the RAM path while the panel
+  kept blinking [inferred from the counters].
+- So the visible blinks are **not** whole-screen one-colour frames, and `iop_blank` was a red herring for them;
+  they fall off with the start-up load. Candidates: black regions inside the composite (windows/layers drawn black
+  for a frame: Metal plugin side, e.g. #296's host-page uploads), or something after our copy [unverified].
+- Next: a screen recording during the blinking separates the two. The recording reads WindowServer's composite, so
+  blinks in it mean the composite (nullmoth's side); a clean recording means our scanout path.
