@@ -1,17 +1,17 @@
 #!/bin/bash
-# build.sh: builds NVAccel (nullmoth's accelerator kext) from our branch nmx-accel-250 (worktree ~/nmx-build/accel/src-250,
-# based on v2.5.0; patches in source-fixes/accel/v2.5.0) into ~/nmx-build/accel/out/NVAccel.kext. Needs NVIDIA open-gpu-kernel-modules at tag 615.78.08
+# build.sh: builds NVAccel (nullmoth's accelerator kext) from our branch nmx-accel-254 (worktree ~/nmx-build/accel/src-254,
+# based on v2.5.4; patches in source-fixes/accel/v2.5.4) into ~/nmx-build/accel/out/NVAccel.kext. Needs NVIDIA open-gpu-kernel-modules at tag 615.78.08
 # in ~/ogkm615 (git clone --depth 1 --branch 615.78.08 https://github.com/NVIDIA/open-gpu-kernel-modules ~/ogkm615).
 # nullmoth's build reads the RM -D flags from a Darwin RM build (_out/Darwin_x86_64/compile_cmds.sh) that is not
 # public; this writes one with the defines of upstream src/nvidia/Makefile for x86_64. Built from v2.1.0 the result
 # has the release's strings, symbols, __const and __data byte-for-byte equal in size; __text differs by 112 B (compiler);
 # built from v2.3.6, strings and symbols are identical to the release and __text differs by 128 B; from v2.5.0 the same
-# with 144 B, and the 610 and 615 trees give byte-identical output. Older branches still build with SRC=… OGKM=~/ogkm610:
-# nmx-accel-236 (~/nmx-build/accel/src-236, v2.3.6), nmx-accel (~/nmx-build/accel/src, v2.1.0).
+# with 144 B, and the 610 and 615 trees give byte-identical output; from v2.5.4 with 128 B. Older branches still build with SRC=… (OGKM=~/ogkm610 before 2.5):
+# nmx-accel-250 (~/nmx-build/accel/src-250, v2.5.0), nmx-accel-236 (~/nmx-build/accel/src-236, v2.3.6), nmx-accel (~/nmx-build/accel/src, v2.1.0).
 set -uo pipefail
-SRC=${SRC:-$HOME/nmx-build/accel/src-250}; OUT=${OUT:-$HOME/nmx-build/accel/out}; OGKM=${OGKM:-$HOME/ogkm615}
+SRC=${SRC:-$HOME/nmx-build/accel/src-254}; OUT=${OUT:-$HOME/nmx-build/accel/out}; OGKM=${OGKM:-$HOME/ogkm615}
 [ -d "$OGKM/src/nvidia" ] || { echo "missing $OGKM (open-gpu-kernel-modules 615.78.08)"; exit 1; }
-[ -d "$SRC/kexts/NVRM/accel" ] || { echo "missing $SRC (git worktree add -b nmx-accel-250 ~/nmx-build/accel/src-250 v2.5.0, then git am source-fixes/accel/v2.5.0/*)"; exit 1; }
+[ -d "$SRC/kexts/NVRM/accel" ] || { echo "missing $SRC (git worktree add -b nmx-accel-254 ~/nmx-build/accel/src-254 v2.5.4, then git am source-fixes/accel/v2.5.4/*)"; exit 1; }
 CC=$OGKM/src/nvidia/_out/Darwin_x86_64/compile_cmds.sh
 if [ ! -f "$CC" ]; then
   mkdir -p "$(dirname "$CC")"
