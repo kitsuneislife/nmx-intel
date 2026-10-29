@@ -242,3 +242,28 @@ Read live from the session, 2 min after boot (Lukas logged in; `log.sh` not run 
   [measured / inferred cause].
 - Open: refresh is 60 Hz (the panel does 144 Hz), the RTX is off (`-nvoff` on the WEX boot), brightness/PWM not yet
   checked, and this was a boot-once: the next reboot returns to the normal config.
+
+XE-6 log (`~/hybrid.txt`, 20:36 boot) [measured]: no `Hardware mode set failed` in this boot (the 20:18 lines in the
+same file are XE-5's); `xe-catest` 16/16 layers draw (text, icons, opacity, rotation included, the losses NootedGreen
+had in HYB-12 are gone); `xe-geomtest` all modes cover, MSAA 4x included (black under NootedGreen in HYB-14);
+`ADLSPanelPWMReady = No` and `EFI using a different backlight frequency` remain (brightness untested). Lukas: the
+boot is much faster than the RTX route (no 45 s NMIntelFB delay, no NVRM start) [inferred cause].
+
+## XE-7 (prepared 2026-10-29): the hybrid, Iris Xe desktop + RTX headless
+
+Goal (Lukas): desktop on the Iris Xe, the RTX on demand, less power. One change from XE-6: nullmoth's NVIDIA driver
+stays on. `efi.sh wexrtx` builds `config-wex.plist` with `wex-config.py --rtx`: `-nmintelfboff` replaces `-nvoff`
+(NMIntelFB would take the panel from Apple's framebuffer) and `nvaccel=1` is kept. NMXGPU stays off (no
+`nmxintel=1`). Expected [inferred from nullmoth's source, hybrid-route.md]: NVAccel finds no NVIDIA head, after 60 s
+sets `NVAccelHeadless`; `nvmtl-allow.txt` (`*`, `!WindowServer`) keeps WindowServer on the Iris Xe and lets other
+apps pick the RTX.
+
+Questions for the log: does the panel still light (two IOAccelerators, two framebuffer drivers)? `NVAccelHeadless`
+and `debug.nvaccel_headless=1`? Does `system_profiler` list the RTX with Metal? WindowServer's GPU?
+
+Power [measured, grep of nullmoth's kexts]: nullmoth has no runtime power-off (no RTD3/D3cold/GC6 code), so in the
+hybrid the RTX stays powered at idle. Real battery saving needs either the RTX off for the whole boot (XE-6 style
+plus an ACPI `_OFF`) or runtime power management written for it. Not measured yet.
+
+Risk: the boot is slower (NVRM starts) and the RTX's framebuffer heads (`nvfb=1`) may add ghost displays. Boot-once
+as before. `wex-config.py` checked on `~/config-antes-hybrid.plist`: both modes give the expected boot-args.
