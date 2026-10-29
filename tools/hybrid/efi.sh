@@ -7,7 +7,10 @@
 #                                            a LaunchDaemon puts GPU-only back early in that boot, so a freeze or
 #                                            panic falls back to GPU-only on the next start by itself
 #   sudo bash tools/hybrid/efi.sh hybrid-keep  the same, without the one-boot daemon (once hybrid is stable)
-#   sudo bash tools/hybrid/efi.sh gpu-only   config-gpu-only.plist back as config.plist, NootedGreen.kext removed
+#   sudo bash tools/hybrid/efi.sh wex        the same for the WhateverXe route: config-wex.plist (wex-config.py),
+#                                            WhateverXe.kext and AMFIPassMod.kext to OC/Kexts, boots it ONCE
+#   sudo bash tools/hybrid/efi.sh wex-keep   the same, without the one-boot daemon
+#   sudo bash tools/hybrid/efi.sh gpu-only   config-gpu-only.plist back as config.plist, the route kexts removed
 #   sudo bash tools/hybrid/efi.sh status     which route config.plist is
 #   boot-once (the daemon's job)             GPU-only back if config.plist is hybrid; logs to /var/log/nmx-hybrid.log
 set -uo pipefail
@@ -15,6 +18,7 @@ set -uo pipefail
 HERE=$(cd "$(dirname "$0")" && pwd)
 HOMEU=$(eval echo "~${SUDO_USER:-root}")
 NGK=$HOMEU/nmx-build/hybrid/xps/build/NootedGreen.kext
+WXK=$HOMEU/nmx-build/whateverxe/kexts   # WhateverXe 0.6.1 RELEASE (wex/) and the AMFIPass 1.4.1 Mod as AMFIPassMod.kext
 
 ESP=$(diskutil info disk0s1 2>/dev/null | sed -n 's/^ *Mount Point: *//p')
 # early in boot (boot-once) DiskArbitration may not be up yet: retry for a while
@@ -24,9 +28,9 @@ for i in 1 2 3 4 5 6 7 8 9 10; do
     ESP=$(diskutil info disk0s1 2>/dev/null | sed -n 's/^ *Mount Point: *//p')
 done
 [ -n "$ESP" ] || { echo "could not mount the ESP (disk0s1)"; exit 1; }
-OC=$ESP/EFI/OC; CFG=$OC/config.plist; GPU=$OC/config-gpu-only.plist; HYB=$OC/config-hybrid.plist
+OC=$ESP/EFI/OC; CFG=$OC/config.plist; GPU=$OC/config-gpu-only.plist
 [ -f "$CFG" ] || { echo "no $CFG"; exit 1; }
-is_hybrid() { grep -q '<string>NootedGreen.kext</string>' "$1"; }
+is_hybrid() { grep -qE '<string>(NootedGreen|WhateverXe)\.kext</string>' "$1"; }
 # one-boot daemon: a copy of this script outside ~/Documents (TCC blocks launchd's bash there)
 DAEMON=/Library/LaunchDaemons/com.nmx.hybrid-once.plist; ONCE=/usr/local/libexec/nmx-hybrid-efi.sh
 TESTS=/usr/local/libexec/nmx-gputests   # Metal tests run on the Iris Xe in that boot (gputests.sh build makes them)
@@ -51,31 +55,37 @@ EOP
 disarm_once() { rm -f "$DAEMON" "$ONCE"; rm -rf "$TESTS"; }
 
 case "${1:-}" in
-hybrid|hybrid-keep)
-    [ -f "$NGK/Contents/MacOS/NootedGreen" ] || { echo "no $NGK: run zsh tools/hybrid/build.sh first"; exit 1; }
+hybrid|hybrid-keep|wex|wex-keep)
+    case $1 in
+    hybrid*) HYB=$OC/config-hybrid.plist; GEN=hybrid-config.py; PUT=("$NGK"); NAME=hybrid ;;
+    *)       HYB=$OC/config-wex.plist; GEN=wex-config.py; PUT=("$WXK/wex/WhateverXe.kext" "$WXK/AMFIPassMod.kext"); NAME=wex ;;
+    esac
+    for k in "${PUT[@]}"; do [ -d "$k/Contents/MacOS" ] || { echo "no $k: build or download it first"; exit 1; }; done
     if is_hybrid "$CFG"; then
         [ -f "$GPU" ] || { echo "config.plist loads NootedGreen and there is no config-gpu-only.plist; nothing changed"; exit 1; }
     else
         cp "$CFG" "$GPU" || { echo "could not save config-gpu-only.plist; nothing changed"; exit 1; }
         cp "$CFG" "$HOMEU/config-antes-hybrid.plist" && chown "${SUDO_USER:-root}" "$HOMEU/config-antes-hybrid.plist"
     fi
-    /usr/bin/python3 -I "$HERE/hybrid-config.py" "$GPU" "$HYB" || { echo "could not write config-hybrid.plist; nothing changed"; exit 1; }
-    plutil -lint "$HYB" >/dev/null || { echo "config-hybrid.plist does not parse; nothing changed"; exit 1; }
-    rm -rf "$OC/Kexts/NootedGreen.kext" && cp -R "$NGK" "$OC/Kexts/" || { echo "could not copy NootedGreen.kext; nothing changed"; exit 1; }
-    if [ "$1" = hybrid ]; then
+    /usr/bin/python3 -I "$HERE/$GEN" "$GPU" "$HYB" || { echo "could not write ${HYB##*/}; nothing changed"; exit 1; }
+    plutil -lint "$HYB" >/dev/null || { echo "${HYB##*/} does not parse; nothing changed"; exit 1; }
+    for k in "${PUT[@]}"; do
+        rm -rf "$OC/Kexts/${k##*/}" && cp -R "$k" "$OC/Kexts/" || { echo "could not copy ${k##*/}; nothing changed"; exit 1; }
+    done
+    if [ "$1" = hybrid ] || [ "$1" = wex ]; then
         arm_once || { disarm_once; echo "could not install the one-boot daemon; nothing changed"; exit 1; }
     else disarm_once; fi
     cp "$HYB" "$CFG" || { cp "$GPU" "$CFG"; echo "could not switch config.plist; GPU-only put back"; exit 1; }
     sync
-    [ "$1" = hybrid ] && echo "one boot only: that boot puts GPU-only back by itself (hybrid-keep to stay)"
-    echo "route: hybrid (H1). NootedGreen $(shasum -a 256 "$OC/Kexts/NootedGreen.kext/Contents/MacOS/NootedGreen" | cut -c1-8)"
+    [ "$1" = "$NAME" ] && echo "one boot only: that boot puts GPU-only back by itself ($NAME-keep to stay)"
+    for k in "${PUT[@]}"; do b=${k##*/}; echo "route: $NAME, ${b%.kext} $(shasum -a 256 "$OC/Kexts/$b/Contents/MacOS/"* | cut -c1-8)"; done
     echo "boot-args: $(/usr/libexec/PlistBuddy -c 'Print :NVRAM:Add:7C436110-AB2A-4BBB-A880-FE41995C9F82:boot-args' "$CFG")"
     ;;
 gpu-only)
     [ -f "$GPU" ] || { echo "no config-gpu-only.plist on the ESP; nothing changed"; exit 1; }
-    is_hybrid "$GPU" && { echo "config-gpu-only.plist loads NootedGreen; nothing changed"; exit 1; }
+    is_hybrid "$GPU" && { echo "config-gpu-only.plist loads a route kext; nothing changed"; exit 1; }
     cp "$GPU" "$CFG" || { echo "could not restore config.plist"; exit 1; }
-    rm -rf "$OC/Kexts/NootedGreen.kext"
+    rm -rf "$OC/Kexts/NootedGreen.kext" "$OC/Kexts/WhateverXe.kext" "$OC/Kexts/AMFIPassMod.kext"
     disarm_once; sync
     echo "route: GPU-only"
     ;;
@@ -112,6 +122,6 @@ status)
     [ -f "$DAEMON" ] && echo "one-boot daemon: armed" || echo "one-boot daemon: off"
     ls -l "$OC"/config*.plist
     ;;
-*) echo "usage: sudo bash $0 hybrid|hybrid-keep|gpu-only|status"; exit 1 ;;
+*) echo "usage: sudo bash $0 hybrid|hybrid-keep|wex|wex-keep|gpu-only|status"; exit 1 ;;
 esac
 echo "Reboot for OpenCore to load it."

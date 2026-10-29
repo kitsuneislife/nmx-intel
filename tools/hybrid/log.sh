@@ -10,15 +10,15 @@ OUT=$HOMEU/hybrid.txt
 {
     echo "== $(date) $(sw_vers -productVersion) $(sw_vers -buildVersion)"
     echo "== boot-args: $(nvram boot-args 2>/dev/null | cut -f2-)"
-    echo "== kexts"; kextstat 2>/dev/null | grep -E 'Lilu|NootedGreen|TGL|nullmoth|NMIntelFB'
+    echo "== kexts"; kextstat 2>/dev/null | grep -E 'Lilu|NootedGreen|WhateverXe|AMFIPass|b00t0x|TGL|nullmoth|NMIntelFB'
     echo "== iGPU"; ioreg -r -c IOPCIDevice -n IGPU -d 1 -w0 2>/dev/null | grep -E '"(device-id|model|IOName)"'
     ioreg -r -c IOPCIDevice -n GFX0 -d 1 -w0 2>/dev/null | grep -E '"(device-id|model)"'
-    echo "== accelerators and framebuffers"; ioreg -l -w0 2>/dev/null | grep -E '"(MetalPluginName|IOClass)" = "(Intel|AppleIntel|IntelAccel|AppleIntelFramebuffer)' | sort -u
+    echo "== accelerators and framebuffers"; ioreg -l -w0 2>/dev/null | grep -E '"(MetalPluginName|IOClass)" = "(Intel|AppleIntel|IntelAccel|AppleIntelFramebuffer|NMIntelFB)' | sort -u
     echo "== displays"; system_profiler SPDisplaysDataType 2>/dev/null
     for W in "$PREV" "--last boot"; do
-        echo "== kernel log (NootedGreen / TGL), $W"
+        echo "== kernel log (NootedGreen / WhateverXe / TGL), $W"
         eval /usr/bin/log show $W --style compact --predicate "'process == \"kernel\"'" 2>/dev/null \
-            | grep -E 'nmx HYB|NootedGreen|ngreen|XeNG|AppleIntelTGL|IntelAccelerator|AppleIntelFramebuffer|IGPU|NVAccel: probe' | head -1500
+            | grep -E 'nmx HYB|NootedGreen|ngreen|XeNG|WhateverXe|wex|igfx|AMFIPass|NMIntelFB|AppleIntelTGL|IntelAccelerator|AppleIntelFramebuffer|IGPU|NVAccel: probe' | head -1500
     done
     echo "== WindowServer log"
     /usr/bin/log show --last boot --style compact --predicate 'process == "WindowServer"' 2>/dev/null \
@@ -30,7 +30,7 @@ OUT=$HOMEU/hybrid.txt
     done
     echo "== kernel message buffer saved during the hybrid boot (efi.sh boot-once)"
     for f in /var/log/nmx-hybrid-dmesg-*.txt; do
-        [ -f "$f" ] && { echo "--- $f ($(wc -l < "$f") lines, $(stat -f %Sm "$f"))"; grep -E 'XeNG|NGreen|ngreen|nmx HYB|Lilu' "$f" > "$OUT.tmp"
+        [ -f "$f" ] && { echo "--- $f ($(wc -l < "$f") lines, $(stat -f %Sm "$f"))"; grep -E 'XeNG|NGreen|ngreen|nmx HYB|Lilu|WhateverXe|wex|igfx|AMFIPass|NMIntelFB|AppleIntelTGL|IntelAccel' "$f" > "$OUT.tmp"
             case $f in *-last.txt) tail -400 "$OUT.tmp" ;; *) head -400 "$OUT.tmp" ;; esac; rm -f "$OUT.tmp"; }
     done
     echo "== XeNG HYB lines from every saved buffer"; grep -ah 'XeNG HYB' /var/log/nmx-hybrid-dmesg-*.txt 2>/dev/null > "$OUT.tmp"; sort -u "$OUT.tmp"; rm -f "$OUT.tmp"
