@@ -664,3 +664,7 @@ closing message; no EFI, no boot-args [measured]. OGKM still 615.78.08.
 - Expect: guard clear, bridge counters as UPG-4; the question is whether Lukas still sees blinks in the first minutes
   and what `iop_copy_us`/frame is in steady state.
 
+## UPG-5 — nullmoth 2.6.4 with our patches — still blinks
+Installed and booted 10-29. Lukas: it still blinks [measured, by eye]. Counters not read; parked at Lukas's request
+while the Iris Xe research (WhateverXe, [../knowledge/research.md](../knowledge/research.md)) is looked at.
+

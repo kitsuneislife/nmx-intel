@@ -97,7 +97,7 @@ phase file; open only the row you need.
 | UPG-3 | 10-24 | nullmoth 2.5.4 + NVRM `cb2748c5`, NVAccel `8a251750` | upgrade 2.3.6 → 2.5.4: did 2.5.1–2.5.4 fix UPG-2's black blinks? | partial: blinks for ~5 min after the first boot (both copy modes, iop_blank 291), then 0; copy ~2.4 ms/frame (2.3.6: 1.44) | [rtx-8](rtx-8-accelerated-desktop.md) |
 | UPG-3b | 10-24 | 2.5.4, WindowServer with `NVMTL_SURFIN_UPLOAD=cpu` | does the 2.5.1 copy-engine surface upload (#296) cause the blinks? | inconclusive: blinks stay; env not visible in WindowServer | [rtx-8](rtx-8-accelerated-desktop.md) |
 | UPG-4 | 10-24 | 2.5.4 + NVAccel `b56b0440` (accel-0004) | keep up to 3 one-colour frames in a row off the panel (skip the flip) | **no effect on the blinks**: held 3 (one boot run); the blinks are not one-colour frames | [rtx-8](rtx-8-accelerated-desktop.md) |
-| UPG-5 | 10-29 | nullmoth 2.6.4 + NVRM `3d9325f1`, NVAccel `b8c1df32`, NMIntelFB `241aff3d` kept | upgrade 2.5.4 → 2.6.4 (NvGfx copy/drag fixes in 2.6.3): do the blinks and the 2.4 ms/frame copy change? | pending | [rtx-8](rtx-8-accelerated-desktop.md) |
+| UPG-5 | 10-29 | nullmoth 2.6.4 + NVRM `3d9325f1`, NVAccel `b8c1df32`, NMIntelFB `241aff3d` kept | upgrade 2.5.4 → 2.6.4 (NvGfx copy/drag fixes in 2.6.3): do the blinks and the 2.4 ms/frame copy change? | **still blinks** (Lukas, first boot); counters not read | [rtx-8](rtx-8-accelerated-desktop.md) |
 
 Adding a test: one row here, the entry at the end of the current phase file (start a new phase file when the goal
 changes), then [../status.md](../status.md).
