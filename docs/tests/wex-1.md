@@ -229,3 +229,16 @@ failed`, panel lit. If the single path also fails, `N97FBClockChange` names the 
 WhateverXe `94698a29` (`nm`: `adlnSetDualClockEP9IOServicey`, string `N97FBClockDualColdFallback`), staged in
 `kexts/wex/`; CPU tests 158/158 pass. Same procedure: `efi.sh wex`, then `log.sh`.
 
+
+### XE-6 result (2026-10-29 ~20:38): accelerated desktop on the Iris Xe
+
+Read live from the session, 2 min after boot (Lukas logged in; `log.sh` not run yet):
+
+- `N97FBClockDualColdFallback` present (words: requested 0x4dd1e000, current 0, active 0, gate busy) and
+  `N97FBClockChange` status 12 (Complete): the single path re-enabled CDCLK [measured].
+- The panel is lit: `system_profiler` shows the `0xa7a8` GPU with Metal support driving the internal 1920x1080
+  display, main display [measured]. `IOAccelerator` is `IntelAccelerator` with 569 textures in use [measured].
+- WindowServer ~23 % CPU, load average 13 at 2 min (boot-time indexing; Lukas says the machine is still hot)
+  [measured / inferred cause].
+- Open: refresh is 60 Hz (the panel does 144 Hz), the RTX is off (`-nvoff` on the WEX boot), brightness/PWM not yet
+  checked, and this was a boot-once: the next reboot returns to the normal config.
