@@ -98,7 +98,7 @@ boot-once)
     # OpenCore-injected kexts (NootedGreen) reach the unified log only as "compose failure"; the kernel message
     # buffer (msgbuf=400000) keeps their text, but only until the next reboot. -0 is taken ~15 s into boot (before
     # the desktop); -last is refreshed every 20 s for 10 min, so a manual reboot still leaves the desktop's lines
-    rm -rf /var/log/nmx-hybrid-dmesg-*.txt /var/log/nmx-hybrid-gputests.txt /var/log/nmx-hybrid-xedrv /var/log/nmx-hybrid-catest.png /var/log/nmx-hybrid-png
+    rm -rf /var/log/nmx-hybrid-dmesg-*.txt /var/log/nmx-hybrid-gputests.txt /var/log/nmx-hybrid-xedrv /var/log/nmx-hybrid-catest.png /var/log/nmx-hybrid-png /var/log/nmx-hybrid-ioreg-*.txt
     D=/var/log/nmx-hybrid-dmesg
     dmesg > "$D-0.txt" 2>&1; chmod 644 "$D-0.txt"; sync
     if [ -x "$TESTS/gputests.sh" ]; then (
@@ -113,6 +113,8 @@ boot-once)
         sleep 20
         dmesg > "$D-last.tmp" 2>&1 && chmod 644 "$D-last.tmp" && mv -f "$D-last.tmp" "$D-last.txt"
         [ "$i" = 1 ] && cp "$D-last.txt" "$D-35s.txt"   # kept: accelerator start lines (after -0, gone from -last later)
+        # WhateverXe records its startup checks (N97*, TGL*, XELP*) as registry-root properties, gone after a reboot
+        [ "$i" = 1 ] && { ioreg -l -d 1 -w0 > /var/log/nmx-hybrid-ioreg-root.txt; ioreg -r -n IGPU -l -w0 > /var/log/nmx-hybrid-ioreg-igpu.txt; chmod 644 /var/log/nmx-hybrid-ioreg-*.txt; }
         cp /tmp/xedrv-*.log /var/log/nmx-hybrid-xedrv/ 2>/dev/null; mkdir -p /var/log/nmx-hybrid-png; cp /tmp/nmx-*.png /var/log/nmx-hybrid-png/ 2>/dev/null; chmod -R a+rX /var/log/nmx-hybrid-png; chmod -R a+rX /var/log/nmx-hybrid-xedrv; sync
     done
     exit 0

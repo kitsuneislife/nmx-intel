@@ -34,6 +34,8 @@ OUT=$HOMEU/hybrid.txt
             case $f in *-last.txt) tail -400 "$OUT.tmp" ;; *) head -400 "$OUT.tmp" ;; esac; rm -f "$OUT.tmp"; }
     done
     echo "== XeNG HYB lines from every saved buffer"; grep -ah 'XeNG HYB' /var/log/nmx-hybrid-dmesg-*.txt 2>/dev/null > "$OUT.tmp"; sort -u "$OUT.tmp"; rm -f "$OUT.tmp"
+    echo "== registry root and IGPU saved during the hybrid boot (WhateverXe N97*/TGL* checks)"
+    for f in /var/log/nmx-hybrid-ioreg-*.txt; do [ -f "$f" ] && { echo "--- $f ($(stat -f %Sm "$f"))"; head -1500 "$f"; }; done
     echo "== Metal tests on the Iris Xe (gputests.sh, run by boot-once)"; cat /var/log/nmx-hybrid-gputests.txt 2>/dev/null
     echo "== libxedrv logs copied from /tmp during the hybrid boot"
     for f in /var/log/nmx-hybrid-xedrv/*.log; do [ -f "$f" ] && { echo "--- $f ($(wc -l < "$f") lines)"; tail -40 "$f"; }; done
