@@ -284,3 +284,36 @@ Read live 2 min after boot [measured]:
 - WindowServer ~15 % CPU. Load average 38 at 2 min (`trustd` ~85 %, boot work).
 - Power: NVRM logs `b81 PERF_BOOST flags 0x12 INFINITE`, the RTX held at boost clocks for the whole boot, even when
   headless. On the hybrid this probably wastes power [inferred]; not measured.
+
+XE-7 follow-up, same boot [measured]:
+
+- Brightness unavailable (Lukas). The panel is an `AppleDisplay`, not an `AppleBacklightDisplay`, and the ACPI tree
+  has no `PNLF` device. WhateverXe's README: "Add `SSDT-PNLF` to OpenCore to enable internal-display brightness
+  control"; its backlight profile needs `_UID` 19 (`kern_backlight_profile.hpp`). `ADLSPanelPWMReady = No` is
+  expected on this route: WEX moves the result into `display13PanelPWMReady` when display 13 is requested
+  (`kern_xe.cpp` ~12861).
+- Why the RTX runs hot: with nullmoth's allow-list (`*`), 16 processes loaded NVK (`lsof`: Finder, Spotlight,
+  loginwindow, Claude, ghostty...). NVK's device open sends `NV2080_CTRL_CMD_PERF_BOOST` `BOOST_TO_MAX` with
+  `DURATION_INFINITE` and clears it only when the device closes (`nvk-macos.patch` ~10708 and ~10820, knob `BOOST` in
+  `/Library/GPUBundles/nvmtl/nvrm610.conf`). So the RTX sits at max clocks as long as any of those apps lives.
+- `auto.sh` (NMIntelFB enable daemon) finds no NMIntelFB instance on this route and exits after its 5-minute wait;
+  harmless.
+
+## XE-8 (prepared 2026-10-29): the hybrid for keeps, brightness, RTX on demand
+
+Lukas: keep the hybrid, optimise it; 60 Hz is fine (no gaming here). Three changes, each with its own evidence:
+
+1. `efi.sh wexrtx-keep`: the XE-7 config without the one-boot daemon. Not a behaviour change.
+2. `SSDT-PNLF.aml` (new `tools/hybrid/pnlf-aml.py`, the acidanthera table at `\_SB.PC00.GFX0`, `_UID` 19, OEM ID
+   `NMX`), added by `wex-config.py` and written to `OC/ACPI` by `efi.sh` on both WEX modes; `gpu-only` removes it.
+   Expected: an `AppleBacklightDisplay` and a brightness slider.
+3. `tools/hybrid/ondemand.sh on`: `nvmtl-allow.txt` lists no app (nullmoth's list saved as `.nullmoth`), so no
+   process opens the RTX and nothing boosts it; `ondemand.sh add NAME` gives it to one app. Expected: `ondemand.sh
+   status` shows no process holding NVK; the machine runs cooler. This is a userspace file, undone with
+   `ondemand.sh off`.
+
+Not done: no runtime power-off of the RTX (nullmoth has none). 144 Hz only in fullscreen: macOS switches refresh rate
+by itself only on ProMotion panels; left for later.
+
+Recovery: there is no boot-once on `-keep`. If the panel stays black: OpenCore Space → "Start once without NVIDIA
+driver" (`-nvoff`, the XE-6 setup, which worked), then `sudo bash tools/hybrid/efi.sh gpu-only`.

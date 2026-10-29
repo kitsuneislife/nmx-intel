@@ -322,3 +322,17 @@ names them. Internal eDP on ADL-P/RPL-P is experimental in WEX 0.6.1 (no hardwar
 > XE-5: `N97FBPortProbe*` and `N97FBClockWMAll` are arrays of u64. Reading `N97FBPortProbeFirst1` one word off made
 > the eDP port look like mode 2; it is mode 1 [measured]. Split the hex dump into 16-digit little-endian words before
 > reading fields.
+
+## Hybrid: every app that lists Metal devices boosts the RTX to max clocks
+
+> XE-7 [measured]: with nullmoth's `nvmtl-allow.txt` (`*`), Finder, Spotlight, loginwindow and others each open the
+> RTX through NVK, and NVK's open sends `PERF_BOOST` `BOOST_TO_MAX` with an infinite duration until that process
+> closes the device. On the hybrid the RTX then never idles. `tools/hybrid/ondemand.sh on` lists no app; add only the
+> ones that should use the RTX. (`BOOST=0` in `nvmtl/nvrm610.conf` also stops the boost, for every app.)
+
+## WhateverXe needs SSDT-PNLF for brightness
+
+> XE-7 [measured]: without an ACPI `PNLF` device the panel is an `AppleDisplay` and brightness is unavailable. WEX's
+> README asks for SSDT-PNLF; its profile matches `_UID` 19. `ADLSPanelPWMReady = No` is normal on display 13 (the
+> result moves to `display13PanelPWMReady`).
+
