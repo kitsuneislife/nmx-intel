@@ -12,7 +12,7 @@
 | --- | --- | --- |
 | NVRM | copy-engine wait sleeps (`tools/nvrm/build.sh`) | find the new offsets (below), add a hash case to the script |
 | NVAccel | `source-fixes/accel/v<ver>/accel-0001..0003` | `git am -3` on the new tag, resolve, rebuild |
-| NMIntelFB | `source-fixes/intelfb/*` | rebuild with `REV=v<ver>`; same hash = nothing to install |
+| NMIntelFB | `source-fixes/intelfb/*` | rebuild with `REV=v<ver>`; same hash = nothing to install. If upstream changed `kexts/NMIntelFB` and the series no longer applies but `nvrm_vram_abi.h` did not change, keep the installed binary (UPG-5) |
 | NVRMFB, NVRMAGDC, Metal (GPUBundles) | nothing | the release's |
 
 ## 1. Read the release (in the clone)

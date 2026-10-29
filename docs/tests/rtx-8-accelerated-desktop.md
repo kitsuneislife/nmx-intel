@@ -634,3 +634,33 @@ sooner.
   for a frame: Metal plugin side, e.g. #296's host-page uploads), or something after our copy [unverified].
 - Next: a screen recording during the blinking separates the two. The recording reads WindowServer's composite, so
   blinks in it mean the composite (nullmoth's side); a clean recording means our scanout path.
+
+## UPG-5 prep — nullmoth NVIDIA driver 2.5.4 → 2.6.4
+Goal: see whether 2.5.5–2.6.4 change the 2.5.x black blinks (UPG-2..4) and the ~2.4 ms/frame copy (2.3.6: 1.44).
+Releases read (`CHANGELOG.md` at v2.6.4) [measured]: **2.5.5** Discord video, H.264/HEVC sync-frame marks, screen
+capture of BGRA-as-RGBA, NVAccel logs refused VRAM allocations throttled (`debug.nvaccel_vm_refused`); **2.6.0–2.6.2**
+installer: an update needs one restart (records the new kexts' cdhash in `KextPolicy` for kexts already allowed), 1401
+apps; **2.6.3** watchthelight's NvGfx: window dragging without stutters and a crash when a window closes during a copy
+(#251, #340, #412), smooth Dock/Control Center blur, small-BAR1 surfaces keep their memory between copies (#368, #399),
+GPU utilization in Activity Monitor (NVAccel samples RM every 1 s on its own work loop), NMIntelFB panel brightness
+through the PCH PWM (41e7e68), BAR1 placement fixes; **2.6.4** shader translator (sampler arrays, WebGL). The NvGfx
+copy/drag changes are in the Metal plugin, not in the kexts we patch [inferred from `git diff --stat`]; they are the
+reason to try this release against the blinks.
+Package `nullmoth-nvidia-2.6.4.tar.gz` `90f4c677` (matches SHA256SUMS; inner SHA256SUMS all OK), `~/nmx-build/pkg-2.6.4`;
+`install.sh` = `package/install.sh` at v2.6.4; its only change since 2.5.4 is the `KextPolicy` cdhash update and the
+closing message; no EFI, no boot-args [measured]. OGKM still 615.78.08.
+- **NVRM** `cea6fb0e` → `3d9325f1`: `nvrm_pageoff.c` unchanged; same three patches 0x940 after 2.5.4
+  (`0x1cb48/0x1cb53/0x1cb58`, `_osDelayUs` 0x2e0420, `_os_delay` 0x14f90, same call bytes); `otool` shows
+  `callq _os_delay` [measured].
+- **NVAccel** `2926f8aa` (release, `kexts/15`) → `b8c1df32`: accel-0001..0004 apply clean with `git am -3` (branch
+  `nmx-accel-264`, `~/nmx-build/accel/src-264`, `source-fixes/accel/v2.6.4/`). Plain v2.6.4 built here `3a845c7e`:
+  symbols and strings identical to the release, data sections equal, `__text` +128 B [measured]. accel-0004 is kept
+  (default hold 3) so the only variable against UPG-4 is nullmoth's release.
+- **NMIntelFB** kept at `241aff3d` (v2.5.4 + intelfb-0001..0021). Upstream changed `kexts/NMIntelFB` (its own panel
+  brightness, the same method as our intelfb-0020), so our series no longer applies (0002 fails, the rest cascade).
+  The only header it shares with NVRM/NVAccel, `nvrm_vram_abi.h`, is unchanged, and the installer handles NMIntelFB
+  as in 2.5.4 [measured], so the installed binary stays valid; rebasing the series is only needed for a new
+  NMIntelFB feature [inferred].
+- Expect: guard clear, bridge counters as UPG-4; the question is whether Lukas still sees blinks in the first minutes
+  and what `iop_copy_us`/frame is in steady state.
+

@@ -96,6 +96,9 @@ source-fixes/00NN-<slug>.patch`, add an `apply` line to `build/apply-fixes.sh` (
 - `source-fixes/accel/v2.5.4/accel-0004-hold-blank-frames` (UPG-4) — in flip mode a one-colour frame is not
   flipped (up to `debug.nvaccel_iop_blank_hold`, default 3, in a row; `iop_blank_held` counts): hides 2.5.x's black
   blinks. NVAccel `b56b0440`.
+- UPG-5 (nullmoth 2.6.4, NVIDIA 615.78.08): NVRM `cea6fb0e` → `3d9325f1` (patches at `0x1cb48/0x1cb53/0x1cb58`,
+  everything 0x940 after 2.5.4); `source-fixes/accel/v2.6.4/0001..0004` (branch `nmx-accel-264`, `git am -3` clean),
+  NVAccel `2926f8aa` → `b8c1df32`; NMIntelFB unchanged `241aff3d` (built from v2.5.4; see the UPG-5 prep note).
 - `source-fixes/wifi/wifi-0001` (WIFI-1) — SimpleMtkWlan (OverlordDev fork): `probe` leaves the card alone on
   `-nvoff` or `-mtkwlanoff`. Applied by `tools/wifi/build.sh` with `git am`.
 - `source-fixes/wifi/wifi-0002` (WIFI-1) — the ring log stops with public `thread_call_cancel` + wait instead of
