@@ -8,7 +8,8 @@
 #                                            panic falls back to GPU-only on the next start by itself
 #   sudo bash tools/hybrid/efi.sh hybrid-keep  the same, without the one-boot daemon (once hybrid is stable)
 #   sudo bash tools/hybrid/efi.sh wex        the same for the WhateverXe route: config-wex.plist (wex-config.py),
-#                                            WhateverXe.kext and AMFIPassMod.kext to OC/Kexts, boots it ONCE
+#                                            WhateverXe.kext and AMFIPassMod.kext to OC/Kexts, SSDT-PNLF.aml
+#                                            (pnlf-aml.py) to OC/ACPI, boots it ONCE
 #   sudo bash tools/hybrid/efi.sh wex-keep   the same, without the one-boot daemon
 #   sudo bash tools/hybrid/efi.sh wexrtx     the WhateverXe route with nullmoth's NVIDIA driver on, headless (XE-7,
 #                                            wex-config.py --rtx), boots it ONCE; wexrtx-keep to stay
@@ -75,6 +76,9 @@ hybrid|hybrid-keep|wex|wex-keep|wexrtx|wexrtx-keep)
     for k in "${PUT[@]}"; do
         rm -rf "$OC/Kexts/${k##*/}" && cp -R "$k" "$OC/Kexts/" || { echo "could not copy ${k##*/}; nothing changed"; exit 1; }
     done
+    if [ "$NAME" != hybrid ]; then
+        /usr/bin/python3 -I "$HERE/pnlf-aml.py" "$OC/ACPI/SSDT-PNLF.aml" || { echo "could not write SSDT-PNLF.aml; nothing changed"; exit 1; }
+    fi
     if [ "$1" = "$NAME" ]; then
         arm_once || { disarm_once; echo "could not install the one-boot daemon; nothing changed"; exit 1; }
     else disarm_once; fi
@@ -88,7 +92,7 @@ gpu-only)
     [ -f "$GPU" ] || { echo "no config-gpu-only.plist on the ESP; nothing changed"; exit 1; }
     is_hybrid "$GPU" && { echo "config-gpu-only.plist loads a route kext; nothing changed"; exit 1; }
     cp "$GPU" "$CFG" || { echo "could not restore config.plist"; exit 1; }
-    rm -rf "$OC/Kexts/NootedGreen.kext" "$OC/Kexts/WhateverXe.kext" "$OC/Kexts/AMFIPassMod.kext"
+    rm -rf "$OC/Kexts/NootedGreen.kext" "$OC/Kexts/WhateverXe.kext" "$OC/Kexts/AMFIPassMod.kext" "$OC/ACPI/SSDT-PNLF.aml"
     disarm_once; sync
     echo "route: GPU-only"
     ;;
