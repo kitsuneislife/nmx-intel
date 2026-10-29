@@ -1,7 +1,11 @@
 #!/usr/bin/env python3
 """Derive the WhateverXe route's OpenCore config from the GPU-only one (Iris Xe alone, nullmoth off).
 
-Usage: wex-config.py GPU_ONLY_PLIST OUT_PLIST
+Usage: wex-config.py [--rtx] GPU_ONLY_PLIST OUT_PLIST
+
+--rtx (XE-7, the hybrid): nullmoth's NVIDIA driver stays on. -nmintelfboff replaces -nvoff (NMIntelFB must leave
+the panel to Apple's framebuffer) and nvaccel=1 is kept, so NVAccel starts, finds no NVIDIA head and goes headless:
+WindowServer composites on the Iris Xe, other apps may pick the RTX (nvmtl-allow.txt).
 
 Only these change, everything else stays as in the GPU-only config:
 - Kernel/Add: WhateverXe.kext after Lilu; AMFIPass.kext replaced by AMFIPassMod.kext (b00t0x's Mod build, which
@@ -29,7 +33,7 @@ WEX_ENTRY = {
 }
 
 
-def make(c: dict) -> dict:
+def make(c: dict, rtx: bool = False) -> dict:
     add = c["Kernel"]["Add"]
     paths = [e.get("BundlePath") for e in add]
     for bad in ("NootedGreen.kext", "WhateverXe.kext", "WhateverGreen.kext"):
@@ -41,18 +45,22 @@ def make(c: dict) -> dict:
     add.insert(paths.index("Lilu.kext") + 1, dict(WEX_ENTRY))
     c["DeviceProperties"]["Add"].setdefault(IGPU, {})["nmx-wex"] = b"\x01"
     boot = c["NVRAM"]["Add"][APPLE_BOOT]
-    args = [a for a in boot["boot-args"].split() if a not in DROP_ARGS]
-    boot["boot-args"] = " ".join(args + [a for a in WEX_ARGS if a not in args])
+    drop, extra = (DROP_ARGS - {"nvaccel=1"}, WEX_ARGS[:-1] + ["-nmintelfboff"]) if rtx else (DROP_ARGS, WEX_ARGS)
+    args = [a for a in boot["boot-args"].split() if a not in drop]
+    boot["boot-args"] = " ".join(args + [a for a in extra if a not in args])
     return c
 
 
 def main() -> None:
-    if len(sys.argv) != 3:
+    argv = sys.argv[1:]
+    rtx = argv[:1] == ["--rtx"]
+    argv = argv[rtx:]
+    if len(argv) != 2:
         sys.exit(__doc__)
-    with open(sys.argv[1], "rb") as f:
+    with open(argv[0], "rb") as f:
         c = plistlib.load(f)
-    out = make(c)
-    with open(sys.argv[2], "wb") as f:
+    out = make(c, rtx)
+    with open(argv[1], "wb") as f:
         plistlib.dump(out, f, sort_keys=True)
 
 

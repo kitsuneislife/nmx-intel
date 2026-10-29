@@ -10,6 +10,8 @@
 #   sudo bash tools/hybrid/efi.sh wex        the same for the WhateverXe route: config-wex.plist (wex-config.py),
 #                                            WhateverXe.kext and AMFIPassMod.kext to OC/Kexts, boots it ONCE
 #   sudo bash tools/hybrid/efi.sh wex-keep   the same, without the one-boot daemon
+#   sudo bash tools/hybrid/efi.sh wexrtx     the WhateverXe route with nullmoth's NVIDIA driver on, headless (XE-7,
+#                                            wex-config.py --rtx), boots it ONCE; wexrtx-keep to stay
 #   sudo bash tools/hybrid/efi.sh gpu-only   config-gpu-only.plist back as config.plist, the route kexts removed
 #   sudo bash tools/hybrid/efi.sh status     which route config.plist is
 #   boot-once (the daemon's job)             GPU-only back if config.plist is hybrid; logs to /var/log/nmx-hybrid.log
@@ -55,10 +57,11 @@ EOP
 disarm_once() { rm -f "$DAEMON" "$ONCE"; rm -rf "$TESTS"; }
 
 case "${1:-}" in
-hybrid|hybrid-keep|wex|wex-keep)
+hybrid|hybrid-keep|wex|wex-keep|wexrtx|wexrtx-keep)
     case $1 in
-    hybrid*) HYB=$OC/config-hybrid.plist; GEN=hybrid-config.py; PUT=("$NGK"); NAME=hybrid ;;
-    *)       HYB=$OC/config-wex.plist; GEN=wex-config.py; PUT=("$WXK/wex/WhateverXe.kext" "$WXK/AMFIPassMod.kext"); NAME=wex ;;
+    hybrid*) HYB=$OC/config-hybrid.plist; GEN=(hybrid-config.py); PUT=("$NGK"); NAME=hybrid ;;
+    wexrtx*) HYB=$OC/config-wex.plist; GEN=(wex-config.py --rtx); PUT=("$WXK/wex/WhateverXe.kext" "$WXK/AMFIPassMod.kext"); NAME=wexrtx ;;
+    *)       HYB=$OC/config-wex.plist; GEN=(wex-config.py); PUT=("$WXK/wex/WhateverXe.kext" "$WXK/AMFIPassMod.kext"); NAME=wex ;;
     esac
     for k in "${PUT[@]}"; do [ -d "$k/Contents/MacOS" ] || { echo "no $k: build or download it first"; exit 1; }; done
     if is_hybrid "$CFG"; then
@@ -67,12 +70,12 @@ hybrid|hybrid-keep|wex|wex-keep)
         cp "$CFG" "$GPU" || { echo "could not save config-gpu-only.plist; nothing changed"; exit 1; }
         cp "$CFG" "$HOMEU/config-antes-hybrid.plist" && chown "${SUDO_USER:-root}" "$HOMEU/config-antes-hybrid.plist"
     fi
-    /usr/bin/python3 -I "$HERE/$GEN" "$GPU" "$HYB" || { echo "could not write ${HYB##*/}; nothing changed"; exit 1; }
+    /usr/bin/python3 -I "$HERE/${GEN[0]}" "${GEN[@]:1}" "$GPU" "$HYB" || { echo "could not write ${HYB##*/}; nothing changed"; exit 1; }
     plutil -lint "$HYB" >/dev/null || { echo "${HYB##*/} does not parse; nothing changed"; exit 1; }
     for k in "${PUT[@]}"; do
         rm -rf "$OC/Kexts/${k##*/}" && cp -R "$k" "$OC/Kexts/" || { echo "could not copy ${k##*/}; nothing changed"; exit 1; }
     done
-    if [ "$1" = hybrid ] || [ "$1" = wex ]; then
+    if [ "$1" = "$NAME" ]; then
         arm_once || { disarm_once; echo "could not install the one-boot daemon; nothing changed"; exit 1; }
     else disarm_once; fi
     cp "$HYB" "$CFG" || { cp "$GPU" "$CFG"; echo "could not switch config.plist; GPU-only put back"; exit 1; }
@@ -124,6 +127,6 @@ status)
     [ -f "$DAEMON" ] && echo "one-boot daemon: armed" || echo "one-boot daemon: off"
     ls -l "$OC"/config*.plist
     ;;
-*) echo "usage: sudo bash $0 hybrid|hybrid-keep|wex|wex-keep|gpu-only|status"; exit 1 ;;
+*) echo "usage: sudo bash $0 hybrid|hybrid-keep|wex|wex-keep|wexrtx|wexrtx-keep|gpu-only|status"; exit 1 ;;
 esac
 echo "Reboot for OpenCore to load it."
