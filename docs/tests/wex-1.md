@@ -267,3 +267,20 @@ plus an ACPI `_OFF`) or runtime power management written for it. Not measured ye
 
 Risk: the boot is slower (NVRM starts) and the RTX's framebuffer heads (`nvfb=1`) may add ghost displays. Boot-once
 as before. `wex-config.py` checked on `~/config-antes-hybrid.plist`: both modes give the expected boot-args.
+
+### XE-7 result (2026-10-29 ~20:52): the hybrid works
+
+Read live 2 min after boot [measured]:
+
+- Boot-args as planned (`nvaccel=1`, `-nmintelfboff`, no `-nvoff`). Loaded together: WhateverXe, Apple's TGL
+  framebuffer and accelerator, NVRM/NVRMFB/NVRMAGDC 2.6.4, NVAccel. NMIntelFB loaded but stood down.
+- The panel is lit on the Iris Xe (1920x1080 @ 60 Hz, main display); `N97FBClockDualColdFallback` fired again.
+  `system_profiler` lists both GPUs: Iris Xe (Metal 2, internal display) and RTX 3050 (Metal 3, no display).
+- `debug.nvaccel_headless = 1`, `NVAccelHeadless = Yes`; two `IOAccelerator`s (`IntelAccelerator`, `NVAccel`).
+- A Metal compute test (1 M floats, every device): `MTLCreateSystemDefaultDevice` is the Iris Xe (`isLowPower`
+  true); both the Iris Xe (2.50 ms) and the RTX (`NVMTL over ... NVK GA107-A`, 1.81 ms, `isLowPower` false) return
+  correct results. So apps that ask for the high-power GPU get the RTX, the rest get the Iris Xe, as on Apple's
+  two-GPU Macs [inferred for real apps; measured for the test].
+- WindowServer ~15 % CPU. Load average 38 at 2 min (`trustd` ~85 %, boot work).
+- Power: NVRM logs `b81 PERF_BOOST flags 0x12 INFINITE`, the RTX held at boost clocks for the whole boot, even when
+  headless. On the hybrid this probably wastes power [inferred]; not measured.

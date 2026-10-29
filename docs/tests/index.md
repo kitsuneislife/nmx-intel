@@ -108,4 +108,4 @@ Adding a test: one row here, the entry at the end of the current phase file (sta
 changes), then [../status.md](../status.md).
 | XE-5 | 10-29 | WhateverXe `d080f93b` (wex-0001..0003) | boot handoff accepts mode 0 on the combo eDP port; mode recorded | **Metal works on the Iris Xe**, panel black: dual-output CDCLK set fails (gate busy), clock faulted, every SST modeset `NotReady` | [wex-1](wex-1.md) |
 | XE-6 | 10-29 | WhateverXe `94698a29` (wex-0001..0004) | cold dual-output clock set (CDCLK stopped, no pipe) falls back to the single path | **works: accelerated desktop on the Iris Xe** (Metal, IntelAccelerator, panel lit at 60 Hz) | [wex-1](wex-1.md) |
-| XE-7 | 10-29 | as XE-6, `efi.sh wexrtx` | the hybrid: nullmoth's NVIDIA driver on (headless), NMIntelFB off | pending | [wex-1](wex-1.md) |
+| XE-7 | 10-29 | as XE-6, `efi.sh wexrtx` | the hybrid: nullmoth's NVIDIA driver on (headless), NMIntelFB off | **works**: panel on the Iris Xe, RTX headless with Metal 3; compute runs correctly on both GPUs | [wex-1](wex-1.md) |
