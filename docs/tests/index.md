@@ -106,4 +106,5 @@ phase file; open only the row you need.
 
 Adding a test: one row here, the entry at the end of the current phase file (start a new phase file when the goal
 changes), then [../status.md](../status.md).
-| XE-5 | 10-29 | WhateverXe `d080f93b` (wex-0001..0003) | boot handoff accepts mode 0 on the combo eDP port; mode recorded | pending | [wex-1](wex-1.md) |
+| XE-5 | 10-29 | WhateverXe `d080f93b` (wex-0001..0003) | boot handoff accepts mode 0 on the combo eDP port; mode recorded | **Metal works on the Iris Xe**, panel black: dual-output CDCLK set fails (gate busy), clock faulted, every SST modeset `NotReady` | [wex-1](wex-1.md) |
+| XE-6 | 10-29 | WhateverXe `94698a29` (wex-0001..0004) | cold dual-output clock set (CDCLK stopped, no pipe) falls back to the single path | pending | [wex-1](wex-1.md) |

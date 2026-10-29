@@ -308,3 +308,17 @@ names them. Internal eDP on ADL-P/RPL-P is experimental in WEX 0.6.1 (no hardwar
 > the controller start, before Apple's `setPortMode`, so the mode is most likely still 0 [inferred]. WEX already
 > allows mode 0 in `display13AUXReady` for that reason. The SST hooks (exact-byte checks on the Sequoia binary) are
 > ready, so a byte mismatch is not the problem. XE-5 tests accepting mode 0 in the handoff only.
+
+## WhateverXe: a failed dual-output CDCLK set blacks out the panel for good
+
+> XE-5 [measured]: Apple's modeset stops CDCLK (`N97FBClockStop` status 12), then asks for 652.8 MHz again. With HDMI
+> wired on DDI B, WEX takes the dual-output path, which needs the controller gate; `tryCloseGate` failed (another
+> thread owned it), so the change ended `NotReady` and WEX set `clockFaulted`. From then on `display13SSTPort`
+> returns null and every SST modeset hook returns `0xe00002d8`: Metal works, the panel stays black. Who held the gate
+> is [unverified]. XE-6 lets the cold case fall back to the single-output path.
+
+## Decode WEX registry records as the right word size
+
+> XE-5: `N97FBPortProbe*` and `N97FBClockWMAll` are arrays of u64. Reading `N97FBPortProbeFirst1` one word off made
+> the eDP port look like mode 2; it is mode 1 [measured]. Split the hex dump into 16-digit little-endian words before
+> reading fields.

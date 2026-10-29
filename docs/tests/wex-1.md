@@ -185,3 +185,47 @@ by itself.
 
 WhateverXe `d080f93b` (`nm` shows `display13SSTPortEPvb`), staged in `kexts/wex/`; CPU tests 158/158 pass (the SST
 fixture declaration was updated for the new parameter).
+
+### XE-5 result (2026-10-29 ~21:00): Metal works, the panel stays black
+
+Lukas: the Mac did not come up unaccelerated this time; it hung on a black screen. The log shows the GPU side works:
+
+- `N97FramebufferStartAccepted = Yes`: the boot handoff now completes [measured].
+- The accelerator starts and Metal sees the Iris Xe; every gputest passes [measured]. **First Metal on the Iris Xe
+  through Apple's own driver.**
+- The panel is black because the modeset fails: `FB0: Complete modeset` at 18.278 s, then `Hardware mode set failed,
+  err = 0xe00002d8` (`kIOReturnNotReady`) three times between 18.30 and 18.42 s [measured].
+
+Cause, read from WEX's records [measured unless tagged]:
+
+1. `N97FBClockStop` status 12 (Complete): Apple's clock disable stopped CDCLK (`clockStopped`).
+2. `N97FBClockChange` status 0 (NotReady): the re-enable to 652.8 MHz (`nativeHz` 0x4dd1e000) failed.
+3. `N97FBClockWMAll` (u64 words): current clock 0, active pipes 0, workloop matches, gate functions present, caller not
+   in the gate, **`tryCloseGate` failed**, ready false. `...FirstFailure` holds the same values.
+4. The dual-output path runs because the panel is on DDI A and HDMI on DDI B (`multiOutputWiring`,
+   `wrapAlderLakeNClockSet`). It needs the gate; another thread owns it [who: unverified], so it returns NotReady
+   and sets `clockFaulted`.
+5. With `clockFaulted`, `display13SSTPort` returns null, so every SST modeset hook returns NotReady: a permanent
+   black panel.
+
+Also seen, not yet followed: `AGDP ... ASSERT(linkBW) would fail`, `kAGDCRegisterLinkValidateModeTiming: none by
+policy`, `ADLSPanelPWMReady = No`, `EFI using a different backlight frequency`.
+
+Correction (added, see XE-4/XE-5 notes above): `N97FBPortProbeFirst1` decodes as u64 words `[1, 1, 0, 0, 0, 0, 3, 2,
+1, 2]`: the eDP port's mode after the probe is **1**, result 2, `+0x554` = 2. An earlier reading in this session (one
+word off) said mode 2; that was wrong. DDI B (HDMI) probes with result 0 (not connected).
+
+## XE-6 (prepared 2026-10-29): cold dual-output clock set falls back to the single path
+
+One behaviour change: `source-fixes/wex/0004-cold-dual-clock-fallback.patch`. In `adlnSetDualClock`, when the gate
+cannot be taken, no pipe is active and the caller is not in the gate (Apple's cold modeset), it records
+`N97FBClockDualColdFallback` (the evidence words) and returns false; `wrapAlderLakeNClockSet` then runs the
+single-output path, which re-enables CDCLK by itself. With no active pipe there is no peer output to freeze, so the
+dual path's extra work is not needed [inferred].
+
+Expected if it works: `N97FBClockDualColdFallback` present, `N97FBClockChange` status 12, no `Hardware mode set
+failed`, panel lit. If the single path also fails, `N97FBClockChange` names the new status.
+
+WhateverXe `94698a29` (`nm`: `adlnSetDualClockEP9IOServicey`, string `N97FBClockDualColdFallback`), staged in
+`kexts/wex/`; CPU tests 158/158 pass. Same procedure: `efi.sh wex`, then `log.sh`.
+

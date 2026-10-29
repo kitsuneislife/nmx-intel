@@ -1,0 +1,81 @@
+From e0135fb8e85d1fab2fbcee21da6fe3c592edba08 Mon Sep 17 00:00:00 2001
+From: kitsuneislife <kitsuneislif3@gmail.com>
+Date: Thu, 29 Oct 2026 20:33:43 -0300
+Subject: [PATCH] diag: let a cold dual-output clock set fall back to the
+ single path
+
+Apple's modeset stops CDCLK and then re-enables it while another thread
+owns the controller gate. With no active pipe the dual path has no peer
+to freeze, so it now hands the request to the single-output path instead
+of faulting the clock (which made every SST hook return NotReady).
+---
+ WhateverXe/kern_xe.cpp | 18 +++++++++++++++---
+ WhateverXe/kern_xe.hpp |  2 +-
+ 2 files changed, 16 insertions(+), 4 deletions(-)
+
+diff --git a/WhateverXe/kern_xe.cpp b/WhateverXe/kern_xe.cpp
+index 802729a..d265049 100644
+--- a/WhateverXe/kern_xe.cpp
++++ b/WhateverXe/kern_xe.cpp
+@@ -8717,7 +8717,7 @@ void XE::wrapAlderLakeNClockInit(IOService *controller) {
+ }
+ uint64_t XE::wrapAlderLakeNClockProbe(IOService *controller) {return adlnClockReadout(controller).nativeHz();}
+ void XE::wrapAlderLakeNClockSet(IOService *controller,uint64_t nativeHz) {
+-	if(Display13FBTopology::multiOutputWiring(callbackXE->adlnOutputWiring)) {adlnSetDualClock(controller,nativeHz);return;}
++	if(Display13FBTopology::multiOutputWiring(callbackXE->adlnOutputWiring) && adlnSetDualClock(controller,nativeHz))return;
+ 	auto &c=display13FBPower;if(!c.lock)return;
+ 	Display13Clock::Change result;result.requestedHz=nativeHz;
+ 	auto fb=c.pipe[0].memoryFramebuffer;
+@@ -8777,8 +8777,10 @@ void XE::wrapAlderLakeNClockSet(IOService *controller,uint64_t nativeHz) {
+ // A shared crawl needs real WM certificates for every active native pipe.
+ // Never wait for the controller gate or a peer FB mutex while a caller may
+ // already own its own FB mutex. Single-output retains its established path.
+-void XE::adlnSetDualClock(IOService *controller,uint64_t nativeHz) {
+-    auto &c=display13FBPower;if(!c.lock)return;
++// Returns false only for the cold fallback below; the caller then runs the
++// single-output path. Every other outcome is recorded here.
++bool XE::adlnSetDualClock(IOService *controller,uint64_t nativeHz) {
++    auto &c=display13FBPower;if(!c.lock)return true;
+     Display13Clock::Change result;result.requestedHz=nativeHz;
+     Display13WM::Latch before[3],after[3];
+     IOService *frames[3] {};IORecursiveLock *mutexes[3] {};bool locked[3] {};
+@@ -8818,6 +8820,15 @@ void XE::adlnSetDualClock(IOService *controller,uint64_t nativeHz) {
+                 if(ready) {acquired=loop;evidence[8]=1;}
+             }
+         }
++        // nmx XE-6: Apple's cold modeset (CDCLK stopped, no pipe enabled) arrives
++        // while another thread owns the controller gate. With no active clock
++        // consumer there is no peer crawl to freeze, so let the single-output
++        // path re-enable the clock instead of faulting it.
++        if(!ready && evidence[5] && evidence[6] && !evidence[7] && !acquired && !active) {
++            IOLockUnlock(c.lock);
++            IORegistryEntry::getRegistryRoot()->setProperty("N97FBClockDualColdFallback",evidence,sizeof(evidence));
++            return false;
++        }
+         if(ready)for(unsigned p=0;p<3;++p)if(active&(1U<<p)) {
+             auto fb=c.pipe[p].memoryFramebuffer;
+             if(!fb || fb->getMetaClass()->getClassSize()<0x4B90) {ready=false;break;}
+@@ -8900,6 +8911,7 @@ void XE::adlnSetDualClock(IOService *controller,uint64_t nativeHz) {
+     if(result.status!=Display13Clock::ChangeStatus::Complete && !root->getProperty("N97FBClockWMAllFirstFailure"))
+         root->setProperty("N97FBClockWMAllFirstFailure",evidence,sizeof(evidence));
+     root->setProperty("N97FBClockChange",&result,sizeof(result));
++    return true;
+ }
+ 
+ void XE::wrapAlderLakeNClockDisable(IOService *controller) {
+diff --git a/WhateverXe/kern_xe.hpp b/WhateverXe/kern_xe.hpp
+index c418df2..655d3b4 100644
+--- a/WhateverXe/kern_xe.hpp
++++ b/WhateverXe/kern_xe.hpp
+@@ -307,7 +307,7 @@ private:
+ 	static void wrapAlderLakeNClockInit(IOService *controller);
+ 	static uint64_t wrapAlderLakeNClockProbe(IOService *controller);
+ 	static void wrapAlderLakeNClockSet(IOService *controller,uint64_t nativeHz);
+-	static void adlnSetDualClock(IOService *controller,uint64_t nativeHz);
++	static bool adlnSetDualClock(IOService *controller,uint64_t nativeHz);
+ 	static void wrapAlderLakeNClockDisable(IOService *controller);
+ 	static uint64_t wrapAlderLakeNClockCalculate(IOService *controller,uint64_t minimumHz);
+ 	mach_vm_address_t adlnHasExternalDisplay {};
+-- 
+2.39.5 (Apple Git-154)
+

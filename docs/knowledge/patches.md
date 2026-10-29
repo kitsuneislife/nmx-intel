@@ -128,3 +128,7 @@ source-fixes/00NN-<slug>.patch`, add an `apply` line to `build/apply-fixes.sh` (
 - `source-fixes/wex/0003-boot-mode0-sst-port.patch` (XE-5) — the boot handoff's `display13SSTPort` accepts mode 0
   on combo ports (the handoff runs before `setPortMode`); the SST mask records the mode in bits 16-19. WhateverXe
   `d080f93b`.
+- `source-fixes/wex/0004-cold-dual-clock-fallback.patch` (XE-6) — when the dual-output CDCLK set (panel on DDI A,
+  HDMI on DDI B) finds the clock stopped, no active pipe and the controller gate owned by another thread, it returns
+  to the single-output path instead of faulting the clock; records `N97FBClockDualColdFallback`. WhateverXe
+  `94698a29`.
