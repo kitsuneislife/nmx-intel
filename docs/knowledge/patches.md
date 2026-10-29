@@ -122,3 +122,6 @@ source-fixes/00NN-<slug>.patch`, add an `apply` line to `build/apply-fixes.sh` (
 - `source-fixes/wex/0001-adopt-dp-boot-aux-diag.patch` (XE-3) — WhateverXe 0.6.1 (`68a2427`): diagnostics only.
   Each failed `adoptDPBootAUX` condition sets a bit, published as `0x10000|mask` in `N97FBBootHandoff` word 5;
   `0x2000x` = not linked, `0x40000` = `publishObject`, `0x8xxxx` = `adoptBootPath`. WhateverXe `ab6f9989`.
+- `source-fixes/wex/0002-sst-port-mask-diag.patch` (XE-4) — on top of 0001: when `display13SSTPort` refuses the boot
+  eDP port, `N97FBBootHandoff` word 5 = `0x100000|mask` naming each failed condition (bits in tests/wex-1.md XE-4).
+  WhateverXe `fdc5b254`.

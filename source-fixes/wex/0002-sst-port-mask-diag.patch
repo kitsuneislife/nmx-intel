@@ -1,0 +1,70 @@
+From 3b29a157f2ce9881ede6847d7454fc12875f7c79 Mon Sep 17 00:00:00 2001
+From: kitsuneislife <noreply@github.com>
+Date: Thu, 29 Oct 2026 20:01:57 -0300
+Subject: [PATCH] diag: name the failed display13SSTPort conditions
+
+---
+ WhateverXe/kern_xe.cpp | 27 +++++++++++++++++++++++++++
+ WhateverXe/kern_xe.hpp |  1 +
+ 2 files changed, 28 insertions(+)
+
+diff --git a/WhateverXe/kern_xe.cpp b/WhateverXe/kern_xe.cpp
+index e63f572..0676ed3 100644
+--- a/WhateverXe/kern_xe.cpp
++++ b/WhateverXe/kern_xe.cpp
+@@ -7285,6 +7285,31 @@ uint8_t *XE::display13SSTPort(void *port) {
+  return p;
+ }
+ 
++// nmx diagnostic: the display13SSTPort conditions, one bit each (0 = all pass).
++// Read-only; the later bits are evaluated only when the port record is safe to read.
++uint32_t XE::display13SSTPortMask(void *port) {
++ auto s=callbackXE;auto &c=display13FBPower;auto object=static_cast<OSObject *>(port);uint32_t m=0;
++ if(!s->display13FramebufferRequested)m|=1U<<0;
++ if(s->xeProfile.display!=XELP::Display::XeLPD)m|=1U<<1;
++ if(!s->display13FBSSTHooksReady)m|=1U<<2;
++ if(!object || object->getMetaClass()->getClassSize()<0x624)m|=1U<<3;
++ if(!c.controller)m|=1U<<4;
++ if(c.controller!=s->adlnTopologyController)m|=1U<<5;
++ if(!adlnWriterMappingBound())m|=1U<<6;
++ if(c.clockFaulted || c.memoryFaulted || c.panelFaulted || c.clockStopped)m|=1U<<7;
++ if(!s->adlnOutputWiring.described())m|=1U<<8;
++ if(m&(1U<<3))return m;
++ auto p=static_cast<uint8_t *>(port);auto config=Display13FBMemory::field<uint32_t *>(p,0x548);
++ if(!config)return m|1U<<9;
++ if(!Display13FBTopology::selected(s->adlnPlatform,config,s->adlnOutputWiring))m|=1U<<9;
++ if(config[0]>=32 || !(s->adlnOutputWiring.links()&(1U<<config[0])))m|=1U<<10;
++ if(p[0x117])m|=1U<<11;
++ if(Display13FBMemory::field<uint32_t>(p,0x120)!=config[0])m|=1U<<12;
++ if(Display13FBMemory::field<uint32_t>(p,0x550)!=(config[0]>=3?4U:1U))m|=1U<<13;
++ if(Display13FBMemory::field<void *>(p,0x578)!=c.access)m|=1U<<14;
++ return m;
++}
++
+ bool XE::display13HDMIPort(void *port) {
+  auto s=callbackXE;auto object=static_cast<OSObject *>(port);
+  if(!object || object->getMetaClass()->getClassSize()<0x580)return false;
+@@ -8151,6 +8176,8 @@ void XE::wrapAlderLakeNSetupWorkLoop(IOService *controller,IOWorkLoop *workLoop)
+                     result.status=Display13Power::Status::NotReady;
+                     // nmx diagnostic: keep the adoptDPBootAUX mask; otherwise mark the non-AUX path.
+                     if(result.domain<0x10000)result.domain=0x20000|(dp?1U:0)|(ddi>=3?2U:0);
++                    // XE-4: when the SST port check refused, name its failed conditions instead.
++                    if(dp && !display13SSTPort(port))result.domain=0x100000|display13SSTPortMask(port);
+                 }
+             }
+ 			else if(c.bridge.bootPath==reinterpret_cast<uintptr_t>(path))result.status=Display13Power::Status::Complete;
+diff --git a/WhateverXe/kern_xe.hpp b/WhateverXe/kern_xe.hpp
+index b65a2fe..65ab5fa 100644
+--- a/WhateverXe/kern_xe.hpp
++++ b/WhateverXe/kern_xe.hpp
+@@ -170,6 +170,7 @@ private:
+  static bool display13DeferClock(void *access,uint64_t reg,uint32_t value,uintptr_t caller);
+ 
+  static uint8_t *display13SSTPort(void *port);
++ static uint32_t display13SSTPortMask(void *port);
+  static bool display13HDMIPort(void *port);
+  static uint32_t wrapDisplay13TrainingPattern(void *path,uint32_t pattern);
+  static uint32_t wrapDisplay13SignalLevels(void *port,uint32_t swing,uint32_t emphasis,void *overrideConfig);
+-- 
+2.39.5 (Apple Git-154)
+

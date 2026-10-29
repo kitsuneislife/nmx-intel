@@ -116,3 +116,41 @@ Build: `python3 tools/build.py --release --sdk MacKernelSDK --lilu Lilu.kext` (M
 source as `Lilu.kext/Contents/Resources`); CPU tests 158/158 pass. WhateverXe `ab6f9989` staged at
 `~/nmx-build/whateverxe/kexts/wex/` (release `e92b65b0` moved to `kexts/wex-0.6.1-release/`). Lukas runs
 `efi.sh wex` again; `log.sh` prints the root properties as in XE-2.
+
+### XE-3 result (2026-10-29 19:58): the eDP port fails WEX's SST port check before any AUX step
+
+- The diag build loaded: `N97FBBootHandoff` word 5 = **0x20001** [measured]. Only our patch writes that value. It
+  means the boot port (DDI A) is a DP link (bit 0), not a TC port, and was not linked. `adoptDPBootAUX` never ran,
+  because `display13SSTPort(port)` (`kern_xe.cpp:7274`) returned null [inferred from the code path].
+- Everything else is as in XE-2: `N97SharedRegisterCheck` same provider 0, +0xDF8 0x4195000,
+  `N97FramebufferStartAccepted = No`, handoff check `check[35..37]` = 1, accelerator `stage=3 result=200`
+  [measured]. `WEXDisplay13BootHandoff` status 2 = `LinearStatus::Success` (the early GOP handoff is fine) [measured].
+- `display13SSTPort` has 15 conditions and publishes none of them, including `display13FBSSTHooksReady`, which needs
+  exact bytes at fixed offsets in Apple's TGL framebuffer.
+- Wi-Fi after this cycle: `en2` active with an IPv4 address at 6 min uptime [measured]. XE-2's inactive Wi-Fi did not
+  repeat. Cause still unknown [unverified].
+
+## XE-4 (prepared 2026-10-29): XE-3 plus the SST port conditions
+
+One variable on top of XE-3: `source-fixes/wex/0002-sst-port-mask-diag.patch` adds `display13SSTPortMask`, which is
+read-only. When the SST check refuses, word 5 becomes `0x100000|mask`, with these bits:
+
+| Bit | Failed condition |
+|---|---|
+| 0 | not `display13FramebufferRequested` |
+| 1 | not XeLPD |
+| 2 | `!display13FBSSTHooksReady` |
+| 3 | port object or class size < 0x624 |
+| 4 | no controller |
+| 5 | controller ≠ topology controller |
+| 6 | `!adlnWriterMappingBound` |
+| 7 | clock, memory or panel fault, or clock stopped |
+| 8 | wiring not described |
+| 9 | `Topology::selected` false, or no config |
+| 10 | DDI not a link |
+| 11 | `port+0x117` set |
+| 12 | `port+0x120` ≠ DDI |
+| 13 | `port+0x550` ≠ 1 (combo) or 4 (TC) |
+| 14 | `port+0x578` ≠ access |
+
+WhateverXe `fdc5b254`, staged in `kexts/wex/`; CPU tests 158/158 pass. Same procedure: `efi.sh wex`, then `log.sh`.
