@@ -154,3 +154,34 @@ read-only. When the SST check refuses, word 5 becomes `0x100000|mask`, with thes
 | 14 | `port+0x578` ≠ access |
 
 WhateverXe `fdc5b254`, staged in `kexts/wex/`; CPU tests 158/158 pass. Same procedure: `efi.sh wex`, then `log.sh`.
+
+### XE-4 result (2026-10-29 ~20:05): only the port mode fails
+
+- `N97FBBootHandoff` word 5 = **0x102000** [measured]: `0x100000` (SST check refused) with only bit 13 set. The port
+  mode at `port+0x550` is not 1 (the value expected for combo DDI A). The other 14 conditions pass, including
+  `display13FBSSTHooksReady`, so the Sequoia framebuffer binary matches WEX's exact-byte checks [measured].
+- Checks and accelerator are unchanged from XE-3 (`N97FramebufferStartAccepted = No`) [measured].
+- WEX's own comment on `display13AUXReady` (`kern_xe.cpp` ~6986): "Probe may run before setPortMode, hence mode0 is
+  allowed". The handoff runs in the controller start, before Apple's `setPortMode`, so the eDP port is most likely
+  still in mode 0 there [inferred; the value itself was not recorded].
+- Lukas ran `efi.sh wex` again by mistake after this log. That re-arms one WEX boot with the XE-4 kext. XE-5's
+  `efi.sh wex` overwrites it, so no harm [inferred from efi.sh].
+
+## XE-5 (prepared 2026-10-29): accept mode 0 on combo ports in the boot handoff
+
+One behaviour change: `source-fixes/wex/0003-boot-mode0-sst-port.patch`. `display13SSTPort` takes a `bootMode0` flag,
+and only the boot handoff passes it. With the flag set, a combo port (DDI < 3) in mode 0 passes, the same rule as
+`display13AUXReady`. Every other caller still requires mode 1/4. It also records the port mode in bits 16-19 of the
+SST mask.
+
+Reading word 5:
+- `0x1m....` means SST was still refused, and `m` is the port mode.
+- `0x1xxxx` means SST passed and `adoptDPBootAUX` refused; the bits are as in XE-3.
+- `0x8xxxx` means `adoptBootPath` failed.
+- If the handoff completes, `N97FramebufferStartAccepted = Yes`, and the next question is the accelerator and Metal.
+
+Risk: the adopted boot link may misbehave (black panel) on that one boot. The boot-once returns to the normal config
+by itself.
+
+WhateverXe `d080f93b` (`nm` shows `display13SSTPortEPvb`), staged in `kexts/wex/`; CPU tests 158/158 pass (the SST
+fixture declaration was updated for the new parameter).

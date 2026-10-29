@@ -102,7 +102,8 @@ phase file; open only the row you need.
 | XE-1 | 10-29 | WhateverXe `e92b65b0`, AMFIPass Mod `2d36aeca` | `efi.sh wex`: Apple's TGL driver on the Iris Xe via WhateverXe, one boot | **framebuffer starts, accelerator fails**: WEX's register prerequisites refuse (no Metal device) | [wex-1](wex-1.md) |
 | XE-2 | 10-29 | as XE-1 | same boot, registry root + IGPU saved at 35 s: which WEX prerequisite fails? | **sameProvider**: WEX refuses Apple's FB start (eDP boot handoff `NotReady`), controller drops off the IGPU; DVMT fine | [wex-1](wex-1.md) |
 | XE-3 | 10-29 | WhateverXe `ab6f9989` (built here, wex-0001 diag) | XE-2 with a bit per failed eDP handoff condition | **0x20001**: the eDP port fails `display13SSTPort` before any AUX step | [wex-1](wex-1.md) |
-| XE-4 | 10-29 | WhateverXe `fdc5b254` (wex-0001 + 0002) | XE-3 plus a bit per failed SST port condition | pending | [wex-1](wex-1.md) |
+| XE-4 | 10-29 | WhateverXe `fdc5b254` (wex-0001 + 0002) | XE-3 plus a bit per failed SST port condition | **0x102000**: only the port mode (`+0x550`) fails; SST hooks ready | [wex-1](wex-1.md) |
 
 Adding a test: one row here, the entry at the end of the current phase file (start a new phase file when the goal
 changes), then [../status.md](../status.md).
+| XE-5 | 10-29 | WhateverXe `d080f93b` (wex-0001..0003) | boot handoff accepts mode 0 on the combo eDP port; mode recorded | pending | [wex-1](wex-1.md) |

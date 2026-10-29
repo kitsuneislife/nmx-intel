@@ -1,0 +1,97 @@
+From e214840c82da28e5d99412af0824797abeb46ee0 Mon Sep 17 00:00:00 2001
+From: kitsuneislife <kitsuneislif3@gmail.com>
+Date: Thu, 29 Oct 2026 20:16:16 -0300
+Subject: [PATCH] diag: allow mode 0 on combo ports in the boot handoff, record
+ the port mode
+
+The boot handoff runs before Apple's setPortMode, so the eDP combo port is
+still in mode 0 there; display13SSTPort refused it (XE-4 bit 13).
+display13AUXReady already allows mode 0 for the same reason.
+---
+ WhateverXe/kern_xe.cpp          | 14 ++++++++++----
+ WhateverXe/kern_xe.hpp          |  2 +-
+ tests/display13_sst_fixture.cpp |  2 +-
+ 3 files changed, 12 insertions(+), 6 deletions(-)
+
+diff --git a/WhateverXe/kern_xe.cpp b/WhateverXe/kern_xe.cpp
+index 0676ed3..802729a 100644
+--- a/WhateverXe/kern_xe.cpp
++++ b/WhateverXe/kern_xe.cpp
+@@ -7271,7 +7271,9 @@ bool XE::processDisplay13FramebufferSST(KernelPatcher &patcher,size_t index,mach
+ 
+ // Called with the display owner lock held. The native caller owns the port;
+ // require its retained platform record and BAR association before sampling it.
+-uint8_t *XE::display13SSTPort(void *port) {
++// bootMode0: the boot handoff runs before Apple's setPortMode, so a combo port
++// may still be in mode 0 there (as display13AUXReady already allows).
++uint8_t *XE::display13SSTPort(void *port,bool bootMode0) {
+  auto s=callbackXE;auto &c=display13FBPower;auto object=static_cast<OSObject *>(port);
+  if(!s->display13FramebufferRequested || s->xeProfile.display!=XELP::Display::XeLPD || !s->display13FBSSTHooksReady ||
+     !object || object->getMetaClass()->getClassSize()<0x624 || !c.controller ||
+@@ -7280,7 +7282,9 @@ uint8_t *XE::display13SSTPort(void *port) {
+  auto p=static_cast<uint8_t *>(port);auto config=Display13FBMemory::field<uint32_t *>(p,0x548);
+  if(!Display13FBTopology::selected(s->adlnPlatform,config,s->adlnOutputWiring) ||
+     !(s->adlnOutputWiring.links()&(1U<<config[0])) || p[0x117] ||
+-    Display13FBMemory::field<uint32_t>(p,0x120)!=config[0] || Display13FBMemory::field<uint32_t>(p,0x550)!=(config[0]>=3?4U:1U) ||
++    Display13FBMemory::field<uint32_t>(p,0x120)!=config[0] ||
++    (Display13FBMemory::field<uint32_t>(p,0x550)!=(config[0]>=3?4U:1U) &&
++     !(bootMode0 && config[0]<3 && Display13FBMemory::field<uint32_t>(p,0x550)==0)) ||
+     Display13FBMemory::field<void *>(p,0x578)!=c.access)return nullptr;
+  return p;
+ }
+@@ -7306,6 +7310,8 @@ uint32_t XE::display13SSTPortMask(void *port) {
+  if(p[0x117])m|=1U<<11;
+  if(Display13FBMemory::field<uint32_t>(p,0x120)!=config[0])m|=1U<<12;
+  if(Display13FBMemory::field<uint32_t>(p,0x550)!=(config[0]>=3?4U:1U))m|=1U<<13;
++ // XE-5: the port mode itself, in bits 16-19 (capped at 15).
++ const auto mode=Display13FBMemory::field<uint32_t>(p,0x550);m|=(mode<15?mode:15U)<<16;
+  if(Display13FBMemory::field<void *>(p,0x578)!=c.access)m|=1U<<14;
+  return m;
+ }
+@@ -8156,7 +8162,7 @@ void XE::wrapAlderLakeNSetupWorkLoop(IOService *controller,IOWorkLoop *workLoop)
+                 const auto ddi=c.bridge.bootPort;
+                 const bool dp=ddi<7 && (callbackXE->adlnOutputWiring.links()&(1U<<ddi));
+                 bool linked=!dp;
+-                if(dp && display13SSTPort(port)) {
++                if(dp && display13SSTPort(port,true)) {
+                     Display13FBBootIO io{c.map};auto &boot=c.displayScratch;AlderLakeN::readDisplay(io,true,boot);
+                     if(ddi>=3) {
+                         const auto source=Display13TC::Boot::capture(io,true,ddi,0);
+@@ -8177,7 +8183,7 @@ void XE::wrapAlderLakeNSetupWorkLoop(IOService *controller,IOWorkLoop *workLoop)
+                     // nmx diagnostic: keep the adoptDPBootAUX mask; otherwise mark the non-AUX path.
+                     if(result.domain<0x10000)result.domain=0x20000|(dp?1U:0)|(ddi>=3?2U:0);
+                     // XE-4: when the SST port check refused, name its failed conditions instead.
+-                    if(dp && !display13SSTPort(port))result.domain=0x100000|display13SSTPortMask(port);
++                    if(dp && !display13SSTPort(port,true))result.domain=0x100000|display13SSTPortMask(port);
+                 }
+             }
+ 			else if(c.bridge.bootPath==reinterpret_cast<uintptr_t>(path))result.status=Display13Power::Status::Complete;
+diff --git a/WhateverXe/kern_xe.hpp b/WhateverXe/kern_xe.hpp
+index 65ab5fa..c418df2 100644
+--- a/WhateverXe/kern_xe.hpp
++++ b/WhateverXe/kern_xe.hpp
+@@ -169,7 +169,7 @@ private:
+  static bool display13StopTranscoder(void *port);
+  static bool display13DeferClock(void *access,uint64_t reg,uint32_t value,uintptr_t caller);
+ 
+- static uint8_t *display13SSTPort(void *port);
++ static uint8_t *display13SSTPort(void *port,bool bootMode0=false);
+  static uint32_t display13SSTPortMask(void *port);
+  static bool display13HDMIPort(void *port);
+  static uint32_t wrapDisplay13TrainingPattern(void *path,uint32_t pattern);
+diff --git a/tests/display13_sst_fixture.cpp b/tests/display13_sst_fixture.cpp
+index a932991..de54dec 100644
+--- a/tests/display13_sst_fixture.cpp
++++ b/tests/display13_sst_fixture.cpp
+@@ -67,7 +67,7 @@ struct XE {
+  uintptr_t orgDisplay13EnablePort=0,orgDisplay13DisablePort=0;
+  static bool display13MainLinkAUX(void*,bool);
+  static uint32_t wrapDisplay13EnablePort(void*);static uint32_t wrapDisplay13DisablePort(void*);
+- static uint8_t *display13SSTPort(void*);static bool display13HDMIPort(void*);
++ static uint8_t *display13SSTPort(void*,bool=false);static bool display13HDMIPort(void*);
+  static uint32_t wrapDisplay13TCSignal(void*,uint32_t,uint32_t,void*){assert(false);return 1;}
+  static uint32_t wrapDisplay13SignalLevels(void*,uint32_t,uint32_t,void*);
+  static uint32_t wrapDisplay13TrainingPattern(void*,uint32_t);
+-- 
+2.39.5 (Apple Git-154)
+

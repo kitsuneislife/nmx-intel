@@ -125,3 +125,6 @@ source-fixes/00NN-<slug>.patch`, add an `apply` line to `build/apply-fixes.sh` (
 - `source-fixes/wex/0002-sst-port-mask-diag.patch` (XE-4) — on top of 0001: when `display13SSTPort` refuses the boot
   eDP port, `N97FBBootHandoff` word 5 = `0x100000|mask` naming each failed condition (bits in tests/wex-1.md XE-4).
   WhateverXe `fdc5b254`.
+- `source-fixes/wex/0003-boot-mode0-sst-port.patch` (XE-5) — the boot handoff's `display13SSTPort` accepts mode 0
+  on combo ports (the handoff runs before `setPortMode`); the SST mask records the mode in bits 16-19. WhateverXe
+  `d080f93b`.

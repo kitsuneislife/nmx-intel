@@ -301,3 +301,10 @@ IOKit drops `AppleIntelFramebufferController` from the IGPU, and the accelerator
 handoff) before suspecting DVMT: on our 64 MiB stolen, `controller+0xDF8` = 0x4195000 passes WEX's minimum
 (stolen + 0x192000) [measured]. WEX's handoff returns bare `NotReady` for several conditions; the wex-0001 diag patch
 names them. Internal eDP on ADL-P/RPL-P is experimental in WEX 0.6.1 (no hardware coverage, README).
+
+## WhateverXe: the eDP port is still in mode 0 during the boot handoff
+
+> XE-4 [measured]: of `display13SSTPort`'s 15 conditions, only `port+0x550 == 1` failed on DDI A. The handoff runs in
+> the controller start, before Apple's `setPortMode`, so the mode is most likely still 0 [inferred]. WEX already
+> allows mode 0 in `display13AUXReady` for that reason. The SST hooks (exact-byte checks on the Sequoia binary) are
+> ready, so a byte mismatch is not the problem. XE-5 tests accepting mode 0 in the handoff only.
