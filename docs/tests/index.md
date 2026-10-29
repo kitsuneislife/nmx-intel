@@ -99,7 +99,8 @@ phase file; open only the row you need.
 | UPG-4 | 10-24 | 2.5.4 + NVAccel `b56b0440` (accel-0004) | keep up to 3 one-colour frames in a row off the panel (skip the flip) | **no effect on the blinks**: held 3 (one boot run); the blinks are not one-colour frames | [rtx-8](rtx-8-accelerated-desktop.md) |
 | UPG-5 | 10-29 | nullmoth 2.6.4 + NVRM `3d9325f1`, NVAccel `b8c1df32`, NMIntelFB `241aff3d` kept | upgrade 2.5.4 → 2.6.4 (NvGfx copy/drag fixes in 2.6.3): do the blinks and the 2.4 ms/frame copy change? | **still blinks** (Lukas, first boot); counters not read | [rtx-8](rtx-8-accelerated-desktop.md) |
 | XE-0 | 10-29 | WhateverXe Graphics 0.3.2 pkg + nmx-wex gate | install the pkg (replaces NootedGreen's stack), GPU-only boot: does NMIntelFB keep the iGPU? | **works**: TGL kexts in the AuxKC but idle, NMIntelFB owns the iGPU | [wex-1](wex-1.md) |
-| XE-1 | 10-29 | WhateverXe `e92b65b0`, AMFIPass Mod `2d36aeca` | `efi.sh wex`: Apple's TGL driver on the Iris Xe via WhateverXe, one boot | pending | [wex-1](wex-1.md) |
+| XE-1 | 10-29 | WhateverXe `e92b65b0`, AMFIPass Mod `2d36aeca` | `efi.sh wex`: Apple's TGL driver on the Iris Xe via WhateverXe, one boot | **framebuffer starts, accelerator fails**: WEX's register prerequisites refuse (no Metal device) | [wex-1](wex-1.md) |
+| XE-2 | 10-29 | as XE-1 | same boot, registry root + IGPU saved at 35 s: which WEX prerequisite fails? | pending | [wex-1](wex-1.md) |
 
 Adding a test: one row here, the entry at the end of the current phase file (start a new phase file when the goal
 changes), then [../status.md](../status.md).

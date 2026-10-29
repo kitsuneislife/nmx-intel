@@ -45,3 +45,30 @@ no HookCase or `xe.bundle`. AuxKC (19:24) lists `com.apple.driver.AppleIntelTGLG
 `org.b00t0x.AppleIntelTGLCompat` 0.6.1. Both personalities carry `IOPropertyMatch nmx-wex`. Boot: no TGL kext
 loaded, the only IOClasses on the iGPU are `NMIntelFBClaim` and `NMIntelFB` (pipe A 1920x1080, 146.90 Hz), RTX
 desktop as before, no panic. A `shutdown_stall` report at 19:24 is from the reboot itself [inferred, not read].
+
+### XE-1 result (2026-10-29 19:29): WhateverXe's framebuffer starts, the accelerator does not
+
+[measured] Booted with the WEX boot-args; the one-boot daemon put GPU-only back. dmesg-0:
+- `AppleIntelTGLCompat: revision 0.5.0 started`; `IntelAccelerator::probe: Found device with ID 0xa7a88086`.
+- Framebuffer: `Display13 native handoff status=2 writes=10`, `TGL330 resources native-return ddi=0 result=1`,
+  `Display13 native controller start return=1` (one `[IGFB][ERROR] EFI using a different backlight frequency`).
+- Accelerator: `stage=4 done=0` (WEX's `wrapTGLAcceleratorRegister`) with no `stage=4 done=1`, then
+  `stage=3 result=200` (Apple's failure path, reason 0x200) and `TGL accelerator start returned 0`.
+- Metal tests: `no Metal device` for all; carender all zero; `xe-tex-tests` `ERRO lib (null)`; 3 segfaults.
+- No Wi-Fi: expected, `-nvoff` keeps our AirportMtkWlan off (pitfalls.md).
+
+Reading of WEX 0.6.1 `kern_xe.cpp:13827`: on ADL-P/RPL-P (`adlnDetected`, set by `adlpRenderRequested`) the register
+wrapper checks prerequisites first and returns false without calling Apple's function, and without logging
+`stage=4 done=1`, when any fails [measured, source]. So one prerequisite failed: the shared Display13 controller, its
+provider, `display13FBGTT` state, or the controller's reservation `0xDF8 >= stolen + 0x192000`. Which one is recorded
+only in registry-root properties (`N97SharedRegisterCheck`), lost at reboot. Suspect: our 64 MiB stolen memory
+(WEX asks for 96 MB DVMT) [unverified]. The dmesg buffers start at 1.2 s (131071 bytes), so WEX's early memory and
+profile lines are missing.
+
+## XE-2 (prepared 2026-10-29): XE-1 again, registry checks saved
+
+No change to the route: `efi.sh boot-once` now saves `ioreg -l -d 1` of the registry root and the IGPU subtree at
+~35 s (`/var/log/nmx-hybrid-ioreg-{root,igpu}.txt`), and `log.sh` prints them. Expected: `N97SharedRegisterCheck`
+names the failing prerequisite (array: version, ready, controller match, callback, class size, same provider,
+controller+0xC0, controller+0xDF8, GTT initialized, GTT faulted, memory faulted), plus WEX's `XELP*`/`TGL*` memory
+records.
