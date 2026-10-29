@@ -292,3 +292,12 @@ accelerator list `0xa7a88086` [measured, Info.plist]. NMIntelFB scores 61000 in 
 installed and WhateverXe not loaded (GPU-only config), Apple's unpatched driver would take the iGPU [inferred].
 NootedGreen's stack was safe only because it matched the spoofed 9A49. `wex-install.sh` gates both personalities with
 `IOPropertyMatch nmx-wex=<01>`, injected only by `config-wex.plist`. Re-run it after any pkg reinstall.
+
+## WhateverXe: "accelerator start returned 0" is a framebuffer handoff failure, not a memory one
+
+When WhateverXe rejects Apple's framebuffer start (`N97FramebufferStartAccepted = No`), its wrapper returns `false`,
+IOKit drops `AppleIntelFramebufferController` from the IGPU, and the accelerator later fails `sameProvider` in
+`N97SharedRegisterCheck` [measured, XE-2]. Read `N97FBFirstPowerError` / `N97FBBootHandoff` (operation 7 = boot
+handoff) before suspecting DVMT: on our 64 MiB stolen, `controller+0xDF8` = 0x4195000 passes WEX's minimum
+(stolen + 0x192000) [measured]. WEX's handoff returns bare `NotReady` for several conditions; the wex-0001 diag patch
+names them. Internal eDP on ADL-P/RPL-P is experimental in WEX 0.6.1 (no hardware coverage, README).

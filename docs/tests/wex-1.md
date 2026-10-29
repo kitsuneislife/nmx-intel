@@ -72,3 +72,47 @@ No change to the route: `efi.sh boot-once` now saves `ioreg -l -d 1` of the regi
 names the failing prerequisite (array: version, ready, controller match, callback, class size, same provider,
 controller+0xC0, controller+0xDF8, GTT initialized, GTT faulted, memory faulted), plus WEX's `XELP*`/`TGL*` memory
 records.
+
+### XE-2 result (2026-10-29 19:40): the accelerator waits on a framebuffer handoff that failed
+
+WhateverXe refuses Apple's framebuffer start, Apple's controller leaves the IGPU, and the accelerator's
+`sameProvider` check fails. The 64 MiB DVMT is **not** the cause.
+
+- `N97SharedRegisterCheck` = version 1, ready **0**, controller match 1, callback set, class size 0x1c80,
+  **same provider 0**, +0xC0 0, **+0xDF8 0x4195000** (≥ stolen 64 MiB + 0x192000 = 0x4192000, so the reservation
+  passes), GTT initialized 1, GTT fault 0, memory fault 0 [measured]. Only `sameProvider` fails.
+- `N97FramebufferStartAccepted = No` [measured]: `kern_xe.cpp:8024`'s framebuffer-start wrapper returns `false` when
+  not accepted, so IOKit drops Apple's `AppleIntelFramebufferController`. The saved IGPU subtree has
+  `AppleIntelFramebuffer@0..2` and `.Display_boot` but no controller and no `IntelAccelerator` [measured]. The
+  controller's provider is therefore not the IGPU when the accelerator registers [inferred].
+- Why it is not accepted: `N97FBFirstPowerError` = `N97FBBootHandoff` = operation 7 (boot handoff, `kern_xe.cpp:8157`),
+  status 1 (`NotReady`), result domain 0x13 (default, no domain), bridge faulted 1 [measured]. The init record
+  `N97FBPower` (operation 0) is `Complete`, so `holdDPBootAUX` succeeded at init [measured].
+- `N97FBBootHandoffCheck`: every IRQ, work-loop, surface, plane and path check passes (`check[35..37]` = 1), boot
+  port 0 (DDI A, the eDP), plane control 0x94000008, stride 0x78, size 0x437077f (1920x1080) [measured]. The failure
+  is after that, in the eDP adoption: `adoptDPBootAUX` (`kern_alderlake_n.hpp:304`), `display13SSTPort` or
+  `adoptBootPath`. All three return `NotReady` with no detail [inferred from the code].
+- WEX's README lists internal eDP on Alder/Raptor Lake-P as **experimental, "local CPU and donor replay coverage
+  only"**: this is the first hardware run of that path that we know of [measured: README; no GitHub issues exist].
+
+Wi-Fi on the normal boot after the cycle [measured]: AirportMtkWlan 1.5.0 loaded, firmware MT7921 up, power On, but
+`en2` `status: inactive`, no scan results, "Network Service Inactive", country code 0. No AirportMtkWlan lines in
+the unified log; dmesg needs sudo. Not explained yet; the cycle's two warm reboots (one with `-nvoff`, where the
+kext does not load) are the suspect [unverified].
+
+## XE-3 (prepared 2026-10-29): XE-2 with WhateverXe built here, telling which handoff condition fails
+
+One variable: WhateverXe 0.6.1 built from source (`68a2427`) with `source-fixes/wex/0001-adopt-dp-boot-aux-diag.patch`.
+The patch only adds diagnostics: every condition of `adoptDPBootAUX` is still required, but each failed one sets a
+bit, and the result is published in `N97FBBootHandoff` word 5 (result domain):
+
+- `0x1xxxx`: `adoptDPBootAUX` failed, mask bits 0 target, 1 ddi≥2, 2 activePipes≠1, 3 dpSource, 4 dpSourceUnchanged,
+  5 bootPort≠ddi, 6 bootAdopted, 7 !bootPGProtected, 8 !bootDDIProtected, 9 !outputHeld, 10 !bootPending, 11 owner
+  set, 12 port≠ddi, 13 lease owner, 14 lease domains, 15 !held.
+- `0x2000x`: not linked without the AUX path (bit 0 = DP link, bit 1 = TC port), e.g. `display13SSTPort` false.
+- `0x4000x`: `publishObject` failed. `0x8xxxx`: `adoptBootPath` failed (low 16 bits = its domain).
+
+Build: `python3 tools/build.py --release --sdk MacKernelSDK --lilu Lilu.kext` (MacKernelSDK `master`, Lilu 1.7.2
+source as `Lilu.kext/Contents/Resources`); CPU tests 158/158 pass. WhateverXe `ab6f9989` staged at
+`~/nmx-build/whateverxe/kexts/wex/` (release `e92b65b0` moved to `kexts/wex-0.6.1-release/`). Lukas runs
+`efi.sh wex` again; `log.sh` prints the root properties as in XE-2.

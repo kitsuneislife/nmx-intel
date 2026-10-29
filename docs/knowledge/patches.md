@@ -119,3 +119,6 @@ source-fixes/00NN-<slug>.patch`, add an `apply` line to `build/apply-fixes.sh` (
   rate adaptation instead of the fixed basic rate with BA disabled (luzility `110c92c`); EAPOL keeps the basic rate.
 - `source-fixes/wifi/dropped-wifi-0005` (WIFI-4, **dropped**: hung the boot) — the 1 s watchdog runs the interrupt handler when `HOST_INT_STA` has
   pending bits (lost MSI) and dumps the RX DMA state after 3 s without frames.
+- `source-fixes/wex/0001-adopt-dp-boot-aux-diag.patch` (XE-3) — WhateverXe 0.6.1 (`68a2427`): diagnostics only.
+  Each failed `adoptDPBootAUX` condition sets a bit, published as `0x10000|mask` in `N97FBBootHandoff` word 5;
+  `0x2000x` = not linked, `0x40000` = `publishObject`, `0x8xxxx` = `adoptBootPath`. WhateverXe `ab6f9989`.

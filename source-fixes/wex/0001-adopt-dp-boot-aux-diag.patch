@@ -1,0 +1,75 @@
+From 92fa94dd95c832a720f8d6f695772eb8739b0a2a Mon Sep 17 00:00:00 2001
+From: kitsuneislife <noreply@github.com>
+Date: Thu, 29 Oct 2026 19:51:58 -0300
+Subject: [PATCH] diag: record which adoptDPBootAUX condition fails
+
+---
+ WhateverXe/kern_alderlake_n.hpp | 25 ++++++++++++++++++++-----
+ WhateverXe/kern_xe.cpp          | 12 +++++++++---
+ 2 files changed, 29 insertions(+), 8 deletions(-)
+
+diff --git a/WhateverXe/kern_alderlake_n.hpp b/WhateverXe/kern_alderlake_n.hpp
+index 11c6803..b817127 100644
+--- a/WhateverXe/kern_alderlake_n.hpp
++++ b/WhateverXe/kern_alderlake_n.hpp
+@@ -304,11 +304,26 @@ template<class IO> Display13Power::Result holdDPBootAUX(IO &io,const DisplayRead
+ template<class IO> Display13Power::Result adoptDPBootAUX(IO &io,const DisplayReadout &boot,
+     Display13Power::NativeBridge &bridge,Display13Power::MainLinkAUX &link,uintptr_t target,unsigned ddi,bool panel=false) {
+     using namespace Display13Power;Result r;
+-    if(!target || ddi>=2 || boot.activePipes!=1 || !dpSource(boot,0,ddi,nullptr,panel) || !dpSourceUnchanged(io,boot,0,ddi,0,nullptr,panel) ||
+-       bridge.bootPort!=ddi || bridge.bootAdopted || !bridge.bootPGProtected || !bridge.bootDDIProtected ||
+-       !bridge.outputHeld(io,ddi,0) || !link.bootPending || link.owner || link.port!=ddi ||
+-       link.lease.owner!=&bridge.state || link.lease.domains!=dependencies(auxDomain(ddi)) ||
+-       !held(io,bridge.state,link.lease.domains))return r;
++    // nmx diagnostic: one bit per failed condition, published as 0x10000|mask in
++    // N97FBBootHandoff word 5 (result.domain). Every condition is still required.
++    uint32_t m=0;
++    if(!target)m|=1U<<0;
++    if(ddi>=2)m|=1U<<1;
++    if(boot.activePipes!=1)m|=1U<<2;
++    if(ddi<2 && !dpSource(boot,0,ddi,nullptr,panel))m|=1U<<3;
++    if(ddi<2 && !dpSourceUnchanged(io,boot,0,ddi,0,nullptr,panel))m|=1U<<4;
++    if(bridge.bootPort!=ddi)m|=1U<<5;
++    if(bridge.bootAdopted)m|=1U<<6;
++    if(!bridge.bootPGProtected)m|=1U<<7;
++    if(!bridge.bootDDIProtected)m|=1U<<8;
++    if(ddi<2 && !bridge.outputHeld(io,ddi,0))m|=1U<<9;
++    if(!link.bootPending)m|=1U<<10;
++    if(link.owner)m|=1U<<11;
++    if(link.port!=ddi)m|=1U<<12;
++    if(link.lease.owner!=&bridge.state)m|=1U<<13;
++    if(ddi<2 && link.lease.domains!=dependencies(auxDomain(ddi)))m|=1U<<14;
++    if(!held(io,bridge.state,link.lease.domains))m|=1U<<15;
++    if(m){r.domain=0x10000|m;return r;}
+     link.owner=target;link.bootPending=false;r.status=Status::Complete;return r;
+ }
+ enum class LinearStatus : uint32_t {
+diff --git a/WhateverXe/kern_xe.cpp b/WhateverXe/kern_xe.cpp
+index daf4053..e63f572 100644
+--- a/WhateverXe/kern_xe.cpp
++++ b/WhateverXe/kern_xe.cpp
+@@ -8144,12 +8144,18 @@ void XE::wrapAlderLakeNSetupWorkLoop(IOService *controller,IOWorkLoop *workLoop)
+                         if(linked)port->retain(); // Released only after real buffer stop/idle.
+                     }
+                 }
+-                if(linked)result=c.bridge.adoptBootPath(reinterpret_cast<uintptr_t>(path),0,ddi);
+-                else result.status=Display13Power::Status::NotReady;
++                if(linked) {
++                    result=c.bridge.adoptBootPath(reinterpret_cast<uintptr_t>(path),0,ddi);
++                    if(result.status!=Display13Power::Status::Complete)result.domain=0x80000|(result.domain&0xFFFF);
++                } else {
++                    result.status=Display13Power::Status::NotReady;
++                    // nmx diagnostic: keep the adoptDPBootAUX mask; otherwise mark the non-AUX path.
++                    if(result.domain<0x10000)result.domain=0x20000|(dp?1U:0)|(ddi>=3?2U:0);
++                }
+             }
+ 			else if(c.bridge.bootPath==reinterpret_cast<uintptr_t>(path))result.status=Display13Power::Status::Complete;
+ 			if(result.status==Display13Power::Status::Complete &&
+-				!Display13Power::publishObject(c.bridge,c.power,0x80,controller,0x1C20))result.status=Display13Power::Status::NotReady;
++				!Display13Power::publishObject(c.bridge,c.power,0x80,controller,0x1C20)){result.status=Display13Power::Status::NotReady;result.domain=0x40000;}
+ 		}
+ 		c.pipe[0].memory=r;
+ 	}
+-- 
+2.39.5 (Apple Git-154)
+
