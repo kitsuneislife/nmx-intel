@@ -284,3 +284,11 @@ restart fixes is hardware state outside the context image, not the image itself 
 transcoder << 12`) into `p->0x160/0x164` and then divides by `p->0x164`. A guard on the cached field misses a register
 that reads 0 early in boot (link not trained yet) → divide error panic. Check the register for the transcoder the
 function uses (0xf when `port->0x548->0x8 == 0`, else `p->0x3640`). Fixed in hybrid-0006.
+
+## WhateverXe Graphics' TGL kexts match our a7a8 and outrank NMIntelFB
+
+The pkg's `AppleIntelFramebufferController` personality (IOProbeScore 80000, category IOFramebuffer) and the `Gen7`
+accelerator list `0xa7a88086` [measured, Info.plist]. NMIntelFB scores 61000 in the same category, so with the pkg
+installed and WhateverXe not loaded (GPU-only config), Apple's unpatched driver would take the iGPU [inferred].
+NootedGreen's stack was safe only because it matched the spoofed 9A49. `wex-install.sh` gates both personalities with
+`IOPropertyMatch nmx-wex=<01>`, injected only by `config-wex.plist`. Re-run it after any pkg reinstall.

@@ -175,3 +175,10 @@ the ESP and copies one over `config.plist`, so the route switch is one command, 
 Recovery. The hybrid config differs from the GPU-only one in three places only (iGPU DeviceProperties, NootedGreen
 after Lilu with no MinKernel, NootedGreen boot-args plus `-nvoff`). Test record and steps:
 [../tests/hybrid-1.md](../tests/hybrid-1.md).
+
+## WhateverXe replaces NootedGreen (2026-10-29)
+
+b00t0x's WhateverXe 0.6.1 runs Apple's TGL driver on Raptor Lake-P without a device-id spoof and has an eDP path
+(research.md). NootedGreen never got past HYB-12's rendering losses, so H1 moves to WhateverXe: XE-0/XE-1 in
+[../tests/wex-1.md](../tests/wex-1.md). Phase H2 (nullmoth headless next to it) is unchanged. Pitfall: the pkg's
+kexts match a7a8 and must be gated (pitfalls.md).

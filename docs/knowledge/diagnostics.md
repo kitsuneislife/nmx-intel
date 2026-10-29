@@ -102,3 +102,10 @@ Lukas cannot type `|`: when he runs commands, write to a file and `grep`/`tail` 
 HYB-15: `-ngreenbootgdrst` (hybrid-0005) does a full GT reset (`GDRST=1`) before Apple's `start()`. dmesg-0 lines
 `XeNG HYB15 pre: RCS ctl/head/tail/ccid BCS ctl/head/tail err` and `XeNG HYB15 GDRST full done|TIMEOUT gdrst= fw=` (they print after dmesg-0; HYB-15b keeps `dmesg-35s.txt` and `log.sh` greps `XeNG HYB` in every buffer)
 with the same registers after. Remove the boot-arg from `tools/hybrid/hybrid-config.py` to undo without a rebuild.
+
+## WhateverXe route
+
+- DeviceProperty `nmx-wex=<01>` on `PciRoot(0x0)/Pci(0x2,0x0)`: lets the gated TGL personalities match (only
+  `config-wex.plist`). WhateverXe boot-args: `-allow3d -disablegfxfirmware` (required), `-wex-noaccel` (framebuffer
+  only), `-wex-adlp-load-only` (blocks the framebuffer and accelerator probes), `-igfxdvmt` (60 MiB stolen only).
+- Same evidence as the hybrid route: `efi.sh boot-once` dmesg buffers, `sudo bash tools/hybrid/log.sh` → `~/hybrid.txt`.
