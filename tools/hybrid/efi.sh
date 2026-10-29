@@ -18,7 +18,7 @@ set -uo pipefail
 HERE=$(cd "$(dirname "$0")" && pwd)
 HOMEU=$(eval echo "~${SUDO_USER:-root}")
 NGK=$HOMEU/nmx-build/hybrid/xps/build/NootedGreen.kext
-WXK=$HOMEU/nmx-build/whateverxe/kexts   # WhateverXe in wex/ (XE-5: our build with wex-0001..0003; release in wex-0.6.1-release/), AMFIPass 1.4.1 Mod as AMFIPassMod.kext
+WXK=$HOMEU/nmx-build/whateverxe/kexts   # WhateverXe in wex/ (XE-6: our build with wex-0001..0004; release in wex-0.6.1-release/), AMFIPass 1.4.1 Mod as AMFIPassMod.kext
 
 ESP=$(diskutil info disk0s1 2>/dev/null | sed -n 's/^ *Mount Point: *//p')
 # early in boot (boot-once) DiskArbitration may not be up yet: retry for a while
