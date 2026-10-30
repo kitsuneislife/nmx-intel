@@ -284,3 +284,33 @@ test had the same mistake.
 
 - Note (2026-10-18): wifi5-0002 and wifi5-0005 sent upstream in https://github.com/flxxxxddd/SimpleMtkWlan/pull/1
   (both build, the fork's `tests/run-all.sh` passes on that branch).
+
+## WIFI-9 (prepared 2026-10-30): boot panic in the firmware download, TX cleanup lock
+
+Evidence [measured]: `/Library/Logs/DiagnosticReports/Kernel-2026-10-30-183855.panic`, the boot before 18:38 (the
+next boot came up normally on the hybrid):
+
+```
+panic(cpu 4 ...): m_free: freeing an already freed mbuf @uipc_mbuf.c:4509
+  _m_freem
+  AirportMtkWlan : mwx_dma_tx_cleanup(mwx_softc*, mwx_queue*) + 0x119
+  AirportMtkWlan : mwx_mcu_send_firmware(...) + 0xa4
+  AirportMtkWlan : mwx_load_firmware / mt7921_mcu_init / mwx_init_hardware / mwx_preinit / mwx_attach
+  IOService::startCandidate ... _IOConfigThread::main
+```
+
+Cause [inferred from the source, `nmx-wifi5` `0727db5`]: `mwx_dma_tx_cleanup` reclaims a TX ring with no lock. Two
+threads call it on the firmware-download ring `sc_txfwdlq`: the attach thread after each firmware chunk
+(`mwx_mcu_send_firmware`) and the interrupt handler on the driver's work loop (`mwx_intr` → `mwx_dma_tx_done`, which
+cleans all three TX rings). OpenBSD serialises them with `splnet()`, but here `splnet()` returns 1 and does nothing
+(`mtk80211/openbsd/net80211/timeout.c:40`). Both threads can see the same `md_mbuf != NULL` and free it: a rare,
+timing-dependent boot panic. Not a GPU or hybrid issue.
+
+Fix wifi5-0006: an `IOLock` in the softc, allocated before the interrupt is established, held around the ring walk
+in `mwx_dma_tx_cleanup` (released before `wakeup`). Every caller runs in thread context (attach, work loop, timeout),
+so a mutex is legal. Build `AirportMtkWlan dd967442` (`7202ddd`): the KPI check passes (`_IOLockAlloc`,
+`_IOLockLock`, `_IOLockUnlock` resolve), the fork's host tests pass (10/10). Not covered: `mwx_queue_reset` also
+frees TX mbufs without the lock (only on reset/attach, with DMA disabled) [unverified risk, not seen].
+
+Expected: no more `freeing an already freed mbuf` at boot; Wi-Fi unchanged. The panic was rare, so one clean boot
+proves little; the check is "no recurrence" over the next days.

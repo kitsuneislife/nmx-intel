@@ -1,0 +1,71 @@
+From e0a4c2f9a677e1a89bb6f77df7dd518a48dc32e0 Mon Sep 17 00:00:00 2001
+From: nmx <nmx@localhost>
+Date: Fri, 30 Oct 2026 18:48:37 -0300
+Subject: [PATCH] TX cleanup: serialise ring reclaim between the interrupt and
+ the firmware download
+
+splnet() is a no-op on xnu, so mwx_intr (workloop) and
+mwx_mcu_send_firmware (attach thread) could reclaim sc_txfwdlq at the
+same time and free the same mbuf twice (panic at boot, 2026-10-30).
+---
+ SimpleMtkWlan/hal_mwx/MtkMwx.cpp | 19 ++++++++++++++++++-
+ 1 file changed, 18 insertions(+), 1 deletion(-)
+
+diff --git a/SimpleMtkWlan/hal_mwx/MtkMwx.cpp b/SimpleMtkWlan/hal_mwx/MtkMwx.cpp
+index 419165c..caa7ae9 100644
+--- a/SimpleMtkWlan/hal_mwx/MtkMwx.cpp
++++ b/SimpleMtkWlan/hal_mwx/MtkMwx.cpp
+@@ -494,6 +494,13 @@ struct mwx_softc {
+ 	struct mwx_queue	sc_txq;
+ 	struct mwx_queue	sc_txmcuq;
+ 	struct mwx_queue	sc_txfwdlq;
++	/*
++	 * splnet() is a no-op here, so the interrupt (workloop) and the
++	 * firmware download (attach thread) both reclaimed sc_txfwdlq and
++	 * freed the same mbuf twice ("m_free: freeing an already freed
++	 * mbuf" panic at boot). Serialises mwx_dma_tx_cleanup.
++	 */
++	IOLock			*sc_txclean_lock;
+ 
+ 	struct mwx_queue	sc_rxq;
+ 	struct mwx_queue	sc_rxmcuq;
+@@ -2380,6 +2387,12 @@ mwx_attach(struct device *parent, struct device *self, void *aux)
+ 	mwx_write(sc, MT_WFDMA0_HOST_INT_ENA, 0);
+ 	mwx_write(sc, MT_PCIE_MAC_INT_ENABLE, 0xff);
+ 
++	/* before the interrupt: mwx_intr reclaims TX rings under it */
++	if (sc->sc_txclean_lock == NULL &&
++	    (sc->sc_txclean_lock = IOLockAlloc()) == NULL) {
++		printf("%s: can't allocate TX cleanup lock\n", DEVNAME(sc));
++		goto fail;
++	}
+ 	sc->sc_ih = pci_intr_establish(pa->pa_pc, ih, IPL_NET,
+ 	    mwx_intr, sc, DEVNAME(sc));
+ 	if (sc->sc_ih == NULL) {
+@@ -3333,11 +3346,14 @@ mwx_dma_tx_cleanup(struct mwx_softc *sc, struct mwx_queue *q)
+ 	struct mwx_desc *desc;
+ 	int idx, last;
+ 
++	IOLockLock(sc->sc_txclean_lock);
+ 	idx = q->mq_cons;
+ 	last = mwx_read(sc, q->mq_regbase + MT_DMA_DMA_IDX);
+ 
+-	if (idx == last)
++	if (idx == last) {
++		IOLockUnlock(sc->sc_txclean_lock);
+ 		return;
++	}
+ 
+ 	bus_dmamap_sync(sc->sc_dmat, q->mq_map, 0, q->mq_map->dm_mapsize,
+ 	     BUS_DMASYNC_PREWRITE);
+@@ -3382,6 +3398,7 @@ mwx_dma_tx_cleanup(struct mwx_softc *sc, struct mwx_queue *q)
+ 	    BUS_DMASYNC_POSTWRITE);
+ 
+ 	q->mq_cons = idx;
++	IOLockUnlock(sc->sc_txclean_lock);
+ 	if (q->mq_wakeme) {
+ 		q->mq_wakeme = 0;
+ 		wakeup(q);
+-- 
+2.39.5 (Apple Git-154)
+

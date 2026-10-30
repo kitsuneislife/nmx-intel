@@ -336,3 +336,9 @@ names them. Internal eDP on ADL-P/RPL-P is experimental in WEX 0.6.1 (no hardwar
 > README asks for SSDT-PNLF; its profile matches `_UID` 19. `ADLSPanelPWMReady = No` is normal on display 13 (the
 > result moves to `display13PanelPWMReady`).
 
+## AirportMtkWlan: `splnet()` is a no-op, so the interrupt races every other thread
+
+> WIFI-9 [measured panic, inferred cause]: the OpenBSD code assumes `splnet()` blocks the interrupt; in this port it
+> returns 1 and does nothing. The work-loop interrupt (`mwx_intr`) and the attach thread both reclaimed the
+> firmware-download TX ring and freed the same mbuf ("m_free: freeing an already freed mbuf" during
+> `mwx_load_firmware`). Any shared ring or list touched from both sides needs a real lock (wifi5-0006 for TX cleanup).

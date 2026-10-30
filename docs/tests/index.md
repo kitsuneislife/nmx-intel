@@ -74,6 +74,7 @@ phase file; open only the row you need.
 | WIFI-6 | 10-18 | AirportMtkWlan + wifi5-0003, NVRAM `nullmoth-wifi-band=5` | 5 GHz only (2.4 GHz at MCS 1: 4.9 down / 0.9 up) | **38 down / 5.1 up** (VHT80 ch 108); 2.4-only networks hidden; upload limited by TX queue | [wifi-1](wifi-1-mt7921.md) |
 | WIFI-7 | 10-18 | AirportMtkWlan `6bb3765a` (+wifi5-0004), knob unset | prefer 5 GHz: 5 GHz scanned first, 2.4 GHz twins hidden, 2.4-only kept | **works**: all networks listed, Nardino on 5 GHz, 36.8 / 5.09 | [wifi-1](wifi-1-mt7921.md) |
 | WIFI-8 | 10-18 | AirportMtkWlan `a7bfaa40` (+wifi5-0005) | data frames through firmware rate adaptation (was fixed 1/6 Mbit/s, BA off) | **works**: 37.1 down / 36.9 up (phone's ceiling); curl 38 up / 45 down | [wifi-1](wifi-1-mt7921.md) |
+| WIFI-9 | 10-30 | AirportMtkWlan `dd967442` (+wifi5-0006) | lock around TX ring cleanup (boot panic: interrupt and firmware download freed the same mbuf) | pending: no recurrence over the next boots | [wifi-1](wifi-1-mt7921.md) |
 | SLEEP-1 | 10-19 | OpenCore HibernateMode=Auto, `hibernatemode 25` | hibernate instead of S3, so the GOP relights the panel | **fails**: sleep policy chose deep idle (S3), never hibernated | [sleep-1](sleep-1-hibernate.md) |
 | SLEEP-2 | 10-19 | + HibernationFixup 1.5.4, `hbfx-ahbm=1` | force hibernation over the platform sleep policy | **fails**: still type 7 (S3), panel off at wake; sleep parked | [sleep-1](sleep-1-hibernate.md) |
 | GUARD-1 | 10-19 | NMIntelFB `241aff3d` (intelfb-0021) | stand down when nullmoth's boot guard has NVRM off | pending | [sleep-1](sleep-1-hibernate.md) |
@@ -111,3 +112,4 @@ changes), then [../status.md](../status.md).
 | XE-7 | 10-29 | as XE-6, `efi.sh wexrtx` | the hybrid: nullmoth's NVIDIA driver on (headless), NMIntelFB off | **works**: panel on the Iris Xe, RTX headless with Metal 3; compute runs correctly on both GPUs | [wex-1](wex-1.md) |
 | XE-8 | 10-29 | as XE-7, `efi.sh wexrtx-keep` | hybrid kept; SSDT-PNLF (brightness); `ondemand.sh on` (no app opens the RTX, so no infinite boost) | works: brightness, no NVK holders, clean kernel log | [wex-1](wex-1.md) |
 | XE-9 | 10-29 | XE-8 kept; XE-9b one boot `-nvoff` | battery draw idle, hybrid vs RTX without driver (`tools/hybrid/power.sh`) | pending | [wex-1](wex-1.md) |
+| XE-10 | 10-30 | XE-8 + `ondemand.sh noboost` | `BOOST=0` in nvrm610.conf: an app on the RTX (Safari) no longer pins it at max clocks | pending | [wex-1](wex-1.md) |

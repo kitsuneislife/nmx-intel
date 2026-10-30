@@ -2,7 +2,7 @@
 
 > **Summary.** Since WIFI-8 (2026-10-18) the internal MediaTek MT7921 (`14c3:7961`) works as a normal Mac Wi-Fi card:
 > native Wi-Fi menu, Keychain joins, 5 GHz VHT80, 37 down / 37 up on Lukas's line (the same as his phone). The driver is
-> flxxxxddd's **AirportMtkWlan** (SimpleMtkWlan fork v1.5.0, IO80211 Sequoia ABI) built from source with our five
+> flxxxxddd's **AirportMtkWlan** (SimpleMtkWlan fork v1.5.0, IO80211 Sequoia ABI) built from source with our six
 > patches, installed in `/Library/Extensions` (auxiliary kernel collection), not in the EFI. History and measurements:
 > [../tests/wifi-1-mt7921.md](../tests/wifi-1-mt7921.md).
 
@@ -10,7 +10,7 @@
 
 | Piece | Where | Notes |
 | --- | --- | --- |
-| `AirportMtkWlan.kext` `a7bfaa40` | `/Library/Extensions` | bundle `com.flxxxxddd.AirportMtkWlan` 1.5.0; MediaTek firmware inside (not versioned) |
+| `AirportMtkWlan.kext` `dd967442` (WIFI-9; was `a7bfaa40`) | `/Library/Extensions` | bundle `com.flxxxxddd.AirportMtkWlan` 1.5.0; MediaTek firmware inside (not versioned) |
 | Source | `~/nmx-build/wifi5/src`, branch `nmx-wifi5` | flxxxxddd/SimpleMtkWlan `9a9c2ea` (v1.5.0) + `source-fixes/wifi/flx-v1.5.0/*` |
 | MacKernelSDK | `~/nmx-build/wifi/mks` `3f75008` | the fork's submodule commit |
 | EFI requirement | `DisableIoMapper=true` (already in our config) | the driver does its own DMA without VT-d |
@@ -27,6 +27,7 @@ is separate and lives in the EFI.
 | wifi5-0003 | WIFI-6 | NVRAM knob `nullmoth-wifi-band` (`5` = 5 GHz only, `2` = upstream) |
 | wifi5-0004 | WIFI-7 | default "prefer 5 GHz": 5 GHz scanned first, a 2.4 GHz twin of a 5 GHz SSID hidden, 2.4-only networks kept |
 | wifi5-0005 | WIFI-8 | data frames through firmware rate adaptation; was fixed 1/6 Mbit/s with block ack off (the upload cap) |
+| wifi5-0006 | WIFI-9 | lock around TX ring cleanup: a boot panic (`m_free: freeing an already freed mbuf`) came from the interrupt and the firmware download freeing the same mbuf |
 
 ## Build, install, undo
 
