@@ -317,3 +317,20 @@ by itself only on ProMotion panels; left for later.
 
 Recovery: there is no boot-once on `-keep`. If the panel stays black: OpenCore Space → "Start once without NVIDIA
 driver" (`-nvoff`, the XE-6 setup, which worked), then `sudo bash tools/hybrid/efi.sh gpu-only`.
+
+### XE-8 result (2026-10-29): works
+
+- [measured] Boot-args as prepared (`... msgbuf=400000 -nmintelfboff`, no `-nvoff`); no boot-once daemon.
+- [measured] Brightness works (Lukas); `AppleBacklightDisplay` registered, DisplayProductID 1858.
+- [measured] `ondemand.sh status`: the allow list holds only the header and no process holds `libvulkan_nouveau`.
+- [measured] Kernel log since boot: no panic, assert or GPU fault. NVRM-fb refuses to start (no display on the
+  RTX, expected); NVAccel `createUserGPUTask` ×10 (Metal device enumeration, not NVK, so no boost).
+- [measured] Idle on AC: 89 % CPU idle; WindowServer ~25 % while the Claude app streams. No new panic reports
+  (the `xe-carender` reports and the 21:00 shutdown stall are from earlier boots and the reboot).
+- [unverified] Heat: Lukas has not reported yet.
+
+Next (XE-9): measure battery draw. `tools/hybrid/power.sh` (new) averages `InstantAmperage × Voltage` over 120 s on
+battery and appends to `~/power.txt`. XE-9a: the hybrid, idle. XE-9b: one boot with OpenCore "Start once without
+NVIDIA driver" (`-nvoff`, RTX without driver), same idle. The difference is what the idle RTX costs and decides
+whether an RTX power-off (ACPI `_OFF` SSDT, Intel-only mode) is worth building. Sleep stays off (pitfall: S3 never
+relit the panel on the old route; untested with WhateverXe).

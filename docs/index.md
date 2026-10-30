@@ -47,6 +47,7 @@ knowledge/wifi.md                 runbook: MT7921 native Wi-Fi driver, our patch
 knowledge/brightness.md           why nullmoth's brightness switch does not reach the Intel panel; BL-1/BL-2 plan
 knowledge/hybrid-route.md         Apple TGL driver on the Iris Xe + nullmoth headless, per-app routing; H0 (Sequoia port) done
 archive/LOG-pt.md                 original diary (Portuguese, verbatim)
+archive/status-2026-10-29.md      status.md before the WhateverXe hybrid became daily (verbatim)
 ```
 
 ## Conventions
