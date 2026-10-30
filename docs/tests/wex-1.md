@@ -334,3 +334,23 @@ battery and appends to `~/power.txt`. XE-9a: the hybrid, idle. XE-9b: one boot w
 NVIDIA driver" (`-nvoff`, RTX without driver), same idle. The difference is what the idle RTX costs and decides
 whether an RTX power-off (ACPI `_OFF` SSDT, Intel-only mode) is worth building. Sleep stays off (pitfall: S3 never
 relit the panel on the old route; untested with WhateverXe).
+
+## XE-10 (prepared 2026-10-30): no boost for apps on the RTX
+
+Lukas (2026-10-30): the machine runs much cooler since XE-8. One boot after it panicked in the Wi-Fi driver
+(WIFI-9, not the hybrid) and the next came up normally on the hybrid.
+
+[measured, 6 min after boot] `ondemand.sh status`: Safari is on the RTX list and holds `libvulkan_nouveau` (pid 612).
+NVK's device open sends `PERF_BOOST BOOST_TO_MAX` with an infinite duration unless `BOOST=0` is in
+`/Library/GPUBundles/nvmtl/nvrm610.conf` (`nvrm610_on("BOOST")` in `nvk-macos.patch` ~8089 and ~10707; the default is
+on). So while Safari is open the RTX sits at max clocks, the XE-7 heat source in a smaller form. WhatsApp at ~96 %
+CPU and WindowServer at ~24 % were the other big users at that moment.
+
+Change (one variable): `sudo bash tools/hybrid/ondemand.sh noboost` appends `BOOST=0`; `boost` removes it. Userspace,
+no reboot; apps pick it up when reopened. Expected: Safari still renders on the RTX, the RTX's own clock policy
+picks the clocks, less heat. Risk [unverified]: nullmoth may have turned the boost on because the clocks ramp slowly
+without it (stutter in WebGL or video); then `boost` undoes it.
+
+Not done: nullmoth 2.6.5 (user-space only, research.md) is left for its own step so this test changes one thing.
+XE-9 (battery draw) is still open.
+

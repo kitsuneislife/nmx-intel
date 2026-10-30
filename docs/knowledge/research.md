@@ -50,3 +50,14 @@ Sources: <https://github.com/nullmoth/nvidia-macos-driver/releases>,
 
 Sources: <https://github.com/b00t0x/WhateverXe/releases>, <https://github.com/b00t0x/WhateverXe-Graphics/releases>,
 <https://github.com/JulioNectar/Hackintosh-XPS13Plus-IrisXe-Tahoe/issues>.
+
+## 2026-10-30 check (fetched the git remotes)
+
+- WhateverXe still 0.6.1 and WhateverXe Graphics 0.3.2 (both 2026-10-28 merges): nothing new for the hybrid.
+- SimpleMtkWlan (flxxxxddd): nothing after v1.5.0; our PR #1 still open, no comments.
+- nullmoth **2.6.5** (2026-10-30): user-space only (Metal plugin and shader translator: WebGL shadows, WindowServer
+  per-frame work, Photo Booth, ANGLE in Vivaldi/Opera/Arc, game fixes); `kexts/`, `gpu-port/` and `package/`
+  unchanged since 2.6.4 [measured, `git diff --stat v2.6.4 origin/main`]. On the hybrid it only matters for apps
+  listed in `ondemand.sh` (Safari now). The install replaces `/Library/GPUBundles/nvmtl` (so `nvrm610.conf`) and may
+  rewrite `nvmtl-allow.txt`: run `ondemand.sh on` and `noboost` again after it. Its "my settings" block keeps only
+  `NVMTL_`/`NVK_`/`NVRM_` keys, and NVK reads the boost knob as a bare `BOOST=` line, so the block cannot carry it.
