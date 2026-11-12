@@ -354,3 +354,53 @@ without it (stutter in WebGL or video); then `boost` undoes it.
 Not done: nullmoth 2.6.5 (user-space only, research.md) is left for its own step so this test changes one thing.
 XE-9 (battery draw) is still open.
 
+
+Results XE-10 / WIFI-9 [measured 2026-11-12, no notes from Lukas in between]: `BOOST=0` is in `nvrm610.conf`, the
+RTX list is `Roblox`, `RobloxPlayer` (Safari was removed), `AirportMtkWlan dd967442` (WIFI-9) is installed. No
+`freeing an already freed mbuf` panic since 10-30. One other panic, below.
+
+## Panic 2026-11-12 19:39 (before UPG-6)
+
+`Kernel-2026-11-12-193913.panic` [measured], uptime 78 min, Sequoia 24H32, the XE-8 hybrid:
+
+```
+NMIPI for spinlock acquisition timeout, spinlock owner == current_thread (CPU 0), pid 486: WindowServer
+  CPU 0: _workq_thread_set_max_qos + 0x117a  <- _hndl_allintrs  <- _interrupt
+  CPU 1: Ticket spinlock timeout @lock_ticket.c:386 <- _lck_ticket_lock <- _workq_thread_set_max_qos <- _kevt_getstat
+         <- _kqueue_scan <- _kevent_id (WindowServer)
+```
+
+No third-party kext in either backtrace. The WindowServer thread on CPU 0 held the workqueue ticket lock and was
+interrupted; the interrupt did not return for ~1.3 s, so a second WindowServer thread spun out on CPU 1. Cause: a
+slow interrupt on CPU 0 [inferred]; which driver's interrupt is unknown [unverified] (candidates: NVRM, Apple's TGL
+stack under WhateverXe, AirportMtkWlan). The previous boot's unified log was not kept. Watch for a repeat on UPG-6.
+
+## UPG-6 (prepared 2026-11-12): nullmoth 2.6.4 → 2.9 on the hybrid
+
+Lukas (2026-11-12) asked to move both GPUs to the newest drivers and then to Tahoe; step 1 of 3 (research.md,
+2026-11-12 check). One variable: nullmoth's release package, unmodified.
+
+Why the release as is [inferred from patches.md]: our NVRM byte patch (copy-engine wait sleeps, RTX-25) and the
+NVAccel series (accel-0001..0004) only act on the RTX → NMIntelFB bridge, which is off on the hybrid
+(`-nmintelfboff`). 2.9 moved NVIDIA's modules 615 → 620.70.06, so porting them is real work for a route that is
+parked; it is left until the RTX-only route is needed again. NMIntelFB `241aff3d` stays: it links no NVRM symbol
+(only Apple KPIs) and the 2.9 `nvrm_vram_abi.h` only adds a reply flag (`NVRM_VRAM_SCANOUT_30BIT`).
+
+Package [measured]: `nullmoth-nvidia-2.9.tar.gz` `b624bf07` = the GitHub digest and `SHA256SUMS.txt`; inner
+`SHA256SUMS` passes. NVRM `c1d62ff7`, NVAccel `b298771e`, NVRMFB `4890671d`, NVRMAGDC `97623c55` (all 2.9); NMXAudio
+`17c4804d` is installed only on macOS 26. `install.sh` (726 lines) read: kexts NVRM/NVAccel/NVRMFB/NVRMAGDC, aux KC
+rebuilt (a test KC first), GSP firmware fetched from `download.nvidia.com` with a pinned SHA-256, no EFI or boot-args
+changes (it only prints notes), a backup in `/Library/NullMoth/backup-…`, a one-shot fallback job (lastgood) and a
+boot-guard job that counts a start as good once the same WindowServer stays up 45 s, so a headless RTX passes.
+
+It replaces `nvmtl-allow.txt` (back to `*`, `!WindowServer`) and `nvrm610.conf` (our `BOOST=0` is outside nullmoth's
+"my settings" block, so it goes). 2.9 boosts per burst of work by default (`nvk-perf-boost-burst.patch`:
+"unset or 1 = per burst, hold = for the device's life, 0 = never"), which replaces XE-10's `noboost`: do not set
+`BOOST=0` again. `ondemand.sh on` + `add Roblox` + `add RobloxPlayer` restore the RTX list.
+
+Expected: the hybrid boots as on XE-8 (panel on the Iris Xe, `debug.nvaccel_headless = 1`), the 40 s headless wait
+is gone (#516), `bootguard.log` says the start counts as good, Roblox on the RTX without a permanent boost. Not in
+this test: `nvrtd3=1` (RTX deep sleep; NVRM 2.9 logs "needs nvrtd3res=<ACPI path> to act") is UPG-7.
+
+Undo: `sudo bash tools/upgrade/rollback.sh /Library/NullMoth/backup-…` (path from the install log), reboot; or
+`tools/checkpoint.sh restore ~/nmx-checkpoints/<date>-antes-2.9`.

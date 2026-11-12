@@ -342,3 +342,11 @@ names them. Internal eDP on ADL-P/RPL-P is experimental in WEX 0.6.1 (no hardwar
 > returns 1 and does nothing. The work-loop interrupt (`mwx_intr`) and the attach thread both reclaimed the
 > firmware-download TX ring and freed the same mbuf ("m_free: freeing an already freed mbuf" during
 > `mwx_load_firmware`). Any shared ring or list touched from both sides needs a real lock (wifi5-0006 for TX cleanup).
+
+## A nullmoth update resets the RTX app list and drops `BOOST=` (UPG-6)
+
+> nullmoth's `install.sh` copies its own `nvmtl-allow.txt` (`*`, `!WindowServer`: every app on the RTX) and a fresh
+> `nvrm610.conf`, keeping only the lines inside its "my settings" markers. After any nullmoth install on the hybrid,
+> run `ondemand.sh on` and `add` each app again. From 2.9 the boost is per burst of work by default
+> (`nvk-perf-boost-burst.patch`); `BOOST=0` there means *never* boost, so do not carry XE-10's `noboost` over.
+> [measured, 2.9 `install.sh` lines 425-445 and the patch]
