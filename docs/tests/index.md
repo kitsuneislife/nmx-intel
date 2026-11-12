@@ -113,4 +113,5 @@ changes), then [../status.md](../status.md).
 | XE-8 | 10-29 | as XE-7, `efi.sh wexrtx-keep` | hybrid kept; SSDT-PNLF (brightness); `ondemand.sh on` (no app opens the RTX, so no infinite boost) | works: brightness, no NVK holders, clean kernel log | [wex-1](wex-1.md) |
 | XE-9 | 10-29 | XE-8 kept; XE-9b one boot `-nvoff` | battery draw idle, hybrid vs RTX without driver (`tools/hybrid/power.sh`) | pending | [wex-1](wex-1.md) |
 | XE-10 | 10-30 | XE-8 + `ondemand.sh noboost` | `BOOST=0` in nvrm610.conf: an app on the RTX (Safari) no longer pins it at max clocks | in use since 10-30, no complaint; superseded by 2.9's per-burst boost (UPG-6) | [wex-1](wex-1.md) |
-| UPG-6 | 11-12 | XE-8 hybrid, nullmoth 2.9 release (NVRM `c1d62ff7`, NVAccel `b298771e`), no patches of ours | nullmoth 2.6.4 → 2.9 (NVIDIA 620), per-burst boost instead of `BOOST=0` | pending | [wex-1](wex-1.md) |
+| UPG-6 | 11-12 | XE-8 hybrid, nullmoth 2.9 release (NVRM `c1d62ff7`, NVAccel `b298771e`), no patches of ours | nullmoth 2.6.4 → 2.9 (NVIDIA 620), per-burst boost instead of `BOOST=0` | fail: black screen after the login-window WindowServer restart (wsreset); Intel FB0 "has no memory" | [wex-1](wex-1.md) |
+| UPG-6b | 11-12 | UPG-6 | `/Library/NullMoth/no-wsreset` (no WindowServer restart at the login window) | pending | [wex-1](wex-1.md) |

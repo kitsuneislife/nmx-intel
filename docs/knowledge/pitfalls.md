@@ -350,3 +350,12 @@ names them. Internal eDP on ADL-P/RPL-P is experimental in WEX 0.6.1 (no hardwar
 > run `ondemand.sh on` and `add` each app again. From 2.9 the boost is per burst of work by default
 > (`nvk-perf-boost-burst.patch`); `BOOST=0` there means *never* boost, so do not carry XE-10's `noboost` over.
 > [measured, 2.9 `install.sh` lines 425-445 and the patch]
+
+## Do not restart WindowServer early on the WhateverXe panel (UPG-6)
+
+> [measured, UPG-6] 1401's `com.nullmoth.wsreset` job kills WindowServer at the login window ~13 s after boot. On the
+> hybrid with nullmoth 2.9 the kill lands at once, and the new WindowServer gets no mode on the Iris Xe:
+> `FB0: FB has no memory allocated, err = 0xe00002bc`, `Hardware mode set failed`, then `FB0 is not enabled` every 2 s
+> = black screen. On 2.6.4 the same kill was ignored (TERM) and landed late or never. On the hybrid keep
+> `/Library/NullMoth/no-wsreset` in place (re-check after every 1401/nullmoth install). [inferred: the TGL framebuffer
+> cannot rebuild FB0 that soon after its first modeset]

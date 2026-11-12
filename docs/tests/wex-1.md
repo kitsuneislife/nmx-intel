@@ -404,3 +404,35 @@ this test: `nvrtd3=1` (RTX deep sleep; NVRM 2.9 logs "needs nvrtd3res=<ACPI path
 
 Undo: `sudo bash tools/upgrade/rollback.sh /Library/NullMoth/backup-…` (path from the install log), reboot; or
 `tools/checkpoint.sh restore ~/nmx-checkpoints/<date>-antes-2.9`.
+
+## UPG-6 result (2026-11-12): black screen after the login-window WindowServer restart
+
+Lukas: one boot "did not start", one reached the desktop and went black after a few seconds; "Start once without
+NVIDIA driver" (`-nvoff`) gave a desktop on the Iris Xe only. Boots in `log show` [measured]: 19:54:50, 19:57:44,
+20:00:47 (all 2.9), 20:01:57 (`-nvoff`). No panic report; lastgood kept 2.9 (`driver-restored` absent).
+
+What the RTX side did is the same as on 2.6.4 [measured]: NVRM 2.9 starts, NVKMS 620.70.06 loads, NVRMFB finds no
+display on the RTX and stays off, NVAccel's headless check restores `MetalPluginName` without arming,
+`NMIntelFB: off by boot-arg`. The first WindowServer (pid 161) does a "FB0: Complete modeset" on the Iris Xe.
+
+The break is the WindowServer restart done by 1401's `com.nullmoth.wsreset` job (`/Library/NullMoth/nullmoth-wsreset.sh`,
+dated 10-16, not part of the 2.9 package) at the login window, ~13 s after WindowServer starts:
+
+- 2.9 boots: the restart takes at once (`wsreset.log`: AFTER pid 473 / 467 / 459). The new WindowServer asks for
+  "Setting mode 0x0 ... Failed to obtain mode info", then the Intel framebuffer logs
+  `FB0: This fb does not have FB memory`, `FB has no memory allocated, err = 0xe00002bc`,
+  `Hardware mode set failed, err = 0xe00002d8`, and `FB0 is not enabled` every 2 s until power-off (71-487 per boot).
+  That is the black screen (19:55:21, 19:58:14, 20:01:17).
+- 2.6.4 boots (11-05, 11-12 19:39): the same job logged "restarted", but the AFTER capture still shows pid 161
+  (TERM is ignored, pitfall RTX-9); the WindowServer was replaced only at 19:39:51, ~37 s after boot, and that one
+  set "mode 0x80001000 ... 1920x1080" fine.
+- `-nvoff` boot: no restart (job skipped: user already logged in), no `FB0 is not enabled`.
+
+Cause [inferred]: Apple's TGL framebuffer under WhateverXe cannot rebuild FB0 when WindowServer is replaced within
+seconds of its first modeset (no mode, no FB memory). With 2.9 the replacement lands right away; with 2.6.4 it landed
+late or not at all. Why 2.9 lets the kill land sooner is [unverified]. Not the cause: NVRMFB/NVAccel/AGDC (same log
+lines as 2.6.4), the boost, the app list.
+
+Next (UPG-6b, one variable): turn the restart off with the job's own switch, `touch /Library/NullMoth/no-wsreset`
+(the script exits on it; delete the file to undo). The job only fights a flicker on NVIDIA-driven panels, which the
+hybrid does not have.
