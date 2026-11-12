@@ -6,7 +6,10 @@
 #                                            ~/nmx-build/tahoe/ and checks the PCCI CPU patches against its kernel
 #   sudo bash tools/tahoe/tahoe.sh patch     adds Darwin 25 copies of the PCCI patches to the ESP configs (only
 #                                            after kc passed; Sequoia ignores them: MinKernel 25.0.0)
-#   sudo bash tools/tahoe/tahoe.sh prepare   right before the upgrade: takes the Sequoia-only drivers out of
+#   sudo bash tools/tahoe/tahoe.sh volume    TAHOE-1a, the test route with no backup disk: a new APFS volume "Tahoe" in
+#                                            the same container (Sequoia stays untouched and bootable) and the plain
+#                                            config for the installer; then the installer is pointed at "Tahoe"
+#   sudo bash tools/tahoe/tahoe.sh prepare   right before an in-place upgrade: takes the Sequoia-only drivers out of
 #                                            /Library (WhateverXe Graphics, AirportMtkWlan) and boots the plain
 #                                            config (efi.sh plain: no GPU driver, -nvoff -v), which stays through
 #                                            the installer's reboots
@@ -25,7 +28,7 @@ esp() { [ -n "$ESP" ] && [ -f "$OC/config-gpu-only.plist" ] || { echo "ESP not m
 
 case "${1:-}" in
 check)
-    bad=0; say() { printf '%-4s %s\n' "$1" "$2"; [ "$1" = ok ] || bad=1; }
+    bad=0; say() { printf '%-4s %s\n' "$1" "$2"; [ "$1" = NO ] && bad=1; }
     [ "$(sw_vers -productVersion)" = 15.8.1 ] && say ok "running Sequoia 15.8.1" || say "--" "running $(sw_vers -productVersion)"
     [ "$(sysctl -n hw.model)" = MacBookPro16,1 ] && say ok "SMBIOS MacBookPro16,1 (Tahoe supports it)" || say NO "SMBIOS $(sysctl -n hw.model)"
     OCV=$(nvram 4D1FDA02-38C7-4A6A-9CC6-4BCCA8B30102:opencore-version 2>/dev/null | awk '{print $2}')
@@ -45,8 +48,9 @@ check)
     [ -f "$HOMEU/nmx-build/wifi5/out-tahoe/AirportMtkWlan.kext/Contents/MacOS/AirportMtkWlan" ] && say ok "Wi-Fi Tahoe build present" || say NO "no Wi-Fi Tahoe build: AIRPORT_OS=tahoe bash tools/wifi/build-airport.sh"
     [ -f "$HOMEU/nmx-build/whateverxe/dl/g043/WhateverXe-Graphics-0.4.3.pkg" ] && say ok "WhateverXe Graphics 0.4.3 pkg present (has Tahoe.pkg)" || say NO "no WhateverXe Graphics 0.4.3 pkg"
     LB=$(tmutil latestbackup 2>/dev/null)
-    [ -n "$LB" ] && say ok "Time Machine: $LB" || say NO "no Time Machine backup found (external disk); see tahoe-1.md"
-    [ "$bad" = 0 ] && echo "ready: sudo bash tools/tahoe/tahoe.sh prepare" || echo "not ready yet"
+    [ -n "$LB" ] && say ok "Time Machine: $LB" || say "--" "no Time Machine backup: use the volume route (tahoe.sh volume), not prepare"
+    diskutil info Tahoe >/dev/null 2>&1 && say "--" "APFS volume Tahoe exists" || say "--" "no APFS volume Tahoe yet (tahoe.sh volume)"
+    [ "$bad" = 0 ] && echo "ready: sudo bash tools/tahoe/tahoe.sh volume" || echo "not ready yet"
     exit $bad
     ;;
 kc)
@@ -84,6 +88,18 @@ patch)
     done
     sync; echo "backup of the previous configs: $B"
     ;;
+volume)
+    root; esp
+    grep -q 'PCCI topo:.*(Tahoe)' "$OC/config-gpu-only.plist" || { echo "run tahoe.sh patch first; nothing changed"; exit 1; }
+    [ -d "$APP" ] || { echo "no installer; nothing changed"; exit 1; }
+    CONT=$(diskutil info /System/Volumes/Data | sed -n 's/^ *APFS Container: *//p')
+    [ -n "$CONT" ] || { echo "could not find the APFS container; nothing changed"; exit 1; }
+    if diskutil info Tahoe >/dev/null 2>&1; then echo "volume Tahoe already exists"
+    else diskutil apfs addVolume "$CONT" APFS Tahoe || { echo "addVolume failed; nothing changed"; exit 1; }; fi
+    bash "$HERE/tools/hybrid/efi.sh" plain || { echo "efi.sh plain failed; stopped"; exit 1; }
+    echo "ready: reboot once into Sequoia (plain) to check it boots, then open \"$APP\" and pick the disk Tahoe"
+    echo "back to the daily boot: sudo bash tools/hybrid/efi.sh wexrtx-keep"
+    ;;
 prepare)
     root; esp
     grep -q 'PCCI topo:.*(Tahoe)' "$OC/config-gpu-only.plist" || { echo "run tahoe.sh patch first; nothing changed"; exit 1; }
@@ -97,5 +113,5 @@ undo)
     root
     bash "$HERE/tools/hybrid/wex-install.sh" && bash "$HERE/tools/wifi/install.sh" airport && bash "$HERE/tools/hybrid/efi.sh" wexrtx-keep
     ;;
-*) sed -n 2,13p "$0"; exit 1 ;;
+*) sed -n 2,16p "$0"; exit 1 ;;
 esac
