@@ -8,6 +8,8 @@
 #   sudo bash tools/hybrid/ondemand.sh off           nullmoth's list back (* and !WindowServer), for the RTX route
 #   sudo bash tools/hybrid/ondemand.sh noboost       listed apps no longer pin the RTX at max clocks (BOOST=0 in
 #                                                    nvrm610.conf, NVK's own knob); boost puts nullmoth's default back
+#                                                    (nullmoth 2.9+ boosts per burst of work by default, so noboost
+#                                                    is no longer needed there; BOOST=0 means never boost)
 #   bash tools/hybrid/ondemand.sh status             the list, the boost setting and which processes hold the RTX now
 # Apps pick up a change when they restart. The 1401 app may rewrite the list and replaces nvrm610.conf when it
 # reinstalls the driver: run on and noboost again after an update.
