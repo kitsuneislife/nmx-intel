@@ -34,6 +34,7 @@ is separate and lives in the EFI.
 ```
 bash tools/wifi/build-airport.sh                   # prints "AirportMtkWlan <sha8> (…)"; host tests in the fork: tests/
 sudo bash tools/wifi/install.sh airport            # checkpoint of the aux KC first time; prints the hash; reboot
+AIRPORT_OS=tahoe bash tools/wifi/build-airport.sh  # Tahoe build into out-tahoe/ (3b22cfa5, TAHOE-0); install.sh airport uses it on 26
 sudo bash tools/wifi/install.sh restore            # removes any Wi-Fi driver; reboot
 ```
 The build fails on purpose if the safe-boot string is missing or a symbol would bind to a private KPI. The install

@@ -366,3 +366,11 @@ names them. Internal eDP on ADL-P/RPL-P is experimental in WEX 0.6.1 (no hardwar
 `~/nmx-build` does not exist there. A top-level check on such a path made the job exit before it put GPU-only back
 (`/var/log/nmx-hybrid.log`: `no /var/root/nmx-build/...`). Keep checks of build paths inside the modes that use them,
 and after a one-boot test read the end of `/var/log/nmx-hybrid.log`.
+
+## The PCCI CPU-topology kernel patches stop at Darwin 24 (TAHOE-0)
+
+[measured] The four `PCCI topo:` Kernel>Patch entries that keep the i5-13420H kernel from dividing by zero in
+`smp_init()` have MaxKernel 24.99.99. A macOS major upgrade (Tahoe = Darwin 25) skips them silently. Before any
+upgrade, verify them against the new kernel (`bash tools/tahoe/tahoe.sh kc`, extracted from the installer) and add
+copies with the new kernel range (`sudo tahoe.sh patch`); never just widen MaxKernel unchecked.
+

@@ -1,0 +1,52 @@
+# TAHOE-1: in-place upgrade from Sequoia 15.8.1 to Tahoe 26.7.x
+
+> **Summary.** The third step of the upgrade plan: macOS Tahoe 26.7.3 (25G342) with the same hybrid stack (nullmoth
+> 2.9 + no-wsreset, WhateverXe 0.8.2 + Graphics 0.4.3). Two blockers found before any download: only ~22 GB free on
+> the 215 GB container, and the four CPU-topology kernel patches stop at Darwin 24. `tools/tahoe/tahoe.sh` checks,
+> extracts the Tahoe kernel, verifies and copies the patches, and prepares the plain boot for the installer.
+
+## TAHOE-0 (2026-11-12): readiness, offline
+
+[measured] `tahoe.sh check` on 15.8.1: SMBIOS MacBookPro16,1 (Tahoe supports it), OpenCore `DBG-108-2026-09-27`
+(1.0.8), Wi-Fi Tahoe build present, Graphics 0.4.3 pkg present (it carries `Tahoe.pkg`). Missing: free space (22 GB;
+installer 17957880 KiB ≈ 18.4 GB plus ~30 GB for the upgrade itself), the installer, the patch check against the
+Tahoe kernel, and a Time Machine backup (`tmutil latestbackup` empty, no local snapshots).
+
+[measured] `softwareupdate --list-full-installers`: 26.7.3 (25G342) newest, 26.7.2, 26.7.1; 15.8.1 still offered
+(rollback = reinstall 15.8.1 + restore from Time Machine).
+
+### Blocker: the PCCI topology patches are Darwin 24 only
+
+[measured] config-gpu-only.plist / config.plist / config-wex.plist carry four `PCCI topo:` Kernel>Patch entries
+(hackintosh repo tests J–L, commit 1654887) with MinKernel 24.0.0 / MaxKernel 24.99.99. Without them the i5-13420H
+kernel divides by zero in `smp_init()` or panics in `x86_validate_topology`. On Darwin 25 OpenCore skips all four, so
+Tahoe would not boot [inferred from the J–L panics].
+
+`tools/tahoe/kpatch.py` reads the kernel inside a BootKernelExtensions.kc (fileset entry `com.apple.kernel`, its
+symtab and `__TEXT`), counts each Find from its Base symbol on and checks the first Count hits fall inside that
+function; for "cores per package" it finds which OpenCore 1.0.8 variant the kernel has (V2 masked, then V1_5) and
+writes the 0x40 form of that variant. `add` writes Darwin 25 copies only if all four match.
+
+[measured] Self-test on the running Sequoia BootKC: MSR35h 2 hits inside `_cpuid_set_info`; fallback 4 hits, first 2
+inside; `_x86_validate_topology` at 0xffffff80005230d0; cores per package V1 0 / V1_5 1 / V2 0 → V1_5 (what the
+config already uses); exit 0.
+
+### Wi-Fi Tahoe build
+
+[measured] `AIRPORT_OS=tahoe bash tools/wifi/build-airport.sh`: all six wifi5 patches apply, `AirportMtkWlan
+3b22cfa5` in `~/nmx-build/wifi5/out-tahoe/` (Sequoia build unchanged `dd967442`). The kmutil KPI link check is
+skipped off-Tahoe; rerun the build on Tahoe before `install.sh airport` (which picks out-tahoe on macOS 26).
+
+### Plan
+
+1. Free ~30 GB (Lukas chooses), Time Machine backup to an external disk, `bash tools/checkpoint.sh save pre-tahoe`.
+2. `softwareupdate --fetch-full-installer --full-installer-version 26.7.3`.
+3. `bash tools/tahoe/tahoe.sh kc` → `sudo bash tools/tahoe/tahoe.sh patch` (backups in `~/config-antes-tahoe/`).
+4. `sudo bash tools/tahoe/tahoe.sh prepare`: wex-install.sh remove, wifi restore, `efi.sh plain` (GPU-only config
+   with `-nvoff -v`, kept through the installer's reboots). One reboot into Sequoia to prove the plain config boots.
+5. Run the installer. After Tahoe boots: rebuild/install Wi-Fi (`AIRPORT_OS=tahoe`), nullmoth 2.9 for 26 in the
+   1401 app + `ondemand.sh on/add`, `wex-install.sh`, `efi.sh wexrtx` once, then `wexrtx-keep`.
+
+Risks [unverified]: no AppleHDA on Tahoe (AppleALC useless; nullmoth's NMHDA is the substitute), RealtekRTL8111 3.0.4
+and VoodooI2C 2.9.1 on Tahoe, the RTX-only route patches (not ported anyway). `sudo tahoe.sh undo` restores the daily
+Sequoia setup if the installer was not started.
