@@ -436,3 +436,13 @@ lines as 2.6.4), the boost, the app list.
 Next (UPG-6b, one variable): turn the restart off with the job's own switch, `touch /Library/NullMoth/no-wsreset`
 (the script exits on it; delete the file to undo). The job only fights a flicker on NVIDIA-driven panels, which the
 hybrid does not have.
+
+## UPG-6b result (2026-11-12): pass
+
+[measured] Boot 20:12:36 with `/Library/NullMoth/no-wsreset` present. bootguard 20:13:35: "the desktop came up and
+stayed up (WindowServer 161 for 45 s); this start counts as good". WindowServer still pid 161 afterwards,
+`nullmoth-nv-ok=1`, no panic. Lukas: Roblox runs well on the RTX. A `shutdown_stall_2026-11-12-201229` report comes
+from the restart before this boot (not analysed). Daily setup is now nullmoth 2.9 + `no-wsreset`.
+
+Next: XE-11. The WhateverXe README (0.8.2, checked 2026-11-12) lists Sequoia 15.8.x and Tahoe 26.7+ as supported,
+so 0.8.2 can be tested on Sequoia before Tahoe.
