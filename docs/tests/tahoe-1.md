@@ -50,3 +50,15 @@ skipped off-Tahoe; rerun the build on Tahoe before `install.sh airport` (which p
 Risks [unverified]: no AppleHDA on Tahoe (AppleALC useless; nullmoth's NMHDA is the substitute), RealtekRTL8111 3.0.4
 and VoodooI2C 2.9.1 on Tahoe, the RTX-only route patches (not ported anyway). `sudo tahoe.sh undo` restores the daily
 Sequoia setup if the installer was not started.
+
+## TAHOE-0 update (2026-11-12): space freed, no backup disk → separate-volume route
+
+[measured] After moving radar/kitnet to GitHub and clearing build caches: 92 GB free, container disk1 has 99.8 GB
+unallocated, FileVault off. Lukas has no external disk, so no Time Machine backup is possible.
+
+Decision: **TAHOE-1a** installs Tahoe on a new APFS volume `Tahoe` in disk1 (`sudo tahoe.sh volume`) instead of
+upgrading in place. Sequoia stays untouched and remains the rollback (pick it in the OpenCore picker; `efi.sh
+wexrtx-keep` restores its daily config). Same OpenCore configs for both: the Darwin 25 PCCI copies only apply to
+Tahoe. Once the stack works on the Tahoe volume, the in-place upgrade (`prepare`) or a migration can follow, and the
+test volume is deleted. The plan's steps 2–3 are unchanged; step 4 becomes `volume`, and the installer is pointed at
+the disk `Tahoe`.

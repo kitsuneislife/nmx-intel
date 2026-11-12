@@ -2,8 +2,8 @@
 
 > **Summary.** Last updated 2026-11-12. Daily setup is the **WhateverXe hybrid** (XE-8): the Iris Xe drives the
 > desktop with Metal at 60 Hz, the RTX runs nullmoth headless and only apps listed by `ondemand.sh` open it. Lukas
-> wants the newest drivers on both GPUs and then macOS Tahoe. Drivers done (UPG-6b, XE-11). Now: TAHOE-0, blocked on
-> free space (22 GB), a backup and the installer download; tools ready in `tools/tahoe/`.
+> wants the newest drivers on both GPUs and then macOS Tahoe. Drivers done (UPG-6b, XE-11). Now: TAHOE-1a, Tahoe on a
+> separate APFS volume (no backup disk; Sequoia stays as rollback). 92 GB free; next: installer download, `tahoe.sh kc`.
 
 ## Daily setup (how the machine boots now)
 
