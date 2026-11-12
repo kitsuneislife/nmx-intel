@@ -2,11 +2,11 @@
 
 > **Summary.** Last updated 2026-11-12. Daily setup is the **WhateverXe hybrid** (XE-8): the Iris Xe drives the
 > desktop with Metal at 60 Hz, the RTX runs nullmoth headless and only apps listed by `ondemand.sh` open it. Lukas
-> wants the newest drivers on both GPUs and then macOS Tahoe: three steps, one variable each. Now: XE-11 pending (WhateverXe 0.8.2 `96545d6d` + Graphics 0.4.3 built).
+> wants the newest drivers on both GPUs and then macOS Tahoe: three steps, one variable each. Now: TAHOE-1 next (XE-11 passed: WhateverXe 0.8.2 + Graphics 0.4.3).
 
 ## Daily setup (how the machine boots now)
 
-- OpenCore config from `sudo bash tools/hybrid/efi.sh wexrtx-keep`: WhateverXe `94698a29` (our wex-0001..0004),
+- OpenCore config from `sudo bash tools/hybrid/efi.sh wexrtx-keep`: WhateverXe 0.8.2 `96545d6d` (our wex 0.8.2/0001..0005) + Graphics 0.4.3,
   nullmoth NVRM 2.9 + NVAccel headless, `/Library/NullMoth/no-wsreset` (UPG-6b), NMIntelFB gated off (`-nmintelfboff`), `SSDT-PNLF.aml`.
 - RTX for apps: `sudo bash tools/hybrid/ondemand.sh add NAME` (then reopen the app); list now `Roblox`,
   `RobloxPlayer`; `BOOST=0` (XE-10). After any nullmoth install: `on` + `add` again (pitfall).
@@ -19,7 +19,7 @@
 
 1. **UPG-6** failed: 2.9 itself is fine, but 1401's wsreset restart of WindowServer now lands and the Intel panel
    goes black (pitfall). **UPG-6b** passed with `no-wsreset`. Optional later: UPG-7: `nvrtd3=1` (RTX deep sleep).
-2. **XE-11** (next): WhateverXe 0.8.2 + Graphics 0.4.3 on Sequoia (README: Sequoia 15.8.x, Tahoe 26.7+), wex-0001..0004 rebased.
+2. **XE-11** passed: WhateverXe 0.8.2 + Graphics 0.4.3 on Sequoia (README: Sequoia 15.8.x, Tahoe 26.7+), wex-0001..0004 rebased.
 3. **TAHOE-1**: full backup, OpenCore check, AirportMtkWlan Tahoe build, Tahoe 26.7.x with the same stack.
 
 ## Open problems

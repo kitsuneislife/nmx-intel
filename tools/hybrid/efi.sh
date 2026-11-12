@@ -24,7 +24,8 @@ NGK=$HOMEU/nmx-build/hybrid/xps/build/NootedGreen.kext
 WXK=$HOMEU/nmx-build/whateverxe/kexts   # AMFIPass 1.4.1 Mod as AMFIPassMod.kext; WhateverXe from $WXK/$WEXDIR:
 # wex/ = XE-11 (0.8.2 + our 0001..0005), wex-0.6.1-nmx/ = XE-8 (0.6.1 + wex-0001..0004), wex-0.6.1-release/.
 # Rollback: sudo WEXDIR=wex-0.6.1-nmx bash tools/hybrid/efi.sh wexrtx-keep
-WEXDIR=${WEXDIR:-wex}; [ -d "$WXK/$WEXDIR/WhateverXe.kext" ] || { echo "no $WXK/$WEXDIR/WhateverXe.kext"; exit 1; }
+# no existence check here: boot-once runs as root (HOMEU=/var/root) and must not stop on it; the route modes check PUT
+WEXDIR=${WEXDIR:-wex}
 
 ESP=$(diskutil info disk0s1 2>/dev/null | sed -n 's/^ *Mount Point: *//p')
 # early in boot (boot-once) DiskArbitration may not be up yet: retry for a while

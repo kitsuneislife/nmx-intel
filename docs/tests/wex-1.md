@@ -462,3 +462,19 @@ One variable: the iGPU driver pair 0.6.1/0.3.2 becomes 0.8.2/0.4.3. nullmoth 2.9
   `94698a29` moved to `kexts/wex-0.6.1-nmx/`. `efi.sh` takes `WEXDIR=` to pick one.
 - Steps: checkpoint → `wex-install.sh` → `efi.sh wexrtx` (one boot) → reboot → `log.sh`; if good, `wexrtx-keep`.
   Rollback: `WEXG=0.3.2 wex-install.sh` and `WEXDIR=wex-0.6.1-nmx efi.sh wexrtx-keep`.
+
+## XE-11 result (2026-11-12): pass, kept
+
+[measured] Boot 20:25:50 on the wexrtx config; Lukas: all good, then `efi.sh wexrtx-keep`. Loaded: WhateverXe 0.8.2,
+AppleIntelTGLCompat 0.8.1, the TGL framebuffer and accelerator 16.0.0, AMFIPass 1.4.1, nullmoth NVRM/NVRMFB/NVAccel/
+NVRMAGDC 2.9. `no-wsreset` still present, `nullmoth-nv-ok=1`. WindowServer pid 161 up since 20:26:00, no restart.
+Panel 1920x1080 on "Intel UHD Graphics" (Metal), RTX listed with Metal. Kernel log of this boot: no
+`FB0 is not enabled`, no panic or underrun, 3 `[ERROR]` lines only (`Flip called without enabling VBL`,
+`EFI using a different backlight frequency`, a launchd "Bad CPU type"); the first two also appear in earlier boots in
+`~/hybrid.txt`. Registry: `N97FramebufferBackendReady`, `N97FBCommonABIReady` and the other N97 readiness flags = Yes.
+The `FB has no memory` lines in `hybrid.txt` at 20:12:23 and 20:25:30 belong to the shutdowns of the previous boots.
+
+Bug found (ours): `/var/log/nmx-hybrid.log` ends with `no /var/root/nmx-build/whateverxe/kexts/wex/WhateverXe.kext`.
+The XE-11 `efi.sh` checked `$WEXDIR` for every command, and the boot-once job runs as root with HOMEU=/var/root, so it
+exited before putting GPU-only back. No harm this time (the boot was good and was kept), but the one-boot safety net
+was off for XE-11. Fixed: the check is gone (the route modes already check each kext). Pitfall added.

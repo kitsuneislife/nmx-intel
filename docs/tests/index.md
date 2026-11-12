@@ -115,4 +115,4 @@ changes), then [../status.md](../status.md).
 | XE-10 | 10-30 | XE-8 + `ondemand.sh noboost` | `BOOST=0` in nvrm610.conf: an app on the RTX (Safari) no longer pins it at max clocks | in use since 10-30, no complaint; superseded by 2.9's per-burst boost (UPG-6) | [wex-1](wex-1.md) |
 | UPG-6 | 11-12 | XE-8 hybrid, nullmoth 2.9 release (NVRM `c1d62ff7`, NVAccel `b298771e`), no patches of ours | nullmoth 2.6.4 → 2.9 (NVIDIA 620), per-burst boost instead of `BOOST=0` | fail: black screen after the login-window WindowServer restart (wsreset); Intel FB0 "has no memory" | [wex-1](wex-1.md) |
 | UPG-6b | 11-12 | UPG-6 | `/Library/NullMoth/no-wsreset` (no WindowServer restart at the login window) | pass: desktop stays up, Roblox on the RTX | [wex-1](wex-1.md) |
-| XE-11 | 11-12 | UPG-6b | WhateverXe 0.6.1 → 0.8.2 (our `96545d6d`, wex 0.8.2/0001..0005) + Graphics 0.3.2 → 0.4.3 | pending | [wex-1](wex-1.md) |
+| XE-11 | 11-12 | UPG-6b | WhateverXe 0.6.1 → 0.8.2 (our `96545d6d`, wex 0.8.2/0001..0005) + Graphics 0.3.2 → 0.4.3 | pass, kept (`wexrtx-keep`): no FB0 errors, no panic; boot-once job broken by our efi.sh, fixed | [wex-1](wex-1.md) |

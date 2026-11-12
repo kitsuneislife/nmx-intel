@@ -359,3 +359,10 @@ names them. Internal eDP on ADL-P/RPL-P is experimental in WEX 0.6.1 (no hardwar
 > = black screen. On 2.6.4 the same kill was ignored (TERM) and landed late or never. On the hybrid keep
 > `/Library/NullMoth/no-wsreset` in place (re-check after every 1401/nullmoth install). [inferred: the TGL framebuffer
 > cannot rebuild FB0 that soon after its first modeset]
+
+## efi.sh's boot-once job runs as root without SUDO_USER (XE-11)
+
+[measured] The one-boot LaunchDaemon runs `efi.sh boot-once` as root, so `HOMEU` is `/var/root` and any path under
+`~/nmx-build` does not exist there. A top-level check on such a path made the job exit before it put GPU-only back
+(`/var/log/nmx-hybrid.log`: `no /var/root/nmx-build/...`). Keep checks of build paths inside the modes that use them,
+and after a one-boot test read the end of `/var/log/nmx-hybrid.log`.
