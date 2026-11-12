@@ -14,6 +14,9 @@
 #   sudo bash tools/hybrid/efi.sh wexrtx     the WhateverXe route with nullmoth's NVIDIA driver on, headless (XE-7,
 #                                            wex-config.py --rtx), boots it ONCE; wexrtx-keep to stay
 #   sudo bash tools/hybrid/efi.sh gpu-only   config-gpu-only.plist back as config.plist, the route kexts removed
+#   sudo bash tools/hybrid/efi.sh plain      no GPU driver at all (firmware framebuffer, as for the first install):
+#                                            config-gpu-only.plist plus -nvoff -v, the route kexts removed. Stays
+#                                            across reboots (a macOS upgrade restarts several times); TAHOE-1
 #   sudo bash tools/hybrid/efi.sh status     which route config.plist is
 #   boot-once (the daemon's job)             GPU-only back if config.plist is hybrid; logs to /var/log/nmx-hybrid.log
 set -uo pipefail
@@ -100,6 +103,19 @@ gpu-only)
     disarm_once; sync
     echo "route: GPU-only"
     ;;
+plain)
+    [ -f "$GPU" ] || { echo "no config-gpu-only.plist on the ESP; nothing changed"; exit 1; }
+    is_hybrid "$GPU" && { echo "config-gpu-only.plist loads a route kext; nothing changed"; exit 1; }
+    PL=$OC/config-plain.plist; BA=':NVRAM:Add:7C436110-AB2A-4BBB-A880-FE41995C9F82:boot-args'
+    cp "$GPU" "$PL" || { echo "could not write config-plain.plist; nothing changed"; exit 1; }
+    A=$(/usr/libexec/PlistBuddy -c "Print $BA" "$PL") || { echo "no boot-args in config-gpu-only.plist; nothing changed"; exit 1; }
+    for x in -nvoff -v; do case " $A " in *" $x "*) ;; *) A="$A $x" ;; esac; done
+    /usr/libexec/PlistBuddy -c "Set $BA $A" "$PL" && plutil -lint "$PL" >/dev/null || { echo "could not edit config-plain.plist; nothing changed"; exit 1; }
+    cp "$PL" "$CFG" || { cp "$GPU" "$CFG"; echo "could not switch config.plist; GPU-only put back"; exit 1; }
+    rm -rf "$OC/Kexts/NootedGreen.kext" "$OC/Kexts/WhateverXe.kext" "$OC/Kexts/AMFIPassMod.kext" "$OC/ACPI/SSDT-PNLF.aml"
+    disarm_once; sync
+    echo "route: plain (no GPU driver), boot-args: $A"
+    ;;
 boot-once)
     echo "$(date): boot-once, booted with: $(sysctl -n kern.bootargs)"
     is_hybrid "$CFG" || { echo "config.plist is GPU-only already"; exit 0; }
@@ -135,6 +151,6 @@ status)
     [ -f "$DAEMON" ] && echo "one-boot daemon: armed" || echo "one-boot daemon: off"
     ls -l "$OC"/config*.plist
     ;;
-*) echo "usage: sudo bash $0 hybrid|hybrid-keep|wex|wex-keep|wexrtx|wexrtx-keep|gpu-only|status"; exit 1 ;;
+*) echo "usage: sudo bash $0 hybrid|hybrid-keep|wex|wex-keep|wexrtx|wexrtx-keep|gpu-only|plain|status"; exit 1 ;;
 esac
 echo "Reboot for OpenCore to load it."
