@@ -1,0 +1,26 @@
+From e5cd304b71b5b79f2a4aaf41a7580c40c1f74c55 Mon Sep 17 00:00:00 2001
+From: kitsuneislife <kitsuneislif3@gmail.com>
+Date: Thu, 12 Nov 2026 20:17:38 -0300
+Subject: [PATCH 5/5] diag: test the port mode with the 0.8 Type-C rule in the
+ SST mask
+
+---
+ WhateverXe/kern_xe.cpp | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/WhateverXe/kern_xe.cpp b/WhateverXe/kern_xe.cpp
+index f130a6c..d96a9ab 100644
+--- a/WhateverXe/kern_xe.cpp
++++ b/WhateverXe/kern_xe.cpp
+@@ -7663,7 +7663,7 @@ uint32_t XE::display13SSTPortMask(void *port) {
+  if(config[0]>=32 || !(s->adlnOutputWiring.links()&(1U<<config[0])))m|=1U<<10;
+  if(p[0x117])m|=1U<<11;
+  if(Display13FBMemory::field<uint32_t>(p,0x120)!=config[0])m|=1U<<12;
+- if(Display13FBMemory::field<uint32_t>(p,0x550)!=(config[0]>=3?4U:1U))m|=1U<<13;
++ if(Display13FBMemory::field<uint32_t>(p,0x550)!=(config[0]>=3?((s->adlnOutputWiring.typeC&(1U<<config[0]))?3U:4U):1U))m|=1U<<13;
+  // XE-5: the port mode itself, in bits 16-19 (capped at 15).
+  const auto mode=Display13FBMemory::field<uint32_t>(p,0x550);m|=(mode<15?mode:15U)<<16;
+  if(Display13FBMemory::field<void *>(p,0x578)!=c.access)m|=1U<<14;
+-- 
+2.39.5 (Apple Git-154)
+

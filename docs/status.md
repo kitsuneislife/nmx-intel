@@ -2,7 +2,7 @@
 
 > **Summary.** Last updated 2026-11-12. Daily setup is the **WhateverXe hybrid** (XE-8): the Iris Xe drives the
 > desktop with Metal at 60 Hz, the RTX runs nullmoth headless and only apps listed by `ondemand.sh` open it. Lukas
-> wants the newest drivers on both GPUs and then macOS Tahoe: three steps, one variable each. Now: XE-11 (UPG-6b passed: nullmoth 2.9 + `no-wsreset`).
+> wants the newest drivers on both GPUs and then macOS Tahoe: three steps, one variable each. Now: XE-11 pending (WhateverXe 0.8.2 `96545d6d` + Graphics 0.4.3 built).
 
 ## Daily setup (how the machine boots now)
 

@@ -134,3 +134,8 @@ source-fixes/00NN-<slug>.patch`, add an `apply` line to `build/apply-fixes.sh` (
   HDMI on DDI B) finds the clock stopped, no active pipe and the controller gate owned by another thread, it returns
   to the single-output path instead of faulting the clock; records `N97FBClockDualColdFallback`. WhateverXe
   `94698a29`.
+- `source-fixes/wex/0.8.2/0001..0005` (XE-11) — the wex series rebased on WhateverXe 0.8.2 (`4512191`, branch `nmx-082`,
+  tag `wex-082`, worktree `~/nmx-build/whateverxe/src-082`). 0001, 0002 and 0004 applied clean. 0003 conflicted:
+  0.8 expects port mode 3 on a Type-C port (≥3) and 4 otherwise, and the resolution keeps that rule with our
+  "mode 0 on a combo port during the boot handoff" exception. 0005 (new) makes 0002's mask bit 13 use the same 0.8
+  rule. Built with MacKernelSDK `3f75008` and Lilu 1.7.2; CPU tests pass. WhateverXe `96545d6d`.

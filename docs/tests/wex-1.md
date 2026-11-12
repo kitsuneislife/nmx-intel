@@ -446,3 +446,19 @@ from the restart before this boot (not analysed). Daily setup is now nullmoth 2.
 
 Next: XE-11. The WhateverXe README (0.8.2, checked 2026-11-12) lists Sequoia 15.8.x and Tahoe 26.7+ as supported,
 so 0.8.2 can be tested on Sequoia before Tahoe.
+
+## XE-11 (prepared 2026-11-12): WhateverXe 0.8.2 + Graphics 0.4.3 on Sequoia
+
+One variable: the iGPU driver pair 0.6.1/0.3.2 becomes 0.8.2/0.4.3. nullmoth 2.9 + `no-wsreset` (UPG-6b) stay.
+
+- Upstream [measured, README and pkg 2026-11-12]: Sequoia 15.8.x and Tahoe 26.7+ are supported. The pkg's
+  Distribution picks `Sequoia.pkg` for 15.8 ≤ version < 15.9. Same OpenCore needs as 0.6.1: Lilu, AMFIPass 1.4.1
+  Mod, `-allow3d -disablegfxfirmware`, csr 0x803. RPL-P eDP is still not on the upstream tested list.
+- Pkg 0.4.3 SHA-256 `bd17c737` (matches SHA256SUMS; unsigned, like 0.3.2). New personalities `N97Standalone` and
+  `N97Display13` match only ADL-N IDs (`46d0..46d4`), so our `nmx-wex` gate on `Gen7` and
+  `AppleIntelFramebufferController` still covers `a7a8`. TGLCompat 0.8.1 comes in the pkg. 0.4.3 no longer ships
+  `XeMetalCompiler`, so `wex-install.sh` now removes the old pkg's files before it installs (`WEXG=0.3.2` = rollback).
+- WhateverXe: our build `96545d6d` (patches.md, wex 0.8.2/0001..0005), staged in `kexts/wex/`; the XE-8 build
+  `94698a29` moved to `kexts/wex-0.6.1-nmx/`. `efi.sh` takes `WEXDIR=` to pick one.
+- Steps: checkpoint → `wex-install.sh` → `efi.sh wexrtx` (one boot) → reboot → `log.sh`; if good, `wexrtx-keep`.
+  Rollback: `WEXG=0.3.2 wex-install.sh` and `WEXDIR=wex-0.6.1-nmx efi.sh wexrtx-keep`.

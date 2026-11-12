@@ -7,12 +7,18 @@
 # NMIntelFB (61000) in the IOFramebuffer category. Booted without WhateverXe (the GPU-only config) they would take the
 # iGPU unpatched. So both personalities get IOPropertyMatch nmx-wex=<01>, a property only config-wex.plist injects
 # (wex-config.py): the GPU-only route keeps NMIntelFB. Same kind of Info.plist edit install.sh made for NootedGreen.
-# Download first: gh release download v0.3.2 --repo b00t0x/WhateverXe-Graphics (into ~/nmx-build/whateverxe/dl).
+# Graphics version: WEXG=0.4.3 (default, XE-11, file in dl/g043/) or WEXG=0.3.2 (XE-8 rollback, file in dl/).
+# Download first: gh release download v0.4.3 --repo b00t0x/WhateverXe-Graphics (into ~/nmx-build/whateverxe/dl/g043).
 set -uo pipefail
 [ "$(id -u)" = 0 ] || { echo "run with sudo"; exit 1; }
 HOMEU=$(eval echo "~${SUDO_USER:-root}")
-PKG=$HOMEU/nmx-build/whateverxe/dl/WhateverXe-Graphics-0.3.2.pkg
-PKGSHA=7ac6c7149248c483efbd93555294d587a93d81392421f3af8a4f5b1b5fcc0101
+case "${WEXG:-0.4.3}" in
+    0.4.3) PKG=$HOMEU/nmx-build/whateverxe/dl/g043/WhateverXe-Graphics-0.4.3.pkg
+           PKGSHA=bd17c7373fc91f397f399ef4d39a99143dbda6ad7c30d0cb8de3c949eecde044 ;;
+    0.3.2) PKG=$HOMEU/nmx-build/whateverxe/dl/WhateverXe-Graphics-0.3.2.pkg
+           PKGSHA=7ac6c7149248c483efbd93555294d587a93d81392421f3af8a4f5b1b5fcc0101 ;;
+    *) echo "WEXG must be 0.4.3 or 0.3.2"; exit 1 ;;
+esac
 EXT=/Library/Extensions; GB=/Library/GPUBundles
 KC=/Library/KernelCollections/AuxiliaryKernelExtensions.kc
 KB=/System/Library/KernelCollections/BootKernelExtensions.kc; KS=/System/Library/KernelCollections/SystemKernelExtensions.kc
@@ -23,8 +29,9 @@ BAK=$HOMEU/AuxiliaryKernelExtensions.kc.antes-wex
 # after the pkg ran, its postinstall has put an ungated collection in place: any later failure puts the old one back
 fail() { echo "$1"; [ -n "${PKGRAN:-}" ] && cp -p "$BAK" "$KC" && echo "previous kext collection put back"; exit 1; }
 
-if [ "${1:-}" = remove ]; then
-    # the file list of WhateverXe-Graphics' uninstall.sh (it leaves CoreMedia alone below Tahoe)
+# the file list of WhateverXe-Graphics' uninstall.sh (it leaves CoreMedia alone below Tahoe); also run before an
+# install so files an older pkg had and a newer one dropped (XeOpenCL, XeMetalCompiler) do not linger
+remove_pkg_files() {
     for n in AppleIntelTGLCompat AppleIntelTGLGraphics AppleIntelTGLGraphicsFramebuffer; do rm -rf "$EXT/$n.kext"; done
     for n in AppleIntelTGLGraphicsGLDriver AppleIntelTGLGraphicsMTLDriver AppleIntelTGLGraphicsVADriver XeCompilerAdapter XeMetalCompiler; do
         rm -rf "$GB/$n.bundle"; done
@@ -32,6 +39,10 @@ if [ "${1:-}" = remove ]; then
     for c in Common BigSur Monterey Ventura Sonoma Sequoia Tahoe; do
         pkgutil --pkg-info "org.b00t0x.WhateverXe.$c" >/dev/null 2>&1 && pkgutil --forget "org.b00t0x.WhateverXe.$c" >/dev/null
     done
+    return 0
+}
+if [ "${1:-}" = remove ]; then
+    remove_pkg_files
     echo "removed"
 else
     [ -f "$PKG" ] || { echo "no $PKG"; exit 1; }
@@ -42,6 +53,7 @@ else
              AppleIntelTGLGraphicsGLDriver.bundle AppleIntelTGLGraphicsMTLDriver.bundle AppleIntelTGLGraphicsVADriver.bundle \
              AppleIntelTGLGraphicsVAME.bundle; do rm -rf "$EXT/$n"; done
     rm -rf "$GB/AppleIntelTGLGraphicsMTLDriver.bundle" "$GB/AppleIntelGraphicsShared.bundle" /System/Library/Caches/xe.bundle
+    remove_pkg_files
     echo "installing $(basename "$PKG") (its postinstall rebuilds the kext collection, 1-2 min)..."
     PKGRAN=1
     installer -pkg "$PKG" -target / >"$T/installer.log" 2>&1 || { tail -20 "$T/installer.log"; fail "installer failed"; }
