@@ -61,3 +61,24 @@ Sources: <https://github.com/b00t0x/WhateverXe/releases>, <https://github.com/b0
   listed in `ondemand.sh` (Safari now). The install replaces `/Library/GPUBundles/nvmtl` (so `nvrm610.conf`) and may
   rewrite `nvmtl-allow.txt`: run `ondemand.sh on` and `noboost` again after it. Its "my settings" block keeps only
   `NVMTL_`/`NVK_`/`NVRM_` keys, and NVK reads the boost knob as a bare `BOOST=` line, so the block cannot carry it.
+
+## 2026-11-12 check (fetched the git remotes; Lukas asked to move to the newest drivers and to Tahoe)
+
+- **nullmoth 2.9** (2026-11-10) [measured, `CHANGELOG.md` at `v2.9`]: "the last 2.x release for macOS 15 Sequoia and
+  macOS 26 Tahoe". NVIDIA open modules **615 → 620.70.06** (since 2.8), so our NVRM byte patch and the NVAccel series
+  need a port (UPG runbook, OGKM change). New and relevant to us, all **experimental, off by default**: `nvrtd3=1`
+  (idle GPU deep sleep on laptops: our open problem 1), `nvrmaspm=1`, `nmhybrid` (render on NVIDIA, present on the
+  Intel panel), per-app GPU policy. Fixes: boot hold released when no connector has a display (hybrid laptops waited
+  40 s, #516); boost per burst of work instead of per app life (#522, our "every app boosts" pitfall); Tahoe login
+  black screen; Tahoe HD Audio driver shipped by the package (Tahoe has no AppleHDA). 1401 now ships WhateverXe 0.8.0.
+  `kexts/NMIntelFB` changed (+734 lines in `intelfb.cpp`, `nvrm_vram_abi.h` +3) since 2.6.5.
+- **nullmoth 3.0.0-beta.1**: same commit as 2.9 for now; not a target.
+- **WhateverXe 0.8.2 + Graphics 0.4.3** (2026-11-13 JST, "emergency release") [measured, CHANGELOG/README]: 0.7.0
+  dropped the exact-build match on Sequoia and Tahoe; 0.8.0 adds RPL-U and experimental sleep (MIPI DSI only);
+  Graphics 0.4.2 fixes a Metal memory leak and a GPU freeze in video colour conversion. Supported OS floors: Tahoe
+  26.7+. RPL-P internal eDP is still "implemented but not tested on hardware" upstream; we carry wex-0001..0004 on
+  0.6.1 (0003/0004 are functional) and must rebase them.
+- **AirportMtkWlan** (SimpleMtkWlan `9a9c2ea`, still v1.5.0): built primarily for Tahoe (tested 26.7.1 on MT7921K);
+  our wifi5-0001..0006 must be rebuilt for the Tahoe SDK/IO80211 target.
+- Proposed order [inferred]: nullmoth 2.9 on Sequoia (UPG-6) → WhateverXe 0.8.2 on Sequoia (XE-11) → full backup,
+  then Tahoe 26.7.x with the same stack (TAHOE-1). One variable per step.
