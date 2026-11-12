@@ -3,9 +3,13 @@
 # Wi-Fi menu, IO80211 Sequoia 15.2+ ABI) with our patches (source-fixes/wifi/flx-v1.5.0/*.patch). Source and
 # MacKernelSDK pinned by commit; the fork's own build-macos.sh (Command Line Tools only). Debug configuration: the one
 # the fork's hardware tests ran with; the persistent log is read with the fork's tools/mtklog.sh.
-# Output: ~/nmx-build/wifi5/out/AirportMtkWlan.kext. GPL-2.0; the binary is not versioned (MediaTek firmware inside).
-#   bash tools/wifi/build-airport.sh
+# Output: ~/nmx-build/wifi5/out/AirportMtkWlan.kext (out-tahoe/ for the Tahoe build). GPL-2.0; the binary is not
+# versioned (MediaTek firmware inside).
+#   bash tools/wifi/build-airport.sh                      Sequoia (IO80211 15.2+ ABI)
+#   AIRPORT_OS=tahoe bash tools/wifi/build-airport.sh     Tahoe 26 (the fork's default target); the KPI link check
+#                                                         runs only when the build matches the running macOS
 set -euo pipefail
+OS=${AIRPORT_OS:-sequoia}; case $OS in sequoia) OUT=out; MAJ=15 ;; tahoe) OUT=out-tahoe; MAJ=26 ;; *) echo "AIRPORT_OS: sequoia or tahoe"; exit 1 ;; esac
 HERE=$(cd "$(dirname "$0")/../.." && pwd)
 W=$HOME/nmx-build/wifi5
 REPO=https://github.com/flxxxxddd/SimpleMtkWlan.git; REV=${REV:-9a9c2ea703a199dbcc0cd3f1771a9d712e10ca0a}   # v1.5.0
@@ -19,18 +23,20 @@ for p in "$HERE"/source-fixes/wifi/flx-v1.5.0/*.patch; do
   git -C "$W/src" -c user.name=nmx -c user.email=nmx@localhost am -q "$p"
   echo "patch: $(basename "$p")"
 done
-( cd "$W/src" && rm -rf build && AIRPORT_OS=sequoia MACKERNELSDK="$MKS" ./build-macos.sh Debug AirportMtkWlan ) > "$W/build.log" 2>&1 \
+( cd "$W/src" && rm -rf build && AIRPORT_OS=$OS MACKERNELSDK="$MKS" ./build-macos.sh Debug AirportMtkWlan ) > "$W/build.log" 2>&1 \
   || { tail -30 "$W/build.log"; echo "build falhou (log: $W/build.log)"; exit 1; }
-rm -rf "$W/out" && mkdir -p "$W/out"
-ditto "$W/src/build/Debug/sequoia/AirportMtkWlan.kext" "$W/out/AirportMtkWlan.kext"
-codesign -f -s - "$W/out/AirportMtkWlan.kext" >/dev/null 2>&1 || true
-B=$W/out/AirportMtkWlan.kext/Contents/MacOS/AirportMtkWlan
+rm -rf "${W:?}/$OUT" && mkdir -p "$W/$OUT"
+ditto "$W/src/build/Debug/$OS/AirportMtkWlan.kext" "$W/$OUT/AirportMtkWlan.kext"
+codesign -f -s - "$W/$OUT/AirportMtkWlan.kext" >/dev/null 2>&1 || true
+B=$W/$OUT/AirportMtkWlan.kext/Contents/MacOS/AirportMtkWlan
 grep -q -a -- -mtkwlanoff "$B" || { echo "safe-boot switch missing from the binary"; exit 1; }
 # Every external symbol must come from a KPI a third-party kext may link (kmutil refuses com.apple.kpi.private:
 # WIFI-5's first install failed on thread_call_cancel_wait). _RESERVED vtable slots are bound by the kernel.
-LIBS=$(kmutil libraries -p "$W/out/AirportMtkWlan.kext" --arch x86_64 2>/dev/null)
+if [ "$(sw_vers -productVersion | cut -d. -f1)" = "$MAJ" ]; then
+LIBS=$(kmutil libraries -p "$W/$OUT/AirportMtkWlan.kext" --arch x86_64 2>/dev/null)
 MISSING=$(comm -23 <(nm -u "$B" | awk '{print $1}' | sort -u) <(printf '%s\n' "$LIBS" | awk '/^\t\t/{print $1}' | sort -u) | grep -v _RESERVED || true)
 [ -z "$MISSING" ] || { echo "symbols this kernel does not export: $MISSING"; exit 1; }
 ! printf '%s\n' "$LIBS" | grep -q com.apple.kpi.private || { printf '%s\n' "$LIBS" | grep kpi.private; echo "private KPI used"; exit 1; }
-cp "$W/src/tools/mtklog.sh" "$W/out/mtklog.sh"
+else echo "KPI link check skipped: built for $OS, running $(sw_vers -productVersion); run this again on $OS"; fi
+cp "$W/src/tools/mtklog.sh" "$W/$OUT/mtklog.sh"
 echo "AirportMtkWlan $(shasum -a 256 "$B" | cut -c1-8) ($(git -C "$W/src" log --oneline -1))"

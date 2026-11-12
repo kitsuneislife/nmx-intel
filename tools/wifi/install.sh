@@ -17,7 +17,8 @@ T=$(mktemp -d)
 
 case "${1:-}" in
   restore) FROM= ;;
-  airport) FROM=$HOMEU/nmx-build/wifi5/out/AirportMtkWlan.kext ;;
+  airport) FROM=$HOMEU/nmx-build/wifi5/out/AirportMtkWlan.kext   # on Tahoe the Tahoe build (AIRPORT_OS=tahoe)
+           [ "$(sw_vers -productVersion | cut -d. -f1)" = 26 ] && FROM=$HOMEU/nmx-build/wifi5/out-tahoe/AirportMtkWlan.kext ;;
   plain)   FROM=$HOMEU/nmx-build/wifi/out/SimpleMtkWlan.kext ;;
   "")      FROM=$HOMEU/nmx-build/wifi/out/SimpleMtkWlan-diag.kext ;;
   *) echo "uso: sudo bash tools/wifi/install.sh [plain|airport|restore]"; exit 1 ;;
