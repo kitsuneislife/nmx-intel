@@ -137,8 +137,9 @@ boot-once)
     dmesg > "$D-0.txt" 2>&1; chmod 644 "$D-0.txt"; sync
     if [ -x "$TESTS/gputests.sh" ]; then (
         # wait for the login (console owned by a real user), then 30 s for the desktop to settle
-        for i in $(seq 60); do U=$(stat -f %Su /dev/console); [ "$U" != root ] && break; sleep 5; done
-        [ "$U" != root ] || exit 0
+        # (the login window owns it as _windowserver on Tahoe: TAHOE-3's tests ran there and hung)
+        for i in $(seq 60); do U=$(stat -f %Su /dev/console); case $U in root|_windowserver) ;; *) break ;; esac; sleep 5; done
+        case $U in root|_windowserver) exit 0 ;; esac
         sleep 30; G=/var/log/nmx-hybrid-gputests.txt; touch $G; chown "$U" $G; chmod 644 $G
         launchctl asuser "$(id -u "$U")" sudo -u "$U" /bin/bash "$TESTS/gputests.sh" run "$TESTS" $G
     ) & fi
