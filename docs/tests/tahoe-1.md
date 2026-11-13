@@ -177,3 +177,8 @@ is the running system's group), backs up the ESP configs to `~/config-antes-remo
 (`efi.sh wexrtx-keep`), strips the Darwin 25 PCCI copies from every `config*.plist` (`kpatch.py strip`; add → strip
 round trip gives back the original plist [measured]), and deletes the installer (17 GB), `~/nmx-build/tahoe`,
 `wifi5/out-tahoe` and `~/config-antes-tahoe`. To go to Tahoe again later: the TAHOE-0..3 steps above still apply.
+
+Run 1 (2026-11-13) [measured, Lukas]: `deleteVolumeGroup` failed, "Tahoe - Data ... in use by process 372
+(mds_stores)", so nothing else changed (the script stops there by design). After a reboot Sequoia came up on the
+GPU-only config (NMIntelFB + NVRM 2.9 + AirportMtkWlan loaded, no `-nvoff`). Fix: `remove` now turns Spotlight off
+on both Tahoe volumes and force-unmounts them before `deleteVolumeGroup`.
