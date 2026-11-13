@@ -17,6 +17,9 @@
 #                                            config (efi.sh plain: no GPU driver, -nvoff -v), which stays through
 #                                            the installer's reboots
 #   sudo bash tools/tahoe/tahoe.sh undo      back to the daily Sequoia setup if the upgrade was not started
+#   sudo bash tools/tahoe/tahoe.sh remove    staying on Sequoia (2026-11-13): deletes the Tahoe volume group, the
+#                                            installer and the Tahoe build files, takes the Darwin 25 PCCI patches
+#                                            out of the ESP configs and boots the daily hybrid (efi.sh wexrtx-keep)
 set -uo pipefail
 HERE=$(cd "$(dirname "$0")/../.." && pwd)
 HOMEU=$(eval echo "~${SUDO_USER:-$(id -un)}")
@@ -125,5 +128,27 @@ undo)
     root
     bash "$HERE/tools/hybrid/wex-install.sh" && bash "$HERE/tools/wifi/install.sh" airport && bash "$HERE/tools/hybrid/efi.sh" wexrtx-keep
     ;;
-*) sed -n 2,19p "$0"; exit 1 ;;
+remove)
+    root; esp
+    [ "$(sw_vers -productVersion | cut -d. -f1)" = 15 ] || { echo "run this on Sequoia; nothing changed"; exit 1; }
+    G=$(diskutil info Tahoe 2>/dev/null | sed -n 's/^ *APFS Volume Group: *//p')
+    MINE=$(diskutil info / | sed -n 's/^ *APFS Volume Group: *//p')
+    if [ -n "$G" ]; then
+        [ "$G" != "$MINE" ] || { echo "Tahoe is in the running system's volume group?! nothing changed"; exit 1; }
+        diskutil apfs deleteVolumeGroup "$G" || { echo "deleteVolumeGroup $G failed; nothing else changed"; exit 1; }
+    else echo "no volume Tahoe (already deleted)"; fi
+    B=$HOMEU/config-antes-remove-tahoe; mkdir -p "$B" && cp "$OC"/config*.plist "$B/" && chown -R "${SUDO_USER:-root}" "$B" \
+        || { echo "could not back up the configs; stopped before touching them"; exit 1; }
+    bash "$HERE/tools/hybrid/efi.sh" wexrtx-keep || { echo "efi.sh wexrtx-keep failed; configs backed up in $B"; exit 1; }
+    for c in "$OC"/config*.plist; do
+        grep -q 'PCCI topo:.*(Tahoe)' "$c" || continue
+        /usr/bin/python3 -I "$HERE/tools/tahoe/kpatch.py" strip "$c" "$c.new" && plutil -lint "$c.new" >/dev/null \
+            && mv -f "$c.new" "$c" || { rm -f "$c.new"; echo "${c##*/}: strip failed; configs backed up in $B"; exit 1; }
+    done
+    grep -l 'PCCI topo:.*(Tahoe)' "$OC"/config*.plist && { echo "Tahoe patches still there"; exit 1; }
+    rm -rf "$APP" "$WD" "$HOMEU/nmx-build/wifi5/out-tahoe" "$HOMEU/config-antes-tahoe"
+    sync; bash "$HERE/tools/hybrid/efi.sh" status
+    echo "Tahoe removed; daily hybrid config written (backup of the previous configs: $B). Reboot into macOS."
+    ;;
+*) sed -n 2,22p "$0"; exit 1 ;;
 esac

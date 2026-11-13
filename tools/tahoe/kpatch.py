@@ -12,6 +12,7 @@ would skip them all.
   kpatch.py add KC CONFIG OUT        the same check; if all four match, OUT = CONFIG plus copies of them for
                                      Darwin 25 (MinKernel 25.0.0, MaxKernel 25.99.99), with the cores-per-package
                                      Find/Replace of the variant this kernel has. Nothing is written otherwise.
+  kpatch.py strip CONFIG OUT         OUT = CONFIG without the Darwin 25 copies (back to Sequoia only)
 
 The KC may be the running system's (/System/Library/KernelCollections/BootKernelExtensions.kc, a Sequoia self-test)
 or one taken out of the Tahoe installer (tahoe.sh kc). Exit 0 only if every patch matches as OpenCore needs.
@@ -129,6 +130,15 @@ def check(kcpath, cfgpath):
 
 
 def main():
+    if len(sys.argv) == 4 and sys.argv[1] == "strip":
+        cfg = plistlib.load(open(sys.argv[2], "rb"))
+        old = cfg["Kernel"]["Patch"]
+        cfg["Kernel"]["Patch"] = [p for p in old if not (p.get("Comment", "").startswith("PCCI topo:")
+                                                         and p.get("MinKernel") == TAHOE_MIN)]
+        with open(sys.argv[3], "wb") as fh:
+            plistlib.dump(cfg, fh)
+        print(f"wrote {sys.argv[3]}: {len(old) - len(cfg['Kernel']['Patch'])} Darwin 25 PCCI patches removed")
+        return
     if len(sys.argv) < 4 or sys.argv[1] not in ("check", "add") or (sys.argv[1] == "add" and len(sys.argv) != 5):
         sys.exit(__doc__)
     ok, variant, pcci = check(sys.argv[2], sys.argv[3])
