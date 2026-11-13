@@ -76,7 +76,10 @@ echo "rebuilding the kext collection (1-2 min)..."
 kmutil create -n aux --volume-root / "${KARG[@]}" -B $KB -S $KS --repository "$EXT" -A "$NEWKC" -z >"$T/kmutil.log" 2>&1 \
     || { tail -20 "$T/kmutil.log"; fail "kmutil failed"; }
 INS=$(kmutil inspect -a x86_64 -A "$NEWKC" 2>/dev/null) || { rm -f "$NEWKC"; fail "could not read the new collection"; }
+# every nullmoth and Wi-Fi kext the current collection has must survive the rebuild (a fresh Tahoe volume has no nullmoth)
+OLD=$(kmutil inspect -a x86_64 -A "$KC" 2>/dev/null)
 for k in com.nullmoth.NVRM com.nullmoth.NVRMFB com.nullmoth.NVAccel com.nullmoth.NMIntelFB com.flxxxxddd.AirportMtkWlan; do
+    printf '%s\n' "$OLD" | grep -qw "$k" || continue
     printf '%s\n' "$INS" | grep -qw "$k" || { rm -f "$NEWKC"; fail "$k is missing from the new collection"; }
 done
 if [ "${1:-}" != remove ]; then
