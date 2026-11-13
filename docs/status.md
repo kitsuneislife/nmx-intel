@@ -30,7 +30,8 @@
 1. RTX never powers off at runtime; 2.9 has an experimental RTD3 (`nvrtd3`), untested (UPG-7). XE-9 unmeasured.
 2. Panic 2026-11-12 19:39: xnu spinlock timeout in WindowServer, a slow interrupt on CPU 0, driver unknown
    ([tests/wex-1.md](tests/wex-1.md)). Watch for a repeat.
-3. 144 Hz only in fullscreen (macOS auto-switches only on ProMotion panels); 60 Hz accepted by Lukas.
+3. Refresh: desktop at 60 Hz though the panel does 144 (modes present [measured]). XE-12 (`refresh.sh`): native
+   "Refresh Rate" menu via `display-refresh-rate-policy`, pending.
 4. Sleep: off; untested with WhateverXe.
 5. `ASSERT(linkBW)` warning in the XE-7 log, harmless so far.
 

@@ -478,3 +478,28 @@ Bug found (ours): `/var/log/nmx-hybrid.log` ends with `no /var/root/nmx-build/wh
 The XE-11 `efi.sh` checked `$WEXDIR` for every command, and the boot-once job runs as root with HOMEU=/var/root, so it
 exited before putting GPU-only back. No harm this time (the boot was good and was kept), but the one-boot safety net
 was off for XE-11. Fixed: the check is gone (the route modes already check each kext). Pitfall added.
+
+## XE-12 (prepared 2026-11-13): native refresh-rate menu for the internal panel
+
+Lukas wants to switch 60/144 Hz from System Settings > Displays itself, nothing third-party. One variable: a display
+override for our panel with `display-refresh-rate-policy` = 1. Takes effect at the next boot only.
+
+- [measured] The 144 Hz modes are already there: CoreGraphics lists 60.0 and 144.0 Hz for every size on the main
+  display (built-in = true); the current mode is 1920x1080 @ 60. EDID: LG Display `30e4:0742` (LP156WFJ-SPB4), range
+  60-144 Hz. So 60 Hz is WindowServer's default pick, not a missing mode.
+- [measured] Apple ships `display-refresh-rate-policy` = `0x0000000000000001` (8-byte data) in 21 overrides under
+  `/System/Library/Displays/Contents/Resources/Overrides/DisplayVendorID-610`: the "Color LCD" built-ins, among them
+  `a044` (16" MacBook Pro 2019, which has a refresh menu without ProMotion), and the Pro Display XDR. There is no Apple
+  override for vendor `30e4`.
+- [inferred] That key is what makes System Settings show "Refresh Rate" for a built-in panel. Web search (2026-11-13)
+  found nobody documenting it or doing this on a Hackintosh; the menu itself on Intel MacBook Pros is in Apple's
+  support note HT210742 (there via Option-click on Scaled).
+- `tools/hybrid/refresh.sh` (`e19df98f`): `probe` (144 Hz for 10 s through `kCGConfigureForAppOnly`, undone when it
+  exits), `install` (writes `/Library/Displays/Contents/Resources/Overrides/DisplayVendorID-30e4/DisplayProductID-742`;
+  the data matches Apple's byte for byte), `remove` (deletes it and moves `com.apple.windowserver.displays.plist` aside
+  so the panel boots at 60), `status`. Reboot rather than restart WindowServer (pitfall, UPG-6).
+- Expected: a "Refresh Rate" menu with 60 and 144 Hz; picking 144 gives `@ 144.00Hz` in `system_profiler`. Risk: 144 Hz
+  has never run on the TGL framebuffer here (`ASSERT(linkBW)` seen in XE-7), so the probe goes first.
+- Recovery if 144 leaves the panel black: from Recovery's Terminal, delete
+  `/Volumes/<disk>/Library/Displays/Contents/Resources/Overrides/DisplayVendorID-30e4` and
+  `/Volumes/<disk>/Library/Preferences/com.apple.windowserver.displays.plist`.
