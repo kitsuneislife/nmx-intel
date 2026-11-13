@@ -90,3 +90,10 @@ it. The drivers are installed from inside Tahoe, one per boot: Wi-Fi (`install.s
 Graphics (`wex-install.sh`, needs the Command Line Tools for python3) + `efi.sh wex` → nullmoth 2.9 for 26 (1401 app,
 `no-wsreset`, `ondemand.sh`) + `efi.sh wexrtx`. Keeping everything from Sequoia = once Tahoe works, upgrade Sequoia in
 place (`prepare`) and delete the test volume.
+
+## TAHOE-2 try 1 (2026-11-13): Wi-Fi install refused on Tahoe
+
+[measured, Lukas] `sudo bash tools/wifi/install.sh airport` on Tahoe stopped with `com.nullmoth.nvrm sumiu da coleção
+nova; nada mudou`; no Wi-Fi. Cause: the guard required all four nullmoth kexts in the new aux KC, but the fresh Tahoe
+volume has no nullmoth installed. Fix: require only the nullmoth kexts the current aux KC already has (still all four
+on Sequoia, checked with `kmutil inspect`), and skip the backup copy when there is no aux KC yet.

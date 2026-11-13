@@ -26,7 +26,7 @@ esac
 NAME=SimpleMtkWlan; BID=com.laobamac.SimpleMtkWlan
 [ "${1:-}" = airport ] && { NAME=AirportMtkWlan; BID=com.flxxxxddd.AirportMtkWlan; DST=$ADST; }
 [ -z "$FROM" ] || [ -f "$FROM/Contents/MacOS/$NAME" ] || { echo "falta $FROM (bash tools/wifi/build.sh ou build-airport.sh)"; exit 1; }
-[ -f "$HOMEU/AuxiliaryKernelExtensions.kc.antes-wifi" ] || cp -p "$KC" "$HOMEU/AuxiliaryKernelExtensions.kc.antes-wifi"
+[ -f "$HOMEU/AuxiliaryKernelExtensions.kc.antes-wifi" ] || [ ! -f "$KC" ] || cp -p "$KC" "$HOMEU/AuxiliaryKernelExtensions.kc.antes-wifi"
 rm -rf "$EXT/SimpleMtkWlan.kext" "$ADST"
 if [ -n "$FROM" ]; then
   ditto "$FROM" "$DST" && chown -R root:wheel "$DST" && chmod -R 755 "$DST" || { echo "cópia falhou; rode com restore"; exit 1; }
@@ -58,7 +58,10 @@ echo "refazendo a coleção de kexts (1-2 min)..."
 kmutil create -n aux --volume-root / "${KARG[@]}" -B $KB -S $KS --repository "$EXT" -A "$NEWKC" -z >"$T/kmutil.log" 2>&1 \
   || { tail -20 "$T/kmutil.log"; echo "kmutil falhou; a coleção não mudou (rode com restore)"; exit 1; }
 INS=$(kmutil inspect -a x86_64 -A "$NEWKC" 2>/dev/null) || { echo "não consegui ler a coleção nova"; rm -f "$NEWKC"; exit 1; }
+# Every nullmoth kext the current collection has must survive the rebuild (none on a fresh Tahoe volume).
+OLD=$(kmutil inspect -a x86_64 -A "$KC" 2>/dev/null)
 for k in NVRM NVRMFB NVAccel NMIntelFB; do
+  printf '%s\n' "$OLD" | grep -qw "com.nullmoth.$k" || continue
   printf '%s\n' "$INS" | grep -qw "com.nullmoth.$k" || { echo "com.nullmoth.$k sumiu da coleção nova; nada mudou"; rm -f "$NEWKC"; exit 1; }
 done
 if [ -n "$FROM" ]; then
