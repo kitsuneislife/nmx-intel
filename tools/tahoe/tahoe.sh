@@ -135,6 +135,12 @@ remove)
     MINE=$(diskutil info / | sed -n 's/^ *APFS Volume Group: *//p')
     if [ -n "$G" ]; then
         [ "$G" != "$MINE" ] || { echo "Tahoe is in the running system's volume group?! nothing changed"; exit 1; }
+        # Spotlight (mds_stores) keeps "Tahoe - Data" busy, and deleteVolumeGroup's own unmount is not forced
+        for n in "Tahoe - Data" Tahoe; do
+            d=$(diskutil info "$n" 2>/dev/null | sed -n 's/^ *Device Node: *//p'); [ -n "$d" ] || continue
+            mp=$(diskutil info "$d" | sed -n 's/^ *Mount Point: *//p'); [ -n "$mp" ] && mdutil -i off "$mp" >/dev/null 2>&1
+            diskutil unmount force "$d" >/dev/null 2>&1
+        done
         diskutil apfs deleteVolumeGroup "$G" || { echo "deleteVolumeGroup $G failed; nothing else changed"; exit 1; }
     else echo "no volume Tahoe (already deleted)"; fi
     B=$HOMEU/config-antes-remove-tahoe; mkdir -p "$B" && cp "$OC"/config*.plist "$B/" && chown -R "${SUDO_USER:-root}" "$B" \
