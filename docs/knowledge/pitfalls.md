@@ -243,6 +243,10 @@ has no Wi-Fi [measured, HYB-3].
 Correction (HYB-4, 2026-10-21): without `-v` the artifacts were the same, so `-v` was not their cause here [measured].
 It stays dropped, following Julio.
 
+Note (TAHOE-2, 2026-11-13): the same bit us again with `efi.sh plain`, which adds `-nvoff`: on Tahoe the driver sat in
+the aux KC, loaded, and never touched the card [measured]. Any config with `-nvoff` has no Wi-Fi; `NVOFF=0 efi.sh plain`
+leaves it out.
+
 ## `-nvoff` does not stop nullmoth's NVRM and NVAccel; drop `nvaccel=1` for a hybrid boot
 
 Only our NMIntelFB and AirportMtkWlan honour `-nvoff`. NVRM 2.3.6 and NVAccel start anyway, and NVAccel publishes a

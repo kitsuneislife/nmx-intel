@@ -97,3 +97,29 @@ place (`prepare`) and delete the test volume.
 nova; nada mudou`; no Wi-Fi. Cause: the guard required all four nullmoth kexts in the new aux KC, but the fresh Tahoe
 volume has no nullmoth installed. Fix: require only the nullmoth kexts the current aux KC already has (still all four
 on Sequoia, checked with `kmutil inspect`), and skip the backup copy when there is no aux KC yet.
+
+## TAHOE-2 try 2 (2026-11-13): Wi-Fi driver in the aux KC but off, because of `-nvoff`
+
+[measured, Lukas] After the install.sh fix the install passed on Tahoe, but still no Wi-Fi after the reboot.
+
+[measured, read from Sequoia] The Tahoe volume's aux KC (`/Volumes/Tahoe - Data/Library/KernelCollections`, 4030464
+bytes, 00:15) lists `com.flxxxxddd.AirportMtkWlan 1.5.0`. The Tahoe unified log (`private/var/db/diagnostics` +
+`uuidtext` copied into a `.logarchive` with a hand-made Info.plist, read with `/usr/bin/log show --archive`) shows:
+- 00:15:19 `syspolicyd: Kernel Extension ALLOWED`, `kernelmanagerd: Validate approval ... in auxKC: approved`,
+  `kernelmanager_helper: loading extension from in-kernel fileset: com.flxxxxddd.AirportMtkWlan (will start, will match)`.
+- boot 00:16:05: `IOPCIFamily ... Probing type 0 device class-code 0x028000 ... (0x14c3:0x7961)`, `Loading Aux KC
+  from file /Library/KernelCollections/AuxiliaryKernelExtensions.kc`, `Collection UUID matches with loaded KCs`,
+  00:16:24 `kernelmanagerd: Received kext load notification: com.flxxxxddd.AirportMtkWlan`. Not one line from the
+  driver itself after that.
+- `kernelmanagerd: error: tried to insert an invalid codeful kernel extension in the restricted lookup table` appears
+  on Sequoia too (this boot), so it is harmless.
+
+Cause [measured]: the plain config (`efi.sh plain`, TAHOE-1) adds `-nvoff`, and our wifi5-0001 keeps AirportMtkWlan
+off the card on `-nvoff` (pitfall "`-nvoff` also turns off our Wi-Fi", HYB-3). Sequoia shows the same right now: boot
+with `-nvoff`, `kextstat` lists AirportMtkWlan, no Wi-Fi hardware port, Lukas is on Ethernet. The driver and the
+install were fine; the boot-args were not. Nothing found upstream was needed.
+
+Fix: `sudo NVOFF=0 bash tools/hybrid/efi.sh plain` writes the plain config without `-nvoff` (`-v` kept). The Tahoe
+volume has no nullmoth kexts, so `-nvoff` does nothing useful there. Side effect: a Sequoia boot on this config runs
+nullmoth 2.9 on the GPU-only config (not tested with 2.9) — boot Tahoe, and if Sequoia is needed, OpenCore Space →
+"Start once without NVIDIA driver" or `efi.sh plain` / `wexrtx-keep` first.
