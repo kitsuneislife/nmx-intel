@@ -17,6 +17,8 @@
 #   sudo bash tools/hybrid/efi.sh plain      no GPU driver at all (firmware framebuffer, as for the first install):
 #                                            config-gpu-only.plist plus -nvoff -v, the route kexts removed. Stays
 #                                            across reboots (a macOS upgrade restarts several times); TAHOE-1
+#   sudo NVOFF=0 bash tools/hybrid/efi.sh plain   the same without -nvoff, which also turns our Wi-Fi driver off
+#                                            (TAHOE-2): for the Tahoe volume, which has no nullmoth kexts
 #   sudo bash tools/hybrid/efi.sh status     which route config.plist is
 #   boot-once (the daemon's job)             GPU-only back if config.plist is hybrid; logs to /var/log/nmx-hybrid.log
 set -uo pipefail
@@ -109,7 +111,9 @@ plain)
     PL=$OC/config-plain.plist; BA=':NVRAM:Add:7C436110-AB2A-4BBB-A880-FE41995C9F82:boot-args'
     cp "$GPU" "$PL" || { echo "could not write config-plain.plist; nothing changed"; exit 1; }
     A=$(/usr/libexec/PlistBuddy -c "Print $BA" "$PL") || { echo "no boot-args in config-gpu-only.plist; nothing changed"; exit 1; }
-    for x in -nvoff -v; do case " $A " in *" $x "*) ;; *) A="$A $x" ;; esac; done
+    # -nvoff also keeps AirportMtkWlan off the card (wifi5-0001); NVOFF=0 leaves it out, for a volume without nullmoth
+    OFF="-nvoff -v"; [ "${NVOFF:-1}" = 0 ] && { OFF="-v"; A=$(printf '%s' " $A " | sed 's/ -nvoff / /; s/^ //; s/ $//'); }
+    for x in $OFF; do case " $A " in *" $x "*) ;; *) A="$A $x" ;; esac; done
     /usr/libexec/PlistBuddy -c "Set $BA $A" "$PL" && plutil -lint "$PL" >/dev/null || { echo "could not edit config-plain.plist; nothing changed"; exit 1; }
     cp "$PL" "$CFG" || { cp "$GPU" "$CFG"; echo "could not switch config.plist; GPU-only put back"; exit 1; }
     rm -rf "$OC/Kexts/NootedGreen.kext" "$OC/Kexts/WhateverXe.kext" "$OC/Kexts/AMFIPassMod.kext" "$OC/ACPI/SSDT-PNLF.aml"
