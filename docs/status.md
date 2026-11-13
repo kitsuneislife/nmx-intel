@@ -10,7 +10,8 @@
 - OpenCore config from `sudo bash tools/hybrid/efi.sh wexrtx-keep`: WhateverXe 0.8.2 `96545d6d` (our wex 0.8.2/0001..0005) + Graphics 0.4.3,
   nullmoth NVRM 2.9 + NVAccel headless, `/Library/NullMoth/no-wsreset` (UPG-6b), NMIntelFB gated off (`-nmintelfboff`), `SSDT-PNLF.aml`.
 - RTX for apps: `sudo bash tools/hybrid/ondemand.sh add NAME` (then reopen the app); list now `Roblox`,
-  `RobloxPlayer`; `BOOST=0` (XE-10). After any nullmoth install: `on` + `add` again (pitfall).
+  `RobloxPlayer`, `Google Chrome`, `Google Chrome Helper (Aperitif)` (Chrome 157's GPU process) [measured 11-13];
+  boost back to nullmoth's per-burst default (`BOOST=0` gone after the 2.9 install). After any nullmoth install: `on` + `add` again (pitfall).
 - Wi-Fi: AirportMtkWlan `dd967442` (WIFI-9, no repeat of the 10-30 mbuf panic so far).
 - Recovery: OpenCore Space → "Start once without NVIDIA driver"; `sudo bash tools/hybrid/efi.sh gpu-only` returns to
   the RTX-only route (NMIntelFB bridge; needs our NVRM/NVAccel patches, not ported to 2.9).

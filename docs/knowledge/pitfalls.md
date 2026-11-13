@@ -378,3 +378,11 @@ and after a one-boot test read the end of `/var/log/nmx-hybrid.log`.
 upgrade, verify them against the new kernel (`bash tools/tahoe/tahoe.sh kc`, extracted from the installer) and add
 copies with the new kernel range (`sudo tahoe.sh patch`); never just widen MaxKernel unchecked.
 
+
+## Chrome renders in "Google Chrome Helper (Aperitif)", not "(GPU)" (11-13)
+
+- **Symptom:** with `Google Chrome` and `Google Chrome Helper (GPU)` in `nvmtl-allow.txt`, only the main Chrome
+  process held `libvulkan_nouveau`; the page-drawing process stayed on the Iris Xe [measured].
+- **Cause:** Chrome 157 runs `--type=gpu-process` in the `Google Chrome Helper (Aperitif)` helper [measured, `ps`].
+- **Fix:** list the executable name of the process that does the drawing (`ps -axo args | grep type=gpu-process`).
+  With both names listed, `ondemand.sh status` shows two holders (main + Aperitif) [measured].
