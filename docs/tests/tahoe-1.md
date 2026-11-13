@@ -139,3 +139,25 @@ Tahoe parts). Prep fixes:
 Route: `efi.sh wexrtx` (boot once), not `wex`: `wex` adds `-nvoff`, which would turn the Wi-Fi off again; `--rtx` uses
 `-nmintelfboff` instead, and with no nullmoth on Tahoe the nullmoth args do nothing. Needs python3 on Tahoe: the
 Command Line Tools (`xcode-select --install`).
+
+## TAHOE-3 result (2026-11-13): pass
+
+[measured, Lukas] "aceleração gráfica funcionou perfeitamente". [measured, Tahoe volume logs] boot-once 00:49:54 with
+`... -allow3d -disablegfxfirmware msgbuf=400000 -nmintelfboff` (no `-nvoff`, Wi-Fi stayed on), then "GPU-only put
+back for the next start". `nmx-hybrid-ioreg-igpu.txt`: `MetalPluginName = AppleIntelTGLGraphicsMTLDriver`,
+AppleIntelTGLCompat + AppleIntelTGLGraphics + TGLGraphicsFramebuffer attached; dmesg: `WhateverXe igfx: @ TGL accel
+stage=10 done=1 result=1`. So WhateverXe 0.8.2 `96545d6d` + Graphics 0.4.3 work on 26.7.3.
+
+Side finding [measured]: `gputests.sh` ran at the login window (`== ... _windowserver 25G342`) and `xe-catest` hung
+(killed after 15 s). On Tahoe the console belongs to `_windowserver` before login; the wait loop only skipped `root`.
+Fixed in efi.sh (skips `_windowserver` too); not a driver problem.
+
+## TAHOE-4 (prepared 2026-11-13): nullmoth 2.9 on Tahoe, hybrid
+
+One variable: nullmoth's 2.9 release package (`~/nmx-build/pkg-2.9`, the one UPG-6 checked), installed inside Tahoe
+by its own `install.sh` (macOS 15 and 26 supported; the NVRM build for 26 is chosen by the script). On 26 it also
+installs NMXAudio (`17c4804d`): Tahoe has no HD Audio driver, so this is the first sound on Tahoe [expected, from
+install.sh's comment]. GSP firmware comes from `download.nvidia.com` (Wi-Fi now works). The 1401 app is not installed
+on Tahoe, so its wsreset job does not exist and `no-wsreset` is not needed. Then `ondemand.sh on` (RTX for nobody),
+`efi.sh wexrtx` once. Undo: `tools/upgrade/rollback.sh /Library/NullMoth/backup-…`; no desktop: OpenCore Space →
+"Start once without NVIDIA driver".
