@@ -503,3 +503,10 @@ override for our panel with `display-refresh-rate-policy` = 1. Takes effect at t
 - Recovery if 144 leaves the panel black: from Recovery's Terminal, delete
   `/Volumes/<disk>/Library/Displays/Contents/Resources/Overrides/DisplayVendorID-30e4` and
   `/Volumes/<disk>/Library/Preferences/com.apple.windowserver.displays.plist`.
+
+### XE-12 run 1 (2026-11-13, before the reboot)
+
+[measured] `status`: 1920x1080 @ 60, rates [60, 144], no override. `probe`: `switch to 144.0 Hz: ok`, `now: 144.0 Hz`;
+Lukas: the panel ran perfectly at 144 Hz on the Iris Xe and came back to 60 by itself. First time 144 Hz runs on the
+TGL framebuffer here; the `ASSERT(linkBW)` worry did not show. `install` wrote the override (`plutil -lint` OK).
+Pending: the reboot and the System Settings menu.
