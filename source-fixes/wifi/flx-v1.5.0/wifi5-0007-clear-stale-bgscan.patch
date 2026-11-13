@@ -1,0 +1,35 @@
+From e32c1f7d9b8969c9d0d8813bcb612ca02ee5be27 Mon Sep 17 00:00:00 2001
+From: kitsuneislife <kitsuneislif3@gmail.com>
+Date: Fri, 13 Nov 2026 08:27:17 -0300
+Subject: [PATCH] net80211: clear F_BGSCAN when a background scan ends outside
+ RUN
+
+A disconnect during a background scan left F_BGSCAN set forever, so
+the WCL layer answered every later scan and join with kIOReturnBusy.
+---
+ mtk80211/openbsd/net80211/ieee80211_node.c | 9 +++++++++
+ 1 file changed, 9 insertions(+)
+
+diff --git a/mtk80211/openbsd/net80211/ieee80211_node.c b/mtk80211/openbsd/net80211/ieee80211_node.c
+index 93b9e6a..7984a33 100644
+--- a/mtk80211/openbsd/net80211/ieee80211_node.c
++++ b/mtk80211/openbsd/net80211/ieee80211_node.c
+@@ -1422,6 +1422,15 @@ ieee80211_end_scan(struct _ifnet *ifp)
+     int roamscan = bgscan &&
+                 (ic->ic_flags & IEEE80211_F_DISABLE_BG_AUTO_CONNECT) == 0;
+     
++    /*
++     * A background scan that ends after we left RUN (user disconnect
++     * mid-scan) takes the normal path below, which never clears
++     * F_BGSCAN; the WCL layer then answers every scan and join with
++     * kIOReturnBusy until reboot.
++     */
++    if (!bgscan)
++        ic->ic_flags &= ~IEEE80211_F_BGSCAN;
++    
+     if (ic->ic_event_handler)
+         (*ic->ic_event_handler)(ic, IEEE80211_EVT_SCAN_DONE, NULL);
+     
+-- 
+2.39.5 (Apple Git-154)
+

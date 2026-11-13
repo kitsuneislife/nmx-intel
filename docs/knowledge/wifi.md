@@ -10,7 +10,7 @@
 
 | Piece | Where | Notes |
 | --- | --- | --- |
-| `AirportMtkWlan.kext` `dd967442` (WIFI-9; was `a7bfaa40`) | `/Library/Extensions` | bundle `com.flxxxxddd.AirportMtkWlan` 1.5.0; MediaTek firmware inside (not versioned) |
+| `AirportMtkWlan.kext` `274f4c6a` (WIFI-10, pending install; was `dd967442` WIFI-9) | `/Library/Extensions` | bundle `com.flxxxxddd.AirportMtkWlan` 1.5.0; MediaTek firmware inside (not versioned) |
 | Source | `~/nmx-build/wifi5/src`, branch `nmx-wifi5` | flxxxxddd/SimpleMtkWlan `9a9c2ea` (v1.5.0) + `source-fixes/wifi/flx-v1.5.0/*` |
 | MacKernelSDK | `~/nmx-build/wifi/mks` `3f75008` | the fork's submodule commit |
 | EFI requirement | `DisableIoMapper=true` (already in our config) | the driver does its own DMA without VT-d |
@@ -28,6 +28,7 @@ is separate and lives in the EFI.
 | wifi5-0004 | WIFI-7 | default "prefer 5 GHz": 5 GHz scanned first, a 2.4 GHz twin of a 5 GHz SSID hidden, 2.4-only networks kept |
 | wifi5-0005 | WIFI-8 | data frames through firmware rate adaptation; was fixed 1/6 Mbit/s with block ack off (the upload cap) |
 | wifi5-0006 | WIFI-9 | lock around TX ring cleanup: a boot panic (`m_free: freeing an already freed mbuf`) came from the interrupt and the firmware download freeing the same mbuf |
+| wifi5-0007 | WIFI-10 | clear `F_BGSCAN` when a background scan ends outside RUN: Disconnect during a scan left every scan and join `kIOReturnBusy` until reboot |
 
 ## Build, install, undo
 

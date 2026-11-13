@@ -12,7 +12,8 @@
 - RTX for apps: `sudo bash tools/hybrid/ondemand.sh add NAME` (then reopen the app); list now `Roblox`,
   `RobloxPlayer`, `Google Chrome`, `Google Chrome Helper (Aperitif)` (Chrome 157's GPU process) [measured 11-13];
   boost back to nullmoth's per-burst default (`BOOST=0` gone after the 2.9 install). After any nullmoth install: `on` + `add` again (pitfall).
-- Wi-Fi: AirportMtkWlan `dd967442` (WIFI-9, no repeat of the 10-30 mbuf panic so far).
+- Wi-Fi: AirportMtkWlan `dd967442` (WIFI-9, no repeat of the mbuf panic); WIFI-10 `274f4c6a` built (Disconnect
+  mid-scan left Wi-Fi stuck busy), install pending.
 - Recovery: OpenCore Space → "Start once without NVIDIA driver"; `sudo bash tools/hybrid/efi.sh gpu-only` returns to
   the RTX-only route (NMIntelFB bridge; needs our NVRM/NVAccel patches, not ported to 2.9).
 - Tests and evidence: [tests/wex-1.md](tests/wex-1.md); route background: [knowledge/hybrid-route.md](knowledge/hybrid-route.md).

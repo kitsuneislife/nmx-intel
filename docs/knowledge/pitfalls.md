@@ -347,6 +347,13 @@ names them. Internal eDP on ADL-P/RPL-P is experimental in WEX 0.6.1 (no hardwar
 > firmware-download TX ring and freed the same mbuf ("m_free: freeing an already freed mbuf" during
 > `mwx_load_firmware`). Any shared ring or list touched from both sides needs a real lock (wifi5-0006 for TX cleanup).
 
+## AirportMtkWlan: a state change during a background scan leaves `F_BGSCAN` set
+
+> WIFI-10 [measured symptom, inferred cause]: net80211 clears `F_BGSCAN` only when the scan ends in RUN. A
+> Disconnect mid-scan left it set, and the WCL layer refuses every scan/join while it is set (airportd
+> `Apple80211Scan Failed err[-536870187]`, join `-528342014`). Any flag set for one state must be cleared on every
+> exit path, not only the happy one (wifi5-0007).
+
 ## A nullmoth update resets the RTX app list and drops `BOOST=` (UPG-6)
 
 > nullmoth's `install.sh` copies its own `nvmtl-allow.txt` (`*`, `!WindowServer`: every app on the RTX) and a fresh

@@ -314,3 +314,31 @@ frees TX mbufs without the lock (only on reset/attach, with DMA disabled) [unver
 
 Expected: no more `freeing an already freed mbuf` at boot; Wi-Fi unchanged. The panic was rare, so one clean boot
 proves little; the check is "no recurrence" over the next days.
+
+## WIFI-10 (prepared 2026-11-13): Wi-Fi stuck "busy" after Disconnect, stale background-scan flag
+
+Note on WIFI-9 [measured]: no repeat of the mbuf boot panic from 10-30 to 11-13 (daily boots).
+
+Symptom (boot 2026-11-13 07:10, `dd967442`) [measured, airportd + driver `MtkDebugLog`]:
+
+- 07:11 auto-join to "Nardino" (5 GHz ch 100, VHT80), traffic fine until 07:16.
+- 07:16:53 (driver uptime 380.0 s) WiFiAgent asked for a scan while associated: the driver started background
+  scan seq=5 (`F_BGSCAN` set).
+- 07:16:54 (381.3 s) Lukas pressed "Disconnect" in Control Center (`SET AUTO-JOIN TEMP DISABLED ... pid 460
+  (ControlCenter)`): `leaveWCLNetwork`, state 4 → 1, scan seq=6, `LINK_STATE_IS_DOWN`.
+- 386.8 s "scan done #4 seq=6", then switch_ess / choose_bss / reset_scan; afterwards the driver idles at state=1,
+  `intr_calls=6916` frozen for 45+ min, no scan reaches the firmware.
+- airportd: 96 x `Apple80211Scan Failed err[-536870187]` (kIOReturnBusy) at 07:17, 07:19, 07:25, 08:22; manual joins
+  at 07:19:39 and 07:19:47 fail with `returned error code -528342014, no more attempts`.
+
+Cause [inferred from the source, strong]: `ieee80211_end_scan` (`mtk80211/openbsd/net80211/ieee80211_node.c`) treats
+a scan as background only when `F_BGSCAN` is set **and** `ic_state == RUN`, and clears `F_BGSCAN` only on that
+branch. The disconnect moved the state to SCAN before the background scan ended, so the normal path ran and the
+flag stayed set. `beginWCLScan` (`AirportMtkWlan/WCL/WCL.cpp:246`) returns kIOReturnBusy while `F_BGSCAN` is set, so
+every later scan (and the join, which needs one) failed until the driver stopped (`MtkMwx.cpp:1184` clears it).
+
+Fix wifi5-0007 (`nmx-wifi5` `e32c1f7`): `ieee80211_end_scan` clears `F_BGSCAN` whenever the scan is not treated as
+a background scan. The HAL flag `MWX_FLAG_BGSCAN` is already cleared on scan done. Build `AirportMtkWlan 274f4c6a`.
+
+Expected: connect, start a scan (open the Wi-Fi menu), press Disconnect, then join again: the network list refreshes
+and the join succeeds. Workaround on `dd967442`: Wi-Fi off/on in Control Center [unverified] or reboot.
