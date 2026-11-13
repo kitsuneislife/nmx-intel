@@ -35,7 +35,7 @@ tests/wifi-1-mt7921.md            Wi-Fi MT7921: SimpleMtkWlan (WIFI-1..4), Airpo
 tests/sleep-1-hibernate.md        sleep: hibernation instead of S3 so the GOP relights the panel (SLEEP-1)
 tests/hybrid-1.md                 hybrid route: Iris Xe on Apple's TGL driver (HYB-1 = H1)
 tests/wex-1.md                    WhateverXe route: Iris Xe on Apple's TGL driver via WhateverXe (XE-0, XE-1)
-tests/tahoe-1.md                  Tahoe 26.7 upgrade: readiness, PCCI patch check, plain boot (TAHOE-0, TAHOE-1)
+tests/tahoe-1.md                  Tahoe 26.7 trial on a separate volume (TAHOE-0..3 passed), then removed: staying on Sequoia
 knowledge/architecture.md         components and the path of a frame
 knowledge/pitfalls.md             symptom → cause → fix, by area           (highest-value file)
 knowledge/diagnostics.md          trail/beat/io tokens, knobs, tools, recovery

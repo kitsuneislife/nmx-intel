@@ -120,4 +120,5 @@ changes), then [../status.md](../status.md).
 | TAHOE-0b | 11-12 | TAHOE-0 | 92 GB freed; no backup disk → Tahoe goes on a separate APFS volume (`tahoe.sh volume`) | ready except installer + kernel check | [tahoe-1](tahoe-1.md) |
 | TAHOE-2 | 11-13 | TAHOE-1a | Wi-Fi on Tahoe: install guard fixed (try 1); driver in the aux KC but off on `-nvoff` (try 2) → `NVOFF=0 efi.sh plain` | passed: Wi-Fi works on Tahoe | [tahoe-1](tahoe-1.md) |
 | TAHOE-3 | 11-13 | TAHOE-2 | WhateverXe 0.8.2 + Graphics 0.4.3 on Tahoe (`wex-install.sh`, `efi.sh wexrtx` once, no `-nvoff`) | pass: Metal on the Iris Xe | [tahoe-1](tahoe-1.md) |
-| TAHOE-4 | 11-13 | TAHOE-3 | nullmoth 2.9 release (+ NMXAudio on 26) inside Tahoe, `ondemand.sh on`, `efi.sh wexrtx` once | pending | [tahoe-1](tahoe-1.md) |
+| TAHOE-4 | 11-13 | TAHOE-3 | nullmoth 2.9 release (+ NMXAudio on 26) inside Tahoe, `ondemand.sh on`, `efi.sh wexrtx` once | not run: Lukas stays on Sequoia; Tahoe removed (`tahoe.sh remove`) | [tahoe-1](tahoe-1.md) |
+| TAHOE-X | 11-13 | TAHOE-3 | remove the Tahoe volume, installer and Darwin 25 PCCI patches; back to the daily Sequoia hybrid | pending (Lukas runs it) | [tahoe-1](tahoe-1.md) |

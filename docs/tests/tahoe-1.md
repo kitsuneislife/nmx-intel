@@ -161,3 +161,19 @@ install.sh's comment]. GSP firmware comes from `download.nvidia.com` (Wi-Fi now 
 on Tahoe, so its wsreset job does not exist and `no-wsreset` is not needed. Then `ondemand.sh on` (RTX for nobody),
 `efi.sh wexrtx` once. Undo: `tools/upgrade/rollback.sh /Library/NullMoth/backup-…`; no desktop: OpenCore Space →
 "Start once without NVIDIA driver".
+
+## TAHOE-4 not run; Tahoe removed (decision 2026-11-13)
+
+[measured, Lukas] Lukas decided to stay on Sequoia 15.8.1 ("vou ficar no sequoia"): everything he uses works there,
+and he expects it to be lighter without Liquid Glass [unverified]. TAHOE-4 (nullmoth 2.9 on Tahoe) was not run, so
+the RTX on Tahoe stays untested. What was proven on 26.7.3 stays recorded above: plain boot with the Darwin 25 PCCI
+patches (TAHOE-1a), Wi-Fi `3b22cfa5` (TAHOE-2), WhateverXe 0.8.2 + Graphics 0.4.3 with Metal (TAHOE-3).
+
+Sequoia side checked before removal [measured]: the volume route never touched Sequoia's `/Library`: NVRM 2.9 kexts,
+`/Library/NullMoth/no-wsreset`, AirportMtkWlan `dd967442` (the Sequoia build) still in place.
+
+`sudo bash tools/tahoe/tahoe.sh remove` (new): deletes the APFS volume group of "Tahoe"/"Tahoe - Data" (refuses if it
+is the running system's group), backs up the ESP configs to `~/config-antes-remove-tahoe/`, writes the daily config
+(`efi.sh wexrtx-keep`), strips the Darwin 25 PCCI copies from every `config*.plist` (`kpatch.py strip`; add → strip
+round trip gives back the original plist [measured]), and deletes the installer (17 GB), `~/nmx-build/tahoe`,
+`wifi5/out-tahoe` and `~/config-antes-tahoe`. To go to Tahoe again later: the TAHOE-0..3 steps above still apply.

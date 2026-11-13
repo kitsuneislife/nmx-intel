@@ -1,9 +1,9 @@
 # Status
 
-> **Summary.** Last updated 2026-11-12. Daily setup is the **WhateverXe hybrid** (XE-8): the Iris Xe drives the
-> desktop with Metal at 60 Hz, the RTX runs nullmoth headless and only apps listed by `ondemand.sh` open it. Lukas
-> wants the newest drivers on both GPUs and then macOS Tahoe. Drivers done (UPG-6b, XE-11). Now: TAHOE-1a, Tahoe on a
-> separate APFS volume (no backup disk; Sequoia stays as rollback). Tahoe installed on its own volume, boots plain; Wi-Fi works there (TAHOE-2, plain with `NVOFF=0`); WhateverXe too (TAHOE-3); next TAHOE-4: nullmoth 2.9 inside Tahoe (tahoe-1.md).
+> **Summary.** Last updated 2026-11-13. Daily setup is the **WhateverXe hybrid** (XE-8): the Iris Xe drives the
+> desktop with Metal at 60 Hz, the RTX runs nullmoth headless and only apps listed by `ondemand.sh` open it. Drivers
+> are the newest (UPG-6b, XE-11). **Staying on Sequoia 15.8.1**: the Tahoe trial (TAHOE-0..3 passed, TAHOE-4 not run)
+> is recorded in [tests/tahoe-1.md](tests/tahoe-1.md) and removed with `sudo bash tools/tahoe/tahoe.sh remove`.
 
 ## Daily setup (how the machine boots now)
 
@@ -16,14 +16,11 @@
   the RTX-only route (NMIntelFB bridge; needs our NVRM/NVAccel patches, not ported to 2.9).
 - Tests and evidence: [tests/wex-1.md](tests/wex-1.md); route background: [knowledge/hybrid-route.md](knowledge/hybrid-route.md).
 
-## Upgrade plan (research.md, 2026-11-12 check)
+## Upgrades (research.md, 2026-11-12 check)
 
-1. **UPG-6** failed: 2.9 itself is fine, but 1401's wsreset restart of WindowServer now lands and the Intel panel
-   goes black (pitfall). **UPG-6b** passed with `no-wsreset`. Optional later: UPG-7: `nvrtd3=1` (RTX deep sleep).
-2. **XE-11** passed: WhateverXe 0.8.2 + Graphics 0.4.3 on Sequoia (README: Sequoia 15.8.x, Tahoe 26.7+), wex-0001..0004 rebased.
-3. **TAHOE-0/1** ([tests/tahoe-1.md](tests/tahoe-1.md)): `bash tools/tahoe/tahoe.sh check` lists what is missing.
-   OpenCore 1.0.8 ok, Wi-Fi Tahoe build `3b22cfa5` ok. The four PCCI CPU patches stop at Darwin 24 (pitfall):
-   `tahoe.sh kc` + `patch` must pass before the upgrade. Then `prepare` (plain boot) and the 26.7.3 installer.
+1. **UPG-6b** passed: nullmoth 2.9 with `no-wsreset`. Optional later: UPG-7: `nvrtd3=1` (RTX deep sleep).
+2. **XE-11** passed: WhateverXe 0.8.2 + Graphics 0.4.3 on Sequoia.
+3. Tahoe: not pursued (Lukas, 2026-11-13). Before any future macOS major upgrade, see the PCCI pitfall.
 
 ## Open problems
 
