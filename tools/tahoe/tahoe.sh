@@ -9,6 +9,9 @@
 #   sudo bash tools/tahoe/tahoe.sh volume    TAHOE-1a, the test route with no backup disk: a new APFS volume "Tahoe" in
 #                                            the same container (Sequoia stays untouched and bootable) and the plain
 #                                            config for the installer; then the installer is pointed at "Tahoe"
+#   bash ".../tahoe.sh" link                 on the Tahoe volume (no sudo): links ~/nmx-build and
+#                                            ~/Documents/Projetos/nmx-intel to the Sequoia volume's copies, so the
+#                                            install scripts find the builds without copying them
 #   sudo bash tools/tahoe/tahoe.sh prepare   right before an in-place upgrade: takes the Sequoia-only drivers out of
 #                                            /Library (WhateverXe Graphics, AirportMtkWlan) and boots the plain
 #                                            config (efi.sh plain: no GPU driver, -nvoff -v), which stays through
@@ -100,6 +103,15 @@ volume)
     echo "ready: reboot once into Sequoia (plain) to check it boots, then open \"$APP\" and pick the disk Tahoe"
     echo "back to the daily boot: sudo bash tools/hybrid/efi.sh wexrtx-keep"
     ;;
+link)
+    [ "$(sw_vers -productVersion | cut -d. -f1)" = 26 ] || { echo "run this on the Tahoe volume"; exit 1; }
+    SEQ="/Volumes/macOS - Data/Users/$(id -un)"
+    [ -d "$SEQ/nmx-build" ] || { echo "no $SEQ/nmx-build (Sequoia data volume not mounted, or another user name); nothing changed"; exit 1; }
+    for p in nmx-build Documents/Projetos/nmx-intel; do
+        if [ -e "$HOME/$p" ] || [ -L "$HOME/$p" ]; then echo "~/$p exists, left as is"; continue; fi
+        mkdir -p "$(dirname "$HOME/$p")" && ln -s "$SEQ/$p" "$HOME/$p" && echo "~/$p -> $SEQ/$p"
+    done
+    ;;
 prepare)
     root; esp
     grep -q 'PCCI topo:.*(Tahoe)' "$OC/config-gpu-only.plist" || { echo "run tahoe.sh patch first; nothing changed"; exit 1; }
@@ -113,5 +125,5 @@ undo)
     root
     bash "$HERE/tools/hybrid/wex-install.sh" && bash "$HERE/tools/wifi/install.sh" airport && bash "$HERE/tools/hybrid/efi.sh" wexrtx-keep
     ;;
-*) sed -n 2,16p "$0"; exit 1 ;;
+*) sed -n 2,19p "$0"; exit 1 ;;
 esac

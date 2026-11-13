@@ -76,3 +76,17 @@ BootKernelExtensions.kc `9bb053cf` from `AssetData/boot/System/Library/KernelCol
 [measured] Dry run of `kpatch.py add` on copies of config-gpu-only / config / config-wex: four `(Tahoe)` entries
 each (MinKernel 25.0.0, MaxKernel 25.99.99, Identifier kernel, Enabled), `plutil -lint` OK. Next: `sudo tahoe.sh
 patch` (ESP), `sudo tahoe.sh volume`, one plain boot of Sequoia, then the installer onto `Tahoe`.
+
+## TAHOE-1a step 2 (2026-11-12): Tahoe installed on its own volume
+
+[measured, Lukas] `tahoe.sh patch` + `volume`, plain boot, installer onto `Tahoe`: the install finished and Tahoe
+reached Setup Assistant on the plain config (`-nvoff -v`, Darwin 25 PCCI copies). So the CPU patches work on Tahoe
+[measured: no smp_init divide-by-zero, it boots]. Volumes now: `Tahoe` 12.6 GB + `Tahoe - Data` 3.5 GB; container
+has 60.7 GB unallocated, Sequoia's data volume holds 119 GB, so Migration Assistant cannot copy it all.
+
+Decision: on Tahoe, no migration. One local account named `lukas` (first account → UID 501, same as Sequoia, so the
+Sequoia data volume `/Volumes/macOS - Data` stays readable). `tahoe.sh link` symlinks `~/nmx-build` and the repo to
+it. The drivers are installed from inside Tahoe, one per boot: Wi-Fi (`install.sh airport`, out-tahoe) → WhateverXe
+Graphics (`wex-install.sh`, needs the Command Line Tools for python3) + `efi.sh wex` → nullmoth 2.9 for 26 (1401 app,
+`no-wsreset`, `ondemand.sh`) + `efi.sh wexrtx`. Keeping everything from Sequoia = once Tahoe works, upgrade Sequoia in
+place (`prepare`) and delete the test volume.
