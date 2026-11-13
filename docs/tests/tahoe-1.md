@@ -182,3 +182,7 @@ Run 1 (2026-11-13) [measured, Lukas]: `deleteVolumeGroup` failed, "Tahoe - Data 
 (mds_stores)", so nothing else changed (the script stops there by design). After a reboot Sequoia came up on the
 GPU-only config (NMIntelFB + NVRM 2.9 + AirportMtkWlan loaded, no `-nvoff`). Fix: `remove` now turns Spotlight off
 on both Tahoe volumes and force-unmounts them before `deleteVolumeGroup`.
+
+Run 2 (2026-11-13) [measured, Lukas]: `remove` passed; no Tahoe volume or installer left, OpenCore entry gone, boot-args
+`... -allow3d -disablegfxfirmware msgbuf=400000 -nmintelfboff` (no `-v`), `MetalPluginName =
+AppleIntelTGLGraphicsMTLDriver`: the daily hybrid is back on Sequoia.

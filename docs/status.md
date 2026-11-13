@@ -20,7 +20,8 @@
 
 1. **UPG-6b** passed: nullmoth 2.9 with `no-wsreset`. Optional later: UPG-7: `nvrtd3=1` (RTX deep sleep).
 2. **XE-11** passed: WhateverXe 0.8.2 + Graphics 0.4.3 on Sequoia.
-3. Tahoe: not pursued (Lukas, 2026-11-13). Before any future macOS major upgrade, see the PCCI pitfall.
+3. Tahoe: not pursued (Lukas, 2026-11-13); removed and the hybrid back [measured: Metal
+   `AppleIntelTGLGraphicsMTLDriver`]. Test leftovers: `sudo bash tools/cleanup.sh` (logs packed, ~4.5 GB freed). Before any future macOS major upgrade, see the PCCI pitfall.
 
 ## Open problems
 
