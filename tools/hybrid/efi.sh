@@ -76,6 +76,9 @@ hybrid|hybrid-keep|wex|wex-keep|wexrtx|wexrtx-keep)
     for k in "${PUT[@]}"; do [ -d "$k/Contents/MacOS" ] || { echo "no $k: build or download it first"; exit 1; }; done
     if is_hybrid "$CFG"; then
         [ -f "$GPU" ] || { echo "config.plist loads NootedGreen and there is no config-gpu-only.plist; nothing changed"; exit 1; }
+    elif cmp -s "$CFG" "$OC/config-plain.plist"; then
+        # the plain config is derived from config-gpu-only.plist: keep that one instead of saving plain over it
+        [ -f "$GPU" ] || { echo "config.plist is plain and there is no config-gpu-only.plist; nothing changed"; exit 1; }
     else
         cp "$CFG" "$GPU" || { echo "could not save config-gpu-only.plist; nothing changed"; exit 1; }
         cp "$CFG" "$HOMEU/config-antes-hybrid.plist" && chown "${SUDO_USER:-root}" "$HOMEU/config-antes-hybrid.plist"
