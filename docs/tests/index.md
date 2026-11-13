@@ -118,4 +118,5 @@ changes), then [../status.md](../status.md).
 | XE-11 | 11-12 | UPG-6b | WhateverXe 0.6.1 → 0.8.2 (our `96545d6d`, wex 0.8.2/0001..0005) + Graphics 0.3.2 → 0.4.3 | pass, kept (`wexrtx-keep`): no FB0 errors, no panic; boot-once job broken by our efi.sh, fixed | [wex-1](wex-1.md) |
 | TAHOE-0 | 11-12 | XE-11 | readiness for Tahoe 26.7.3: space, backup, PCCI patches vs Tahoe kernel (`tools/tahoe/`), Wi-Fi Tahoe build `3b22cfa5` | blocked: 22 GB free, no backup, installer not downloaded | [tahoe-1](tahoe-1.md) |
 | TAHOE-0b | 11-12 | TAHOE-0 | 92 GB freed; no backup disk → Tahoe goes on a separate APFS volume (`tahoe.sh volume`) | ready except installer + kernel check | [tahoe-1](tahoe-1.md) |
-| TAHOE-2 | 11-13 | TAHOE-1a | Wi-Fi on Tahoe: install guard fixed (try 1); driver in the aux KC but off on `-nvoff` (try 2) → `NVOFF=0 efi.sh plain` | pending: boot Tahoe without `-nvoff` | [tahoe-1](tahoe-1.md) |
+| TAHOE-2 | 11-13 | TAHOE-1a | Wi-Fi on Tahoe: install guard fixed (try 1); driver in the aux KC but off on `-nvoff` (try 2) → `NVOFF=0 efi.sh plain` | passed: Wi-Fi works on Tahoe | [tahoe-1](tahoe-1.md) |
+| TAHOE-3 | 11-13 | TAHOE-2 | WhateverXe 0.8.2 + Graphics 0.4.3 on Tahoe (`wex-install.sh`, `efi.sh wexrtx` once, no `-nvoff`) | pending | [tahoe-1](tahoe-1.md) |

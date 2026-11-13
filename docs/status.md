@@ -3,7 +3,7 @@
 > **Summary.** Last updated 2026-11-12. Daily setup is the **WhateverXe hybrid** (XE-8): the Iris Xe drives the
 > desktop with Metal at 60 Hz, the RTX runs nullmoth headless and only apps listed by `ondemand.sh` open it. Lukas
 > wants the newest drivers on both GPUs and then macOS Tahoe. Drivers done (UPG-6b, XE-11). Now: TAHOE-1a, Tahoe on a
-> separate APFS volume (no backup disk; Sequoia stays as rollback). Tahoe installed on its own volume, boots plain; TAHOE-2 Wi-Fi: plain needs `NVOFF=0` (no `-nvoff`), then drivers inside Tahoe (tahoe-1.md).
+> separate APFS volume (no backup disk; Sequoia stays as rollback). Tahoe installed on its own volume, boots plain; Wi-Fi works there (TAHOE-2, plain with `NVOFF=0`); next TAHOE-3: WhateverXe inside Tahoe (tahoe-1.md).
 
 ## Daily setup (how the machine boots now)
 

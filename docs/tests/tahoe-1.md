@@ -123,3 +123,19 @@ Fix: `sudo NVOFF=0 bash tools/hybrid/efi.sh plain` writes the plain config witho
 volume has no nullmoth kexts, so `-nvoff` does nothing useful there. Side effect: a Sequoia boot on this config runs
 nullmoth 2.9 on the GPU-only config (not tested with 2.9) — boot Tahoe, and if Sequoia is needed, OpenCore Space →
 "Start once without NVIDIA driver" or `efi.sh plain` / `wexrtx-keep` first.
+
+TAHOE-2 result (2026-11-13) [measured, Lukas]: after `sudo NVOFF=0 bash tools/hybrid/efi.sh plain` and a reboot into
+Tahoe, Wi-Fi works ("funcionou direitinho"). AirportMtkWlan `3b22cfa5` (Tahoe build) is good on 26.7.3.
+
+## TAHOE-3 (prepared 2026-11-13): WhateverXe Graphics on Tahoe
+
+One variable: the Iris Xe driver (WhateverXe 0.8.2 `96545d6d` in the EFI + WhateverXe Graphics 0.4.3, whose pkg has
+Tahoe parts). Prep fixes:
+- `wex-install.sh` had the same guard as install.sh (all four nullmoth kexts required in the new aux KC): now it
+  requires only the nullmoth/Wi-Fi kexts the current aux KC has.
+- `efi.sh wex*` saved the current config.plist as `config-gpu-only.plist` whenever it was not hybrid, so from plain it
+  would have saved plain (`-v`, maybe `-nvoff`) as the GPU-only base. Now it keeps the existing GPU-only file when
+  config.plist equals `config-plain.plist`.
+Route: `efi.sh wexrtx` (boot once), not `wex`: `wex` adds `-nvoff`, which would turn the Wi-Fi off again; `--rtx` uses
+`-nmintelfboff` instead, and with no nullmoth on Tahoe the nullmoth args do nothing. Needs python3 on Tahoe: the
+Command Line Tools (`xcode-select --install`).
