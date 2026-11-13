@@ -62,3 +62,17 @@ wexrtx-keep` restores its daily config). Same OpenCore configs for both: the Dar
 Tahoe. Once the stack works on the Tahoe volume, the in-place upgrade (`prepare`) or a migration can follow, and the
 test volume is deleted. The plan's steps 2–3 are unchanged; step 4 becomes `volume`, and the installer is pointed at
 the disk `Tahoe`.
+
+## TAHOE-1a step 1 (2026-11-12): installer and kernel check
+
+[measured] Checkpoint `20261112-204952-pre-tahoe` (NMIntelFB `241aff3d`, NVAccel `b298771e`, NVRM `c1d62ff7`,
+NVRMAGDC `97623c55`, NVRMFB `4890671d`). Installer 26.7.3 (25G342) downloaded (48 min). `tahoe.sh kc`:
+BootKernelExtensions.kc `9bb053cf` from `AssetData/boot/System/Library/KernelCollections/`; all four patches match:
+- MSR 35h: 2 hits, both inside `_cpuid_set_info` [0x1d3d00,0x1d5770).
+- fallback 8/12: 8 hits (Sequoia had 4), the first 2 inside `_cpuid_set_info`; OpenCore patches only those 2.
+- `_x86_validate_topology` at 0xffffff80004c0c10.
+- cores per package: V1 0, V1_5 1 (0xffffff80004bdce5), V2 0 → V1_5, the same variant as Sequoia.
+
+[measured] Dry run of `kpatch.py add` on copies of config-gpu-only / config / config-wex: four `(Tahoe)` entries
+each (MinKernel 25.0.0, MaxKernel 25.99.99, Identifier kernel, Enabled), `plutil -lint` OK. Next: `sudo tahoe.sh
+patch` (ESP), `sudo tahoe.sh volume`, one plain boot of Sequoia, then the installer onto `Tahoe`.
