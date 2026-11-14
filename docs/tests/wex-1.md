@@ -601,3 +601,14 @@ Lukas: XE-13's 144 Hz feels lighter but not right; there is a visible delay even
   (one 144 Hz frame) the hypothesis holds.
 - Claude taken off the RTX list again (no gain). Also seen: a second Claude copy (`~/Applications/Claude 2.app`)
   running at ~116% CPU.
+
+### 144 Hz run (2026-11-13 ~23:00)
+
+- `refresh.sh set 144` → "switch to 144.0 Hz: ok"; Claude back on the Iris Xe, window visible. [measured]
+  `kernel->gpu` p50 1.6-5.3 ms, p90 8.5-15 ms, max 17.8-19.6 ms: the same as at 60 Hz.
+- The vblank/flip-wait hypothesis is **rejected** [inferred from measured]: the max wait does not follow the frame
+  time. Still open: what fills 15-20 ms of the Iris Xe ring while a busy app is on screen (long composite batches
+  at a low GPU clock, or the host scheduler's ordering) [unverified]. WhateverXe publishes no clock or busy-time
+  telemetry (only `TGLHost*Count` counters), so the next probe needs a GPU clock read-out.
+- Lukas: with Claude on the RTX the feel was better, although `xe-lattest` did not change (try 2). Claude goes back
+  on the RTX list for daily use; 144 Hz stays set.

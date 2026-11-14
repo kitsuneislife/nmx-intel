@@ -34,9 +34,10 @@
    "Refresh Rate" menu via `display-refresh-rate-policy`, pending.
 4. Sleep: off; untested with WhateverXe.
 5. `ASSERT(linkBW)` warning in the XE-7 log, harmless so far.
-6. Feels slow (11-13): cause found [inferred from measured contrast]: other GPU clients (mainly the Claude app) make
-   Iris Xe submits wait p90 12-15 ms; clean desktop p99 <0.25 ms ([tests/wex-1.md](tests/wex-1.md)). Next: those apps
-   on the RTX via `ondemand.sh`. XE-13 pending: no cpuname (Settings crash), touchpad interrupts, `refresh.sh set 144`.
+6. Feels slow (11-13): Iris Xe submits wait p90 10-15 ms, max ~20 ms whenever a busy app (Claude) is on screen;
+   clean desktop p99 <0.25 ms. Not CPU, not vblank (same at 144 Hz), not fixed by Claude on the RTX
+   ([tests/wex-1.md](tests/wex-1.md)). Daily: 144 Hz, Claude on the RTX (feels better). Next: GPU clock probe.
+   XE-13 pending: no cpuname (Settings crash), touchpad interrupts.
 
 ## Other areas
 
