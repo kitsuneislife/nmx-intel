@@ -772,6 +772,7 @@ patches, last good on 2.3.6), so none of our RTX patches are needed.
 - First level 1 (copy), as the upstream tester plan orders. Checks: `log show --last boot --predicate 'eventMessage
   CONTAINS "hybrid:"'` (S1 switch read, S2 provider NMIntelFB, S3 first frame), `sysctl debug.nmhybrid_frames
   debug.nmhybrid_words_skipped debug.nmintelfb_step`, and Lukas's feel vs the LAT-8 hybrid.
+- All of the above in one command: `sudo bash tools/hybrid/rtx-prep.sh` (skips what is done; `NMHYBRID=2` for the next level).
 - Rollback: the next boot is the daily config by itself; a frozen boot → OpenCore Space → "Start once without
   NVIDIA driver" (NMIntelFB stands down on `-nvoff`), the daemon then restores the daily config. Driver:
   `sudo bash tools/upgrade/rollback.sh /Library/NullMoth/backup-…`.
