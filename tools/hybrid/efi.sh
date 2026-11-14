@@ -36,7 +36,7 @@ WXK=$HOMEU/nmx-build/whateverxe/kexts   # AMFIPass 1.4.1 Mod as AMFIPassMod.kext
 # Rollback: sudo WEXDIR=wex-0.6.1-nmx bash tools/hybrid/efi.sh wexrtx-keep
 # Test args: sudo WEX_EXTRA="-disablegfxpreemption" bash tools/hybrid/efi.sh wexrtx-keep (run again without it to undo)
 # Daily since LAT-8 (2026-11-14): sudo WEXDIR=wex-lat8 WEX_EXTRA="-wex-objpreempt" bash tools/hybrid/efi.sh wexrtx-keep
-# LAT-5 test: sudo WEXDIR=wex-lat5 WEX_EXTRA="-wex-objpreempt" WEX_DEV="PreemptionTimerIntervalUS=500" bash tools/hybrid/efi.sh wexrtx
+# LAT-5 test (one boot, back to the daily config by itself): sudo bash tools/hybrid/lat5.sh
 # no existence check here: boot-once runs as root (HOMEU=/var/root) and must not stop on it; the route modes check PUT
 WEXDIR=${WEXDIR:-wex}
 
@@ -100,11 +100,20 @@ hybrid|hybrid-keep|wex|wex-keep|wexrtx|wexrtx-keep)
         /usr/bin/python3 -I "$HERE/pnlf-aml.py" "$OC/ACPI/SSDT-PNLF.aml" || { echo "could not write SSDT-PNLF.aml; nothing changed"; exit 1; }
     fi
     if [ "$1" = "$NAME" ]; then
-        arm_once || { disarm_once; echo "could not install the one-boot daemon; nothing changed"; exit 1; }
+        # the daily config is a route config itself (wexrtx-keep): one boot comes back to it, not to GPU-only
+        # (the RTX-only bridge in config-gpu-only.plist does not work on nullmoth 2.9+). A second run before the
+        # reboot keeps the first copy.
+        ACT=boot-once; BACK=$OC/config-back.plist
+        if grep -q '<string>boot-back</string>' "$DAEMON" 2>/dev/null; then ACT=boot-back
+        elif [ ! -f "$DAEMON" ] && is_hybrid "$CFG"; then
+            cp "$CFG" "$BACK" || { echo "could not save config-back.plist; nothing changed"; exit 1; }; ACT=boot-back
+        fi
+        arm_once $ACT || { disarm_once; echo "could not install the one-boot daemon; nothing changed"; exit 1; }
     else disarm_once; fi
     cp "$HYB" "$CFG" || { cp "$GPU" "$CFG"; echo "could not switch config.plist; GPU-only put back"; exit 1; }
     sync
-    [ "$1" = "$NAME" ] && echo "one boot only: that boot puts GPU-only back by itself ($NAME-keep to stay)"
+    [ "$1" = "$NAME" ] && [ "$ACT" = boot-back ] && echo "one boot only: that boot puts the current config back by itself ($NAME-keep to stay)"
+    [ "$1" = "$NAME" ] && [ "$ACT" = boot-once ] && echo "one boot only: that boot puts GPU-only back by itself ($NAME-keep to stay)"
     for k in "${PUT[@]}"; do b=${k##*/}; echo "route: $NAME, ${b%.kext} $(shasum -a 256 "$OC/Kexts/$b/Contents/MacOS/"* | cut -c1-8)"; done
     echo "boot-args: $(/usr/libexec/PlistBuddy -c 'Print :NVRAM:Add:7C436110-AB2A-4BBB-A880-FE41995C9F82:boot-args' "$CFG")"
     ;;
