@@ -575,3 +575,13 @@ Lukas: XE-13's 144 Hz feels lighter but not right; there is a visible delay even
   delays every other app's frames and WindowServer's composite by up to 1-2 frames.
 - Next: move the heavy Electron app to the RTX (`ondemand.sh add`), one app at a time, and rerun `xe-lattest`
   with it open.
+
+### Claude app on the RTX, try 1 (2026-11-13 ~22:40)
+
+- Listed `Claude` and `Claude Helper (GPU)` with `ondemand.sh add`. [measured] `ondemand.sh status`: only `Claude`
+  (main process) holds the RTX. `xe-lattest` unchanged: `kernel->gpu` p50 0.9-6.6 ms, p90 10.6-13.6 ms, p99 15-18 ms.
+- [measured] `ps`: Claude's GPU process is the plain `Claude Helper` (`--type=gpu-process`, 100% CPU); the
+  `Claude Helper (GPU)` bundle is not used. Renderer at 112% CPU. Unlike Chrome (`... Helper (Aperitif)`), the name
+  to list is `Claude Helper` (this also gives the RTX to Claude's utility processes; harmless, they do not use Metal
+  [inferred]).
+- Next: remove `Claude Helper (GPU)`, add `Claude Helper`, restart Claude, rerun.
