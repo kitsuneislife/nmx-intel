@@ -710,3 +710,14 @@ preemption globally on). CS_CHICKEN1, FF DOP clock gating and compute mode are u
   RPL-P stepping unverified) and whether Lukas feels it.
 - Lukas (~00:30), after a few minutes of use: the general feel improved; no artefacts reported. Kept as daily
   (`wexrtx-keep` with the same `WEXDIR`/`WEX_EXTRA`); longer soak still watches for corruption.
+
+### LAT-8 soak, slow spell (2026-11-14 08:24)
+
+- Lukas: the system feels slow again, uptime 16 min, `-wex-objpreempt` still in boot-args [measured].
+- [measured] Three Claude desktop apps open at once (`Claude`, `Claude 2`, `Claude 3`), each with its GPU process at
+  29-63 % CPU and its main renderer at 38-55 %; total CPU ~240 % of 1200 %, no thermal or speed limit; 320 MB free
+  RAM, swap 45 MB. syspolicyd showed 76 % once, then idle (16 s CPU total).
+- [measured] `xe-lattest`, two runs: kernel->gpu p50 3.5-5.9 ms, p90 12-15.7 ms, p99 17.5-19.1 ms, max 20-24 ms,
+  back to the pre-LAT-8 level (part 1, one Claude app: max 6-10 ms).
+- [inferred] Same queueing as before, scaled by the number of busy Metal clients: object preemption shortens each
+  wait but three apps keep the render engine's queue full. Next check: hide or quit two of the apps and rerun.
