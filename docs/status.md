@@ -37,8 +37,8 @@
 6. Feels slow (11-13): Iris Xe submits wait p90 10-15 ms, max ~20 ms whenever a busy app (Claude) is on screen;
    clean desktop p99 <0.25 ms. Not CPU, not vblank (same at 144 Hz), not fixed by Claude on the RTX
    ([tests/wex-1.md](tests/wex-1.md)), not priority elevation (LAT-2). XE-13 installed: Settings crash fixed,
-   touchpad stays on polling (GPIO interrupts do not match); latency unchanged. Next: LAT-4
-   `-disablegfxpreemption` ([research/xe-latency.md](research/xe-latency.md)).
+   touchpad stays on polling (GPIO interrupts do not match); latency unchanged. LAT-4 `-disablegfxpreemption`: worse (max 25-31 ms), so
+   preemption helps. Next: undo LAT-4, then LAT-8 object preemption ([research/xe-latency.md](research/xe-latency.md)).
 
 ## Other areas
 

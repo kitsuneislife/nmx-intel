@@ -657,3 +657,23 @@ Lukas: XE-13's 144 Hz feels lighter but not right; there is a visible delay even
 - [measured] `xe-lattest` with Claude on screen, 144 Hz (`~/lat-xe13.txt`): kernel->gpu p90 7.8 / 13.9 / 6.2 ms and
   max 17.8 / 14.9 / 14.2 ms for gaps 0 / 8 / 16 ms. Same band as before XE-13, as expected (XE-13 did not touch
   the GPU). Next: LAT-4 `-disablegfxpreemption`.
+
+### LAT-4: `-disablegfxpreemption` (2026-11-14 ~00:12)
+
+Boot-args = XE-13 + `-disablegfxpreemption` (one-off through `WEX_EXTRA`). `debug.intel.schedPriPreemption` still
+reads 1 and the registry shows no preemption key, so whether Apple's driver honoured the arg is [unverified] from
+state; the latency says it did something. Three runs, Claude on screen, 144 Hz, uptime 2-3 min (load 21 -> 12):
+
+| run | gap 0 p90 / max | gap 8 p50 / p90 / max | gap 16 p90 / max |
+|-----|-----------------|-----------------------|------------------|
+| XE-13 baseline (`lat-xe13.txt`) | 7.8 / 17.8 | 5.5 / 13.9 / 14.9 | 6.2 / 14.2 |
+| LAT-4 a (`lat-lat4.txt`) | 3.5 / 27.6 | 13.4 / 19.8 / 25.4 | 15.9 / 28.7 |
+| LAT-4 b (`lat-lat4b.txt`) | 24.1 / 31.1 | 11.8 / 18.2 / 25.4 | 20.3 / 28.8 |
+| LAT-4 c (`lat-lat4c.txt`) | 1.8 / 29.2 | 13.1 / 19.0 / 26.5 | 18.8 / 26.5 |
+
+- [measured] Worse in every run: max ~25-31 ms (was 14-18), gap-8 p50 doubles. kernel->gpu only; GPU exec ~0.
+- [inferred] Host preemption is helping: with it, a waiting submit gets the engine after ~one 2 ms timer plus the
+  busy client's batch; without it, it waits the batch out. So the wait is a lack of preemption granularity, not a
+  cost of it. CPU load in the first minutes is a caveat, but earlier runs showed CPU load does not raise the wait.
+- Next: undo LAT-4 (`efi.sh wexrtx-keep` without `WEX_EXTRA`). The research plan's LAT-8 (`-wex-objpreempt`: let
+  object-level preemption stay on, so the busy batch can be cut mid-way) becomes the most promising change.

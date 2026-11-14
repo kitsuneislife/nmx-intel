@@ -125,3 +125,4 @@ changes), then [../status.md](../status.md).
 | TAHOE-X | 11-13 | TAHOE-3 | remove the Tahoe volume, installer and Darwin 25 PCCI patches; back to the daily Sequoia hybrid | pending (Lukas runs it) | [tahoe-1](tahoe-1.md) |
 | XE-12 | 11-13 | XE-11 | display override with `display-refresh-rate-policy` = 1 for panel `30e4:0742` (`tools/hybrid/refresh.sh`) | probe pass (144 Hz on the Iris Xe); menu after reboot pending | [wex-1](wex-1.md) |
 | XE-13 | 11-13 | XE-12 | boot-args: `revpatch=sbvmm` (no cpuname), no `-vi2c-force-polling`; `refresh.sh set 144`; powermetrics baseline | Settings fixed; touchpad dead without polling (arg restored); latency unchanged | [wex-1](wex-1.md) |
+| LAT-4 | 11-14 | XE-13 | `-disablegfxpreemption` (WEX_EXTRA) | worse: submit wait max 25-31 ms (was 14-18); preemption helps; undone | [wex-1](wex-1.md) |
