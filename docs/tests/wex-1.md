@@ -802,3 +802,19 @@ patches, last good on 2.3.6), so none of our RTX patches are needed.
   `WEXDIR=wex-lat5 WEX_EXTRA=-wex-objpreempt WEX_DEV=PreemptionTimerIntervalUS=500 efi.sh wexrtx` (one boot).
 - Checks as planned above: `ioreg` Development shows 500 (or the clamp in the log); `xe-lattest` with the three
   Claude apps busy vs LAT-8 (max wait 6-10 ms).
+
+### LAT-5 result, part 1 (2026-11-14 ~09:01): one busy Claude app
+
+- [measured] Boot 08:58 with `-wex-objpreempt`; WhateverXe 0.8.2 loaded; registry root `WexDevOverrides` = 1, iGPU
+  `wexdev-PreemptionTimerIntervalUS` = `f4010000`, live `Development` shows `PreemptionTimerIntervalUS=500`. No
+  "Constraining preemption" line in `log show --last boot`, so 500 is inside the driver's range [inferred]. The
+  `LAT-5 Development ...` kernel line did not show in `log show` either (the value itself is the proof).
+  `recoveryCount` 0; boot-back put the daily LAT-8 config back for the next start (`/var/log/nmx-hybrid.log`).
+- [measured] Desktop at 60 Hz this boot (`refresh.sh set 144` not rerun); LAT-8 part 1 was at 144 Hz, and the 144 Hz
+  run showed refresh does not move the wait.
+- [measured] `xe-lattest` three runs (`~/lat-lat5a..c.txt`), uptime 2-3 min, load ~25-58, only the main Claude app
+  busy (Claude 2 and 3 open but idle, <1 % CPU): kernel->gpu p90 0.07-7.8 ms, p99 5.6-8.4 ms, max 5.7-9.6 ms.
+  LAT-8 part 1 (one Claude app): p90 0.1-5.8, p99 2.9-7.7, max 6.2-10.1 ms.
+- [inferred] No clear change in the one-app case: the worst wait stays one ~6-9 ms draw. The case LAT-5 is for (three
+  busy Claude apps, LAT-8 max 20-24 ms) is not measured yet; next run needs Claude 2 and 3 busy on screen.
+- Also seen: a `shutdown_stall` report on the reboot into LAT-5 (08:58), as on the two reboots before it; not new.

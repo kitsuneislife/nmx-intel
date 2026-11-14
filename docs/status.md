@@ -44,6 +44,6 @@
 
 - RTX-only route: our bridge worked on nullmoth 2.3.6 only. **NMH-1 failed** (11-14): nullmoth 3.0's `nmhybrid=1`
   hung the boot with no log; parked. nullmoth 3.0 stays on the daily hybrid ([tests/wex-1.md](tests/wex-1.md)).
-- **LAT-5 next**: `sudo bash tools/hybrid/lat5.sh` (RTX app list back + one boot; back to LAT-8 by itself).
+- **LAT-5 running** (one boot, 11-14): `PreemptionTimerIntervalUS=500` applied; one busy app: no change vs LAT-8 (max 5.7-9.6 ms). Pending: run with three busy Claude apps (LAT-8: max 20-24 ms). Next boot is LAT-8 by itself.
 - Wi-Fi MT7921 at the line's ceiling (WIFI-8), [knowledge/wifi.md](knowledge/wifi.md).
 - Previous status text (verbatim): [archive/status-2026-10-29.md](archive/status-2026-10-29.md).
