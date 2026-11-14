@@ -612,3 +612,16 @@ Lukas: XE-13's 144 Hz feels lighter but not right; there is a visible delay even
   telemetry (only `TGLHost*Count` counters), so the next probe needs a GPU clock read-out.
 - Lukas: with Claude on the RTX the feel was better, although `xe-lattest` did not change (try 2). Claude goes back
   on the RTX list for daily use; 144 Hz stays set.
+
+### Research and LAT-2 (2026-11-13 ~23:50)
+
+- Research report: [../research/xe-latency.md](../research/xe-latency.md) (notes in `research/xe-latency-notes/`).
+  Leading model [inferred]: Apple's host-preemptive scheduler (`GraphicsSchedulerSelect=5`) preempts only between
+  priority bands, so equal-band work waits FIFO behind a busy client; WhateverXe also disables 3D object-level
+  preemption. Clock (request pinned at 1400 MHz by WhateverXe host RPS, actual 1100 MHz), RC6, CPU and vblank ruled out
+  or close to it.
+- Correction to the 144 Hz entry: WhateverXe does publish clock data (`N97GTPowerSample`, 512 reads per boot).
+- [measured] `sysctl debug.intel`: `schedPriCredits*` -1, `schedPriPreemption` 1, `schedPriElevatePID` -1.
+- LAT-2 prepared: `tools/hybrid/lat-elevate.sh` (`850482c4`) runs `xe-lattest` normal, then with its PID in
+  `debug.intel.schedPriElevatePID`, and puts -1 back on exit. If the elevated run's p90 falls to ~1 ms, the band model
+  holds and the fix is priority (e.g. elevate WindowServer or lower background clients).

@@ -15,6 +15,7 @@ summary block on top, linked to each other). The original Portuguese diary is pr
 | Recovering the original binary / legacy patches | [knowledge/binary-patches.md](knowledge/binary-patches.md) |
 | Other projects, upstream state | [knowledge/research.md](knowledge/research.md) |
 | Making the RTX → Intel bridge cheaper | [knowledge/bridge-optimization.md](knowledge/bridge-optimization.md) |
+| Iris Xe submit latency (research, test plan) | [research/xe-latency.md](research/xe-latency.md) |
 | Panel brightness (nullmoth switch vs our Intel panel) | [knowledge/brightness.md](knowledge/brightness.md) |
 | Moving to a new nullmoth release | [knowledge/nullmoth-upgrade.md](knowledge/nullmoth-upgrade.md) |
 | Wi-Fi (MT7921): build, install, knobs, undo | [knowledge/wifi.md](knowledge/wifi.md) |
