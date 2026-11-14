@@ -13,6 +13,11 @@
 #   sudo bash tools/hybrid/efi.sh wex-keep   the same, without the one-boot daemon
 #   sudo bash tools/hybrid/efi.sh wexrtx     the WhateverXe route with nullmoth's NVIDIA driver on, headless (XE-7,
 #                                            wex-config.py --rtx), boots it ONCE; wexrtx-keep to stay
+#   sudo bash tools/hybrid/efi.sh rtx        RTX-only through nullmoth's own hybrid path (3.0+, NMH-1): config-rtx.plist
+#                                            = config-gpu-only.plist minus -nmintelfboff/-nvoff plus nmhybrid=$NMHYBRID
+#                                            (default 1, copy) and $RTX_EXTRA; ONE boot: the current config.plist is
+#                                            saved as config-back.plist and a LaunchDaemon puts it back early in that
+#                                            boot (boot-back). rtx-keep to stay. Needs nullmoth's NMIntelFB installed.
 #   sudo bash tools/hybrid/efi.sh gpu-only   config-gpu-only.plist back as config.plist, the route kexts removed
 #   sudo bash tools/hybrid/efi.sh plain      no GPU driver at all (firmware framebuffer, as for the first install):
 #                                            config-gpu-only.plist plus -nvoff -v, the route kexts removed. Stays
@@ -49,7 +54,7 @@ is_hybrid() { grep -qE '<string>(NootedGreen|WhateverXe)\.kext</string>' "$1"; }
 # one-boot daemon: a copy of this script outside ~/Documents (TCC blocks launchd's bash there)
 DAEMON=/Library/LaunchDaemons/com.nmx.hybrid-once.plist; ONCE=/usr/local/libexec/nmx-hybrid-efi.sh
 TESTS=/usr/local/libexec/nmx-gputests   # Metal tests run on the Iris Xe in that boot (gputests.sh build makes them)
-arm_once() {
+arm_once() {   # $1 = what the daemon runs at the next boot (boot-once by default)
     mkdir -p "${ONCE%/*}" && cp "$HERE/efi.sh" "$ONCE" && chmod 755 "$ONCE" || return 1
     rm -rf "$TESTS"
     [ -x "$HOMEU/nmx-build/hybrid/xps/build/tests/xe-miptest" ] && { cp -R "$HOMEU/nmx-build/hybrid/xps/build/tests" "$TESTS" \
@@ -59,7 +64,7 @@ arm_once() {
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
 <key>Label</key><string>com.nmx.hybrid-once</string>
-<key>ProgramArguments</key><array><string>/bin/bash</string><string>$ONCE</string><string>boot-once</string></array>
+<key>ProgramArguments</key><array><string>/bin/bash</string><string>$ONCE</string><string>${1:-boot-once}</string></array>
 <key>RunAtLoad</key><true/>
 <key>StandardOutPath</key><string>/var/log/nmx-hybrid.log</string>
 <key>StandardErrorPath</key><string>/var/log/nmx-hybrid.log</string>
@@ -102,6 +107,37 @@ hybrid|hybrid-keep|wex|wex-keep|wexrtx|wexrtx-keep)
     [ "$1" = "$NAME" ] && echo "one boot only: that boot puts GPU-only back by itself ($NAME-keep to stay)"
     for k in "${PUT[@]}"; do b=${k##*/}; echo "route: $NAME, ${b%.kext} $(shasum -a 256 "$OC/Kexts/$b/Contents/MacOS/"* | cut -c1-8)"; done
     echo "boot-args: $(/usr/libexec/PlistBuddy -c 'Print :NVRAM:Add:7C436110-AB2A-4BBB-A880-FE41995C9F82:boot-args' "$CFG")"
+    ;;
+rtx|rtx-keep)
+    [ -f "$GPU" ] || { echo "no config-gpu-only.plist on the ESP; nothing changed"; exit 1; }
+    is_hybrid "$GPU" && { echo "config-gpu-only.plist loads a route kext; nothing changed"; exit 1; }
+    [ -d /Library/Extensions/NMIntelFB.kext ] || { echo "no NMIntelFB in /Library/Extensions; nothing changed"; exit 1; }
+    RTX=$OC/config-rtx.plist; BACK=$OC/config-back.plist; BA=':NVRAM:Add:7C436110-AB2A-4BBB-A880-FE41995C9F82:boot-args'
+    A=$(/usr/libexec/PlistBuddy -c "Print $BA" "$GPU") || { echo "no boot-args in config-gpu-only.plist; nothing changed"; exit 1; }
+    N=""; for w in $A; do case $w in -nmintelfboff|-nvoff|nmhybrid=*) ;; *) N="$N${N:+ }$w" ;; esac; done
+    N="$N nmhybrid=${NMHYBRID:-1}${RTX_EXTRA:+ $RTX_EXTRA}"
+    cp "$GPU" "$RTX" && /usr/libexec/PlistBuddy -c "Set $BA $N" "$RTX" && plutil -lint "$RTX" >/dev/null \
+        || { echo "could not write config-rtx.plist; nothing changed"; exit 1; }
+    # keep the daily config to come back to; a second run while config.plist is already rtx keeps the first copy
+    if ! grep -q 'nmhybrid=' "$CFG"; then cp "$CFG" "$BACK" || { echo "could not save config-back.plist; nothing changed"; exit 1; }; fi
+    if [ "$1" = rtx ]; then
+        [ -f "$BACK" ] || { echo "no config-back.plist to come back to; nothing changed"; exit 1; }
+        arm_once boot-back || { disarm_once; echo "could not install the one-boot daemon; nothing changed"; exit 1; }
+    else disarm_once; fi
+    cp "$RTX" "$CFG" || { cp "$BACK" "$CFG"; echo "could not switch config.plist; the previous one put back"; exit 1; }
+    sync
+    [ "$1" = rtx ] && echo "one boot only: that boot puts config-back.plist back by itself (rtx-keep to stay)"
+    echo "route: rtx, NMIntelFB $(shasum -a 256 /Library/Extensions/NMIntelFB.kext/Contents/MacOS/NMIntelFB | cut -c1-8)"
+    echo "boot-args: $N"
+    ;;
+boot-back)
+    echo "$(date): boot-back, booted with: $(sysctl -n kern.bootargs)"
+    BACK=$OC/config-back.plist
+    [ -f "$BACK" ] && plutil -lint "$BACK" >/dev/null || { echo "no usable config-back.plist; config.plist left as is"; exit 1; }
+    cp "$BACK" "$CFG" && sync && echo "config-back.plist put back for the next start" || { echo "copy failed"; exit 1; }
+    diskutil unmount "$ESP" >/dev/null 2>&1
+    disarm_once   # one boot only; bash already holds this script open
+    exit 0
     ;;
 gpu-only)
     [ -f "$GPU" ] || { echo "no config-gpu-only.plist on the ESP; nothing changed"; exit 1; }
@@ -158,10 +194,10 @@ boot-once)
     exit 0
     ;;
 status)
-    is_hybrid "$CFG" && echo "route: hybrid" || echo "route: GPU-only"
+    if is_hybrid "$CFG"; then echo "route: hybrid"; elif grep -q 'nmhybrid=' "$CFG"; then echo "route: rtx (nmhybrid)"; else echo "route: GPU-only"; fi
     [ -f "$DAEMON" ] && echo "one-boot daemon: armed" || echo "one-boot daemon: off"
     ls -l "$OC"/config*.plist
     ;;
-*) echo "usage: sudo bash $0 hybrid|hybrid-keep|wex|wex-keep|wexrtx|wexrtx-keep|gpu-only|plain|status"; exit 1 ;;
+*) echo "usage: sudo bash $0 hybrid|hybrid-keep|wex|wex-keep|wexrtx|wexrtx-keep|rtx|rtx-keep|gpu-only|plain|status"; exit 1 ;;
 esac
 echo "Reboot for OpenCore to load it."
