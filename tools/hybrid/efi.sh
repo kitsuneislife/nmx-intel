@@ -30,6 +30,7 @@ WXK=$HOMEU/nmx-build/whateverxe/kexts   # AMFIPass 1.4.1 Mod as AMFIPassMod.kext
 # wex/ = XE-11 (0.8.2 + our 0001..0005), wex-0.6.1-nmx/ = XE-8 (0.6.1 + wex-0001..0004), wex-0.6.1-release/.
 # Rollback: sudo WEXDIR=wex-0.6.1-nmx bash tools/hybrid/efi.sh wexrtx-keep
 # Test args: sudo WEX_EXTRA="-disablegfxpreemption" bash tools/hybrid/efi.sh wexrtx-keep (run again without it to undo)
+# Daily since LAT-8 (2026-11-14): sudo WEXDIR=wex-lat8 WEX_EXTRA="-wex-objpreempt" bash tools/hybrid/efi.sh wexrtx-keep
 # no existence check here: boot-once runs as root (HOMEU=/var/root) and must not stop on it; the route modes check PUT
 WEXDIR=${WEXDIR:-wex}
 
