@@ -24,7 +24,7 @@ on)
     need_root
     [ -f "$LIST.nullmoth" ] || cp "$LIST" "$LIST.nullmoth" || { echo "could not back up $LIST; nothing changed"; exit 1; }
     grep -q "^$HDR" "$LIST" || { printf '%s\n' "$HDR" > "$LIST" || exit 1; }
-    echo "on: RTX only for:"; grep -v '^#' "$LIST"
+    echo "on: RTX only for:"; grep -v "^#" "$LIST" || true   # an empty list is fine
     ;;
 add|remove)
     need_root
@@ -33,7 +33,7 @@ add|remove)
     grep -vxF -- "$2" "$LIST" > "$LIST.tmp"
     [ "$1" = add ] && printf '%s\n' "$2" >> "$LIST.tmp"
     mv -f "$LIST.tmp" "$LIST" && chmod 644 "$LIST" || exit 1
-    echo "RTX for:"; grep -v '^#' "$LIST"
+    echo "RTX for:"; grep -v "^#" "$LIST" || true
     ;;
 off)
     need_root
