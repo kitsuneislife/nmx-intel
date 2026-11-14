@@ -55,6 +55,13 @@ def make(c: dict, rtx: bool = False) -> dict:
     if not any(e.get("Path") == PNLF_ENTRY["Path"] for e in acpi):
         acpi.append(dict(PNLF_ENTRY))
     c["DeviceProperties"]["Add"].setdefault(IGPU, {})["nmx-wex"] = b"\x01"
+    # LAT-5 test knob: WEX_DEV="PreemptionTimerIntervalUS=500" sets iGPU property wexdev-<Key> (4-byte LE), which our
+    # WhateverXe build (wex-lat5) writes into Apple's Development dict before the TGL accelerator starts
+    for kv in os.environ.get("WEX_DEV", "").split():
+        k, _, v = kv.partition("=")
+        if not k or not v.isdigit():
+            sys.exit(f"WEX_DEV entry {kv!r} is not Key=number")
+        c["DeviceProperties"]["Add"][IGPU]["wexdev-" + k] = int(v).to_bytes(4, "little")
     boot = c["NVRAM"]["Add"][APPLE_BOOT]
     drop, extra = (DROP_ARGS - {"nvaccel=1"}, WEX_ARGS[:-1] + ["-nmintelfboff"]) if rtx else (DROP_ARGS, WEX_ARGS)
     args = [SWAP_ARGS.get(a, a) for a in boot["boot-args"].split() if a not in drop]

@@ -721,3 +721,24 @@ preemption globally on). CS_CHICKEN1, FF DOP clock gating and compute mode are u
   back to the pre-LAT-8 level (part 1, one Claude app: max 6-10 ms).
 - [inferred] Same queueing as before, scaled by the number of busy Metal clients: object preemption shortens each
   wait but three apps keep the render engine's queue full. Next check: hide or quit two of the apps and rerun.
+
+## LAT-5 (prepared 2026-11-14): Apple scheduler Development keys from OpenCore
+
+Lukas works with several busy apps open as a rule, so closing apps is not a fix; the goal is a stable desktop under
+that load. Next lever from the ranked plan ([research/xe-latency.md](../research/xe-latency.md)): Apple's own
+scheduler keys. Live `Development` dict [measured]: `PreemptionTimerIntervalUS=2000`, `PreemptionDelayIntervalUS=160`,
+`SchedThrottleCapMS=100`, `MetalCoalesce=1`. The driver clamps the two preemption values and logs the range
+("Constraining preemption ... in the range [%u,%u] us", strings in the TGL binary).
+
+- Patch `source-fixes/wex/0.8.2/0007-lat5-wexdev-development-keys.patch` (src-082 `b80627d`, tag `lat-5`, on top of
+  LAT-8). In `wrapTGLAcceleratorStart`, before the parent start: an iGPU property `wexdev-<Key>` (4 bytes, LE) for one
+  of five allowed keys overrides that key in `Development`; registry root `WexDevOverrides` counts them and the kernel
+  log says `LAT-5 Development <Key> = <n>`. No property, no change. WhateverXe `fa17909c`; CPU tests pass. Staged in
+  `~/nmx-build/whateverxe/kexts/wex-lat5/`.
+- `wex-config.py`: `WEX_DEV="Key=n ..."` writes those properties. No rebuild for later keys (LAT-6).
+- First value: `PreemptionTimerIntervalUS=500` (one variable; LAT-8 object preemption stays on):
+  `sudo WEXDIR=wex-lat5 WEX_EXTRA="-wex-objpreempt" WEX_DEV="PreemptionTimerIntervalUS=500" bash tools/hybrid/efi.sh wexrtx`
+- Checks: `ioreg` Development shows 500 (or the clamp in the log); `xe-lattest` with the usual three Claude apps busy
+  vs the 08:24 run (max 20-24 ms).
+- On hold: Lukas first asked for one RTX-only boot (`efi.sh gpu-only`) to compare the feel. That route was last
+  good on nullmoth 2.3.6 with our NVRM/NVAccel patches; on release 2.9 it is untested [unverified].

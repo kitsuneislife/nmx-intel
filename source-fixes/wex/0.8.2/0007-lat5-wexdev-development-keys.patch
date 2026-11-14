@@ -1,0 +1,48 @@
+From b80627d2c28f2a0640a6a969e72187da9d8820c3 Mon Sep 17 00:00:00 2001
+From: kitsuneislife <kitsuneislif3@gmail.com>
+Date: Sat, 14 Nov 2026 08:35:43 -0300
+Subject: [PATCH] lat5: wexdev-<Key> iGPU properties override scheduler
+ Development keys
+
+---
+ WhateverXe/kern_xe.cpp | 24 ++++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
+
+diff --git a/WhateverXe/kern_xe.cpp b/WhateverXe/kern_xe.cpp
+index 2a2d6be..2c00f51 100644
+--- a/WhateverXe/kern_xe.cpp
++++ b/WhateverXe/kern_xe.cpp
+@@ -14414,6 +14414,30 @@ bool XE::wrapTGLAcceleratorStart(IOService *that, IOService *provider) {
+    tglHost.startThread=reinterpret_cast<uintptr_t>(current_thread());tglHost.owner=that;
+   }
+ 	}
++	// nmx LAT-5: an iGPU property wexdev-<Key> (4-byte little-endian, from OpenCore DeviceProperties) overrides
++	// one scheduler key of the Development dict before the parent reads it. No property, no change.
++	if (pci) {
++		static const char *const devKeys[] {"PreemptionTimerIntervalUS","PreemptionDelayIntervalUS","SchedThrottleCapMS",
++			"DisableTailCoalescing","MetalCoalesce"};
++		auto dev=OSDynamicCast(OSDictionary,that->getProperty("Development"));
++		auto copy=dev ? OSDictionary::withDictionary(dev) : nullptr;
++		unsigned applied=0;
++		for (auto key : devKeys) {
++			char name[48];
++			snprintf(name,sizeof(name),"wexdev-%s",key);
++			auto data=OSDynamicCast(OSData,pci->getProperty(name));
++			if (!copy || !data || data->getLength()!=4) continue;
++			uint32_t value=0;
++			memcpy(&value,data->getBytesNoCopy(),4);
++			if (auto num=OSNumber::withNumber(value,32)) {
++				copy->setObject(key,num);num->release();applied++;
++				SYSLOG("igfx", "LAT-5 Development %s = %u", key, value);
++			}
++		}
++		if (applied) that->setProperty("Development",copy);
++		if (copy) copy->release();
++		IORegistryEntry::getRegistryRoot()->setProperty("WexDevOverrides",applied,32);
++	}
+ 	tglObserveAccelerator(that, 2, false, 0, reinterpret_cast<uintptr_t>(provider));
+ 	SYSLOG("igfx", "TGL accelerator start entered");
+ 	bool result = FunctionCast(wrapTGLAcceleratorStart, callbackXE->orgTGLAcceleratorStart)(that, provider);
+-- 
+2.39.5 (Apple Git-154)
+
