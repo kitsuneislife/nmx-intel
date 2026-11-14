@@ -510,3 +510,20 @@ override for our panel with `display-refresh-rate-policy` = 1. Takes effect at t
 Lukas: the panel ran perfectly at 144 Hz on the Iris Xe and came back to 60 by itself. First time 144 Hz runs on the
 TGL framebuffer here; the `ASSERT(linkBW)` worry did not show. `install` wrote the override (`plutil -lint` OK).
 Pending: the reboot and the System Settings menu.
+
+## Slowness check (2026-11-13 21:36, after the XE-12 reboot)
+
+Lukas: the system still feels slow and odd, both to use and to look at. Live check, no change made:
+
+- [measured] Touchpad PIXA3848 (VoodooI2C 2.9.1) runs with `"Interrupt Mode" = "Polling"`; boot-args still carry
+  `-vi2c-force-polling` ("polling first, GPIO interrupts tested later" in `make_config.py`, never tested). GPIO
+  controller is `GPI0` = `INTC1055`; no VoodooGPIO instance in the registry [measured], so it does not match
+  [inferred]. Most likely cause of the laggy feel of cursor and scrolling [inferred].
+- [measured] Desktop still `1920x1080 @ 60.02 Hz` with the XE-12 override in place (rates 60 and 144 available).
+  Whether the "Refresh Rate" menu appeared after the reboot: ask Lukas.
+- [measured] `bluetoothd` restarts about every 30 s (WindowServer logs a bluetoothd disconnect every ~31 s; the
+  process was 23 s old when checked). Controller: `BCM_4350C2`, Address NULL, State Off: no working Bluetooth.
+- [measured] System Settings (20:36) and every `system_profiler` run crash with `KERN_MEMORY_ERROR` inside
+  `AppleSystemInfo`, the framework RestrictEvents patches for `revpatch=cpuname` [inferred link, unverified].
+- [measured] Iris Xe Metal (`AppleIntelTGLGraphicsMTLDriver`), `recoveryCount` = 0, no GPU hangs. GPU clock not
+  measured (needs `sudo powermetrics`); `-disablegfxfirmware` is required by WhateverXe.

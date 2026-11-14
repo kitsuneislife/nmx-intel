@@ -34,6 +34,8 @@
    "Refresh Rate" menu via `display-refresh-rate-policy`, pending.
 4. Sleep: off; untested with WhateverXe.
 5. `ASSERT(linkBW)` warning in the XE-7 log, harmless so far.
+6. Feels slow (11-13): touchpad in VoodooI2C polling mode, desktop still 60 Hz, bluetoothd restart loop
+   ([tests/wex-1.md](tests/wex-1.md), slowness check).
 
 ## Other areas
 
