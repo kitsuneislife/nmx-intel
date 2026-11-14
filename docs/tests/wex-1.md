@@ -818,3 +818,12 @@ patches, last good on 2.3.6), so none of our RTX patches are needed.
 - [inferred] No clear change in the one-app case: the worst wait stays one ~6-9 ms draw. The case LAT-5 is for (three
   busy Claude apps, LAT-8 max 20-24 ms) is not measured yet; next run needs Claude 2 and 3 busy on screen.
 - Also seen: a `shutdown_stall` report on the reboot into LAT-5 (08:58), as on the two reboots before it; not new.
+
+### LAT-5 result, part 2 (2026-11-14 ~09:03): Claude 2 and 3 open but not busy
+
+- [measured] `xe-lattest` three runs (`~/lat-lat5d..f.txt`), uptime 4 min, load 9-16: kernel->gpu p90 0.07-6.2 ms,
+  p99 5.3-9.1 ms, max 5.6-11.0 ms.
+- [measured] During the runs Claude 2 and 3 main processes sat at ~6 % CPU and none of their helper (GPU/renderer)
+  processes showed up busy; at 08:24 (LAT-8, max 20-24 ms) each app's GPU process ran 29-63 %. So this is not the
+  three-busy-apps load; the comparison is still open [inferred].
+- Next: rerun while Claude 2 and 3 are actually generating output, with a CPU snapshot of their helpers next to each run.
