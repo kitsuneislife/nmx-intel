@@ -562,3 +562,16 @@ Lukas: XE-13's 144 Hz feels lighter but not right; there is a visible delay even
   On a real Mac this wait is far below 1 ms [unverified here].
 - Next measurement: the same test with only Terminal open, to separate "queued behind other apps" from "the
   driver's own scheduling".
+
+### Clean run (2026-11-13 ~22:20, only Terminal open)
+
+- [measured] Same `xe-lattest`, all other apps closed: `kernel->gpu` p50 0.01-0.06 ms, p99 0.12-0.24 ms, max
+  0.5-1.0 ms; wall p50 0.09-0.32 ms, max 2.1 ms. Busy rerun right after (Claude app open): p50 1.47, p90 12.67 ms.
+- [measured] `top` during the busy run: Claude Helper (Renderer) 73% CPU, Claude Helper (GPU) 68%, Claude 16%,
+  WindowServer 20%.
+- Lukas: "a sensacao é bem melhor com ele limpo" (feels much better clean).
+- [inferred] The WhateverXe driver's own submit path is fine (sub-ms). The delay is queueing behind other GPU clients,
+  chiefly the Claude desktop app (Electron, renders constantly). With the host scheduler (GuC off) one busy client
+  delays every other app's frames and WindowServer's composite by up to 1-2 frames.
+- Next: move the heavy Electron app to the RTX (`ondemand.sh add`), one app at a time, and rerun `xe-lattest`
+  with it open.

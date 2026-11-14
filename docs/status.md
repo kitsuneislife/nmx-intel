@@ -34,9 +34,9 @@
    "Refresh Rate" menu via `display-refresh-rate-policy`, pending.
 4. Sleep: off; untested with WhateverXe.
 5. `ASSERT(linkBW)` warning in the XE-7 log, harmless so far.
-6. Feels slow (11-13): touchpad in VoodooI2C polling mode, desktop still 60 Hz, bluetoothd restart loop
-   ([tests/wex-1.md](tests/wex-1.md), slowness check). XE-13 pending: no cpuname, touchpad interrupts, `refresh.sh set 144`.
-   Iris Xe submit latency p90 12-15 ms [measured, `xe-lattest`]: likely the main cause.
+6. Feels slow (11-13): cause found [inferred from measured contrast]: other GPU clients (mainly the Claude app) make
+   Iris Xe submits wait p90 12-15 ms; clean desktop p99 <0.25 ms ([tests/wex-1.md](tests/wex-1.md)). Next: those apps
+   on the RTX via `ondemand.sh`. XE-13 pending: no cpuname (Settings crash), touchpad interrupts, `refresh.sh set 144`.
 
 ## Other areas
 
