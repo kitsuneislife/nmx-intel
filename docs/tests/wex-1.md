@@ -827,3 +827,16 @@ patches, last good on 2.3.6), so none of our RTX patches are needed.
   processes showed up busy; at 08:24 (LAT-8, max 20-24 ms) each app's GPU process ran 29-63 %. So this is not the
   three-busy-apps load; the comparison is still open [inferred].
 - Next: rerun while Claude 2 and 3 are actually generating output, with a CPU snapshot of their helpers next to each run.
+
+### LAT-5 result, part 3 (2026-11-14 ~09:05): three busy Claude apps
+
+- [measured] `xe-lattest` three runs (`~/lat-lat5g..i.txt`), uptime 6-8 min, Claude 2 and 3 generating long answers,
+  helper CPU snapshot before each run: GPU processes Claude 2 39-45 %, Claude 3 12-20 %, Claude 12-21 %; Claude 2
+  renderer 46-126 %.
+- [measured] kernel->gpu p50 1.9-14.3 ms, p90 28-34 ms, p99 42-62 ms, max 42-72 ms (all gaps). LAT-8 at 08:24 with
+  three busy apps: p90 12-15.7, p99 17.5-19.1, max 20-24 ms.
+- [inferred] `PreemptionTimerIntervalUS=500` makes the busy case 2-3x worse: a shorter timer seems to add switch cost
+  (or preempts the compositor as well) rather than cut the wait. Caveat: the load today (one app streaming a long
+  answer with its renderer at up to 126 %) may be heavier than at 08:24, so the LAT-8 control under the same load
+  comes next, on the boot after this one (boot-back puts LAT-8 back by itself).
+- Verdict: LAT-5 with 500 us rejected for now; final after the control run.
