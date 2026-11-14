@@ -127,3 +127,5 @@ changes), then [../status.md](../status.md).
 | XE-13 | 11-13 | XE-12 | boot-args: `revpatch=sbvmm` (no cpuname), no `-vi2c-force-polling`; `refresh.sh set 144`; powermetrics baseline | Settings fixed; touchpad dead without polling (arg restored); latency unchanged | [wex-1](wex-1.md) |
 | LAT-4 | 11-14 | XE-13 | `-disablegfxpreemption` (WEX_EXTRA) | worse: submit wait max 25-31 ms (was 14-18); preemption helps; undone | [wex-1](wex-1.md) |
 | LAT-8 | 11-14 | XE-13 | WhateverXe `8dfa6775` + `-wex-objpreempt` (object-level preemption on), one boot | better: max 6-10 ms (was 14-18); no GPU reset; soak pending | [wex-1](wex-1.md) |
+| LAT-5 | 11-14 | LAT-8 | WhateverXe `fa17909c` + `wexdev` property `PreemptionTimerIntervalUS=500` | prepared, **not run**: deferred by Lukas (11-14) for NMH-1 | [wex-1](wex-1.md) |
+| NMH-1 | 11-14 | LAT-8 daily + nullmoth 3.0 (NVRM `ba6184e9`, NVAccel `d4ced924`, NMIntelFB `4b8afbcf`) | RTX-only for one boot through nullmoth's own hybrid path, `nmhybrid=1` (copy) | prepared | [wex-1](wex-1.md) |

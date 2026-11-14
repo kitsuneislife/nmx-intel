@@ -742,3 +742,36 @@ scheduler keys. Live `Development` dict [measured]: `PreemptionTimerIntervalUS=2
   vs the 08:24 run (max 20-24 ms).
 - On hold: Lukas first asked for one RTX-only boot (`efi.sh gpu-only`) to compare the feel. That route was last
   good on nullmoth 2.3.6 with our NVRM/NVAccel patches; on release 2.9 it is untested [unverified].
+
+LAT-5 note (2026-11-14): deferred by Lukas, to be run later as prepared above (`wex-lat5` stays staged). It is
+independent of NMH-1: after NMH-1's boot the daily LAT-8 config comes back by itself.
+
+## NMH-1 (prepared 2026-11-14): RTX-only for one boot on nullmoth 3.0's own hybrid path
+
+Lukas asked to see how the RTX-only route feels on nullmoth 3.0, for the next boot only. Since 2.9 nullmoth ships its
+own path for laptops whose panel is on the iGPU: NVAccel presents WindowServer's frames on head 4, published by
+nullmoth's `NMIntelFB` (`docs/HYBRID-LAPTOPS.md`, `docs/HYBRID-TESTER-PLAN.md` at `v3.0`). Off unless the boot-arg
+`nmhybrid` is set; levels 1 copy, 2 import (GTT), 3 owned buffers, 4 copy engine; Intel display 12/13 for 2-4. Not
+run on any hybrid laptop upstream [measured, doc text]. It replaces our own bridge (NMIntelFB fork + NVRM/NVAccel
+patches, last good on 2.3.6), so none of our RTX patches are needed.
+
+- Release 3.0 (2026-11-14) [measured]: `nullmoth-nvidia-3.0.tar.gz` matches `SHA256SUMS.txt`, inner `SHA256SUMS`
+  passes. NVRM `ba6184e9`, NVAccel `d4ced924`, NVRMFB `4d3c4c02`, NVRMAGDC `97623c55` (unchanged), NMIntelFB
+  `4b8afbcf` (in `/Library/NullMoth/kexts/`, not installed by `install.sh`). Changelog: fixes processes that lost the
+  GPU right after login on 2.9 (command memory no longer GPU-cached), Displays pane hang, shutdown hang. `install.sh`
+  now also adds `gfxrst=4` to NVRAM boot-args when WhateverGreen is loaded (our config sets boot-args, so it has no
+  effect) and installs a backlight job.
+- Upstream `NMIntelFB` returns at once on `-nmintelfboff` and declines without `nmhybrid` [measured, `intelfb.cpp`
+  lines 443-445], so it is inert on the daily hybrid.
+- Our `com.nmxintel.intelfb-auto` job (RTX-24) turns our old bridge's sysctls on; removed for this path.
+- `nvmtl-allow.txt` goes back to nullmoth's list on install (`*`, `!WindowServer`), which is what this route wants;
+  `ondemand.sh on` + `add` come after, on the way back to the hybrid.
+- `efi.sh rtx` (new): `config-rtx.plist` = `config-gpu-only.plist` minus `-nmintelfboff`/`-nvoff`, plus
+  `nmhybrid=${NMHYBRID:-1}`; saves the daily `config.plist` as `config-back.plist` and arms a daemon (`boot-back`)
+  that puts it back early in that boot and removes itself. `NMHYBRID=2..4` for the next levels, one per boot.
+- First level 1 (copy), as the upstream tester plan orders. Checks: `log show --last boot --predicate 'eventMessage
+  CONTAINS "hybrid:"'` (S1 switch read, S2 provider NMIntelFB, S3 first frame), `sysctl debug.nmhybrid_frames
+  debug.nmhybrid_words_skipped debug.nmintelfb_step`, and Lukas's feel vs the LAT-8 hybrid.
+- Rollback: the next boot is the daily config by itself; a frozen boot → OpenCore Space → "Start once without
+  NVIDIA driver" (NMIntelFB stands down on `-nvoff`), the daemon then restores the daily config. Driver:
+  `sudo bash tools/upgrade/rollback.sh /Library/NullMoth/backup-…`.

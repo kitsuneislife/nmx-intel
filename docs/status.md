@@ -1,6 +1,6 @@
 # Status
 
-> **Summary.** Last updated 2026-11-13. Daily setup is the **WhateverXe hybrid** (XE-8): the Iris Xe drives the
+> **Summary.** Last updated 2026-11-14. Daily setup is the **WhateverXe hybrid** (XE-8): the Iris Xe drives the
 > desktop with Metal at 60 Hz, the RTX runs nullmoth headless and only apps listed by `ondemand.sh` open it. Drivers
 > are the newest (UPG-6b, XE-11). **Staying on Sequoia 15.8.1**: the Tahoe trial (TAHOE-0..3 passed, TAHOE-4 not run)
 > is recorded in [tests/tahoe-1.md](tests/tahoe-1.md) and removed with `sudo bash tools/tahoe/tahoe.sh remove`.
@@ -42,7 +42,8 @@
 
 ## Other areas
 
-- RTX-only route (path B): works on nullmoth 2.3.6; 2.5.x/2.6.4 blink (UPG-2..5, parked),
-  [tests/rtx-8-accelerated-desktop.md](tests/rtx-8-accelerated-desktop.md).
+- RTX-only route: our bridge worked on nullmoth 2.3.6 only (UPG-2..5 parked). **NMH-1 prepared**: one boot on
+  nullmoth 3.0's own path (`nmhybrid=1`, `efi.sh rtx`), daily config back by itself ([tests/wex-1.md](tests/wex-1.md)).
+- **LAT-5 deferred** (Lukas, 11-14): prepared, run later with the command in `efi.sh`'s header.
 - Wi-Fi MT7921 at the line's ceiling (WIFI-8), [knowledge/wifi.md](knowledge/wifi.md).
 - Previous status text (verbatim): [archive/status-2026-10-29.md](archive/status-2026-10-29.md).
