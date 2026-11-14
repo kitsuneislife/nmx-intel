@@ -677,3 +677,22 @@ state; the latency says it did something. Three runs, Claude on screen, 144 Hz, 
   cost of it. CPU load in the first minutes is a caveat, but earlier runs showed CPU load does not raise the wait.
 - Next: undo LAT-4 (`efi.sh wexrtx-keep` without `WEX_EXTRA`). The research plan's LAT-8 (`-wex-objpreempt`: let
   object-level preemption stay on, so the busy batch can be cut mid-way) becomes the most promising change.
+
+## LAT-8 (prepared 2026-11-14): object-level preemption on, knob `-wex-objpreempt`
+
+LAT-4 says host preemption helps but is too coarse. WhateverXe turns 3D object-level preemption off (r135 clears
+CS_CHICKEN1 bit0, r144 makes CS_DEBUG_MODE1 0x20EC bit0 the global selector, r145 writes 0x20EC = mask 0x3 value
+0x2, so bit0 = 0). One variable: with `-wex-objpreempt` the r145 write becomes value 0x3 (bit0 = 1, object-level
+preemption globally on). CS_CHICKEN1, FF DOP clock gating and compute mode are unchanged.
+
+- Patch `source-fixes/wex/0.8.2/0006-lat8-objpreempt-knob.patch` (src-082 `aed59ac`, tag `lat-8`). Built with the
+  XE-11 SDK `3f75008` and Lilu 1.7.2: WhateverXe `8dfa6775` (`strings` shows `-wex-objpreempt` and
+  `TGLObjectPreemptionKnob`); CPU tests 216/216 (the boot-arg name added to `tests/fixtures/boot_argument_names.json`).
+  Without the arg the build behaves as `96545d6d` [inferred: only that byte depends on the knob].
+- Staged in `~/nmx-build/whateverxe/kexts/wex-lat8/`. Installed with the one-boot mode so a hang falls back to the
+  GPU-only config on the next boot: `sudo WEXDIR=wex-lat8 WEX_EXTRA="-wex-objpreempt" bash tools/hybrid/efi.sh wexrtx`.
+- Risk: the TGL B0 "object-preemption topology corruption" that r135 works around (RPL-P stepping unverified):
+  rendering corruption or GPU hangs (`recoveryCount`).
+- Checks: registry `TGLObjectPreemptionKnob` = Yes; `xe-lattest` with Claude on screen vs the XE-13 baseline
+  (max 14-18 ms); no corruption; `recoveryCount` 0.
+- Keep: run the same command with `wexrtx-keep`. Undo: `sudo bash tools/hybrid/efi.sh wexrtx-keep`.

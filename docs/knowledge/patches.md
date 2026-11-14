@@ -139,3 +139,6 @@ source-fixes/00NN-<slug>.patch`, add an `apply` line to `build/apply-fixes.sh` (
   0.8 expects port mode 3 on a Type-C port (≥3) and 4 otherwise, and the resolution keeps that rule with our
   "mode 0 on a combo port during the boot handoff" exception. 0005 (new) makes 0002's mask bit 13 use the same 0.8
   rule. Built with MacKernelSDK `3f75008` and Lilu 1.7.2; CPU tests pass. WhateverXe `96545d6d`.
+- `source-fixes/wex/0.8.2/0006-lat8-objpreempt-knob.patch` (LAT-8) — knob `-wex-objpreempt`: r145's CS_DEBUG_MODE1
+  (0x20EC) write sets bit0, the global object-level preemption enable under r144's selector. Default off. WhateverXe
+  `8dfa6775`, staged in `kexts/wex-lat8/`.
