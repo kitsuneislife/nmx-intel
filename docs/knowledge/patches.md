@@ -142,3 +142,6 @@ source-fixes/00NN-<slug>.patch`, add an `apply` line to `build/apply-fixes.sh` (
 - `source-fixes/wex/0.8.2/0006-lat8-objpreempt-knob.patch` (LAT-8) — knob `-wex-objpreempt`: r145's CS_DEBUG_MODE1
   (0x20EC) write sets bit0, the global object-level preemption enable under r144's selector. Default off. WhateverXe
   `8dfa6775`, staged in `kexts/wex-lat8/`.
+- `source-fixes/wex/0.8.2/0007-lat5-wexdev-development-keys.patch` (LAT-5, on top of 0006) — iGPU properties
+  `wexdev-<Key>` (5 allowed scheduler keys) override Apple's `Development` dict before the TGL accelerator starts;
+  set with `WEX_DEV` in `wex-config.py`. No property, no change. WhateverXe `fa17909c`, staged in `kexts/wex-lat5/`.
