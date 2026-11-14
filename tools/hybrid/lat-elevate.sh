@@ -12,7 +12,7 @@ if [ ! -x /tmp/xe-lattest ]; then   # build the probe as the user, next to this 
 fi
 home=$(eval echo "~$user")
 out="$home/lat-elevate.txt"
-pidf=$(mktemp); chown "$user" "$pidf"
+pidf=$(mktemp /tmp/lat-elevate.XXXXXX); chown "$user" "$pidf"
 trap 'sysctl -q debug.intel.schedPriElevatePID=-1 >/dev/null; rm -f "$pidf"' EXIT
 
 run() {   # run the probe as the user; $1 = elevate or not
