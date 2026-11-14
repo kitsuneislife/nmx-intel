@@ -36,6 +36,7 @@
 5. `ASSERT(linkBW)` warning in the XE-7 log, harmless so far.
 6. Feels slow (11-13): touchpad in VoodooI2C polling mode, desktop still 60 Hz, bluetoothd restart loop
    ([tests/wex-1.md](tests/wex-1.md), slowness check). XE-13 pending: no cpuname, touchpad interrupts, `refresh.sh set 144`.
+   Iris Xe submit latency p90 12-15 ms [measured, `xe-lattest`]: likely the main cause.
 
 ## Other areas
 

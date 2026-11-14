@@ -544,3 +544,21 @@ Two independent boot-args changes in `wex-config.py` (`bafe4cd0`), each with its
   Mode match now rounds (rates read 60.018 / 144.002). Tested: `set 60` ok, `set 99` usage.
 - Baseline before the reboot: `sudo powermetrics --samplers gpu_power,cpu_power` while scrolling, to see the Iris Xe
   clock (is it stuck low?).
+
+### GPU submission latency (2026-11-13 ~22:00, before XE-13 is installed)
+
+Lukas: XE-13's 144 Hz feels lighter but not right; there is a visible delay even when typing. Typing is PS/2
+(VoodooPS2), not the touchpad, so the cause is shared by every app [inferred]. Measured with no reboot:
+
+- [measured] CPU timer wakeups fine (1 ms nanosleep overshoot p50 ~180 us, p99 ~390 us); CPU not throttled
+  (`CPU_Speed_Limit` 100, 2e9-add loop 2.5-3.1 s).
+- [measured] `tools/hybrid/xe-lattest.m` (`d229ed59`), 300 tiny compute jobs on the Iris Xe, busy desktop (Claude app open):
+  `kernel->gpu` start p50 2.0-4.1 ms, p90 11.6-14.8 ms, p99 22-25 ms, max 33 ms; GPU execution 0.005 ms. The wait
+  is the same with 0, 8 or 16 ms idle gaps, so it is not a GPU wake-up cost [inferred].
+- [measured] GPU interrupts are delivered (`TGLIRQLive` host counters +1400/+1900 per s, ~490 submits/s). Long FMA
+  run: ~711 GFLOPS, about 0.9 GHz on 48 EUs [inferred], so the clock is not stuck at its minimum.
+- [inferred] Each app frame and each WindowServer composite queue behind other GPU work (or the host scheduler,
+  GuC off with `-disablegfxfirmware`) for up to 1-2 frames: the input-to-screen delay and hitching Lukas feels.
+  On a real Mac this wait is far below 1 ms [unverified here].
+- Next measurement: the same test with only Terminal open, to separate "queued behind other apps" from "the
+  driver's own scheduling".
