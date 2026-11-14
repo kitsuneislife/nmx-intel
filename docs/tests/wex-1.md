@@ -585,3 +585,19 @@ Lukas: XE-13's 144 Hz feels lighter but not right; there is a visible delay even
   to list is `Claude Helper` (this also gives the RTX to Claude's utility processes; harmless, they do not use Metal
   [inferred]).
 - Next: remove `Claude Helper (GPU)`, add `Claude Helper`, restart Claude, rerun.
+
+### Claude app on the RTX, try 2 (2026-11-13 ~22:50)
+
+- With `Claude Helper` listed: [measured] the GPU process (`--type=gpu-process`) now holds the RTX, yet `xe-lattest`
+  is no better: `kernel->gpu` p50 3.5-5.7 ms, p90 10.5-15.8 ms, max 17-22 ms. The GPU process still holds 4 Intel
+  user clients (Chromium opens every Metal device) [measured, ioreg `IOUserClientCreator`].
+- [measured] Same desktop plus 12 `yes` CPU burners: `kernel->gpu` p50 0.09-4.1 ms, p99 7.4-8.4 ms, max 9 ms, i.e.
+  better, not worse. So the wait is not CPU starvation of the submit path [inferred].
+- [measured] Intel `PerformanceStatistics` utilization reads 0% (probably not filled by WhateverXe [unverified]).
+- [inferred] New hypothesis: the max wait sits at about one 60 Hz frame (15-22 ms). With the host scheduler the ring
+  is in order, so a WindowServer submit that waits for vblank/flip can hold every later job until the next frame.
+  A constantly repainting window (Claude) keeps WindowServer compositing every frame; under the CPU burners the app
+  draws less, so the wait drops. Test: same run at 144 Hz (`refresh.sh set 144`); if the max falls to ~7-8 ms
+  (one 144 Hz frame) the hypothesis holds.
+- Claude taken off the RTX list again (no gain). Also seen: a second Claude copy (`~/Applications/Claude 2.app`)
+  running at ~116% CPU.
