@@ -8,6 +8,7 @@
 #   sudo bash tools/hybrid/refresh.sh install   write the override; the menu appears after a reboot
 #   sudo bash tools/hybrid/refresh.sh remove    delete it (and the saved mode) so the panel goes back to 60 Hz
 #   bash tools/hybrid/refresh.sh status         current mode, available modes, override present or not
+#   bash tools/hybrid/refresh.sh set 144        pick 144 (or 60) Hz for good, as the Settings menu would (no root)
 # Do not restart WindowServer to apply it early on the WhateverXe panel (pitfall, UPG-6): reboot instead.
 set -uo pipefail
 VID=30e4; PID=742   # IODisplayPrefsKey ...IGPU@2-30e4-742-...; DisplayVendorID 12516, DisplayProductID 1858
@@ -29,24 +30,29 @@ if want == 0 {
     print("rates at this size:", all.filter { $0.width == cur.width && $0.height == cur.height }.map { $0.refreshRate })
     exit(0)
 }
-guard let m = all.first(where: { $0.width == cur.width && $0.height == cur.height && $0.refreshRate == want }) else {
+guard let m = all.first(where: { $0.width == cur.width && $0.height == cur.height && $0.refreshRate.rounded() == want }) else {
     print("no \(want) Hz mode at \(cur.width)x\(cur.height)"); exit(1)
 }
 var cfg: CGDisplayConfigRef?
 CGBeginDisplayConfiguration(&cfg)
 CGConfigureDisplayWithDisplayMode(cfg, d, m, nil)
-let err = CGCompleteDisplayConfiguration(cfg, .forAppOnly)
+let keep = CommandLine.arguments.count > 2   // "set": saved in WindowServer's display prefs like the Settings menu
+let err = CGCompleteDisplayConfiguration(cfg, keep ? .permanently : .forAppOnly)
 print("switch to \(want) Hz: \(err == .success ? "ok" : "error \(err.rawValue)")")
+if keep { exit(err == .success ? 0 : 1) }
 Thread.sleep(forTimeInterval: 1)
 print("now: \(CGDisplayCopyDisplayMode(d)!.refreshRate) Hz; back to \(cur.refreshRate) Hz in 10 s")
 Thread.sleep(forTimeInterval: 10)
 EOF
-    swift "$t" ${1:+"$1"}; local rc=$?
+    swift "$t" "$@"; local rc=$?
     rm -f "$t"; return $rc
 }
 case "${1:-}" in
 probe)
     modes 144
+    ;;
+set)
+    case "${2:-}" in 60|144) modes "$2" keep ;; *) echo "usage: refresh.sh set 60|144"; exit 1 ;; esac
     ;;
 install)
     need_root

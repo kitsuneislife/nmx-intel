@@ -527,3 +527,20 @@ Lukas: the system still feels slow and odd, both to use and to look at. Live che
   `AppleSystemInfo`, the framework RestrictEvents patches for `revpatch=cpuname` [inferred link, unverified].
 - [measured] Iris Xe Metal (`AppleIntelTGLGraphicsMTLDriver`), `recoveryCount` = 0, no GPU hangs. GPU clock not
   measured (needs `sudo powermetrics`); `-disablegfxfirmware` is required by WhateverXe.
+
+Lukas (21:50): the Refresh Rate menu appears, but System Settings crashes so often it is hard to use; and the
+slowness feels odd even for 60 Hz.
+
+## XE-13 (prepared 2026-11-13): no cpuname patch, touchpad on interrupts, 144 Hz without Settings
+
+Two independent boot-args changes in `wex-config.py` (`bafe4cd0`), each with its own check, plus a no-reboot tool:
+
+- `revpatch=sbvmm,cpuname` → `revpatch=sbvmm`. Check: System Settings opens Displays and About without crashing;
+  no new `KERN_MEMORY_ERROR` report. Cost: About This Mac may show a generic CPU name.
+- `-vi2c-force-polling` dropped. Check: `ioreg -r -c VoodooI2CDeviceNub -l` → `"Interrupt Mode"` (Polling or
+  GPIO/APIC) and how the cursor feels. If GPI0 `INTC1055` has no VoodooGPIO match, VoodooI2C falls back to
+  polling [unverified]; worst case the touchpad is dead (USB mouse, or add the arg back with `efi.sh`).
+- `refresh.sh set 144` (`483d1979`): switches with `kCGConfigureForPermanently`, the same save the Settings menu does.
+  Mode match now rounds (rates read 60.018 / 144.002). Tested: `set 60` ok, `set 99` usage.
+- Baseline before the reboot: `sudo powermetrics --samplers gpu_power,cpu_power` while scrolling, to see the Iris Xe
+  clock (is it stuck low?).

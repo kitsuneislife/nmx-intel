@@ -19,6 +19,8 @@ Only these change, everything else stays as in the GPU-only config:
   does not start, so WindowServer cannot pick the RTX Metal driver).
 - ACPI/Add: SSDT-PNLF.aml (pnlf-aml.py, efi.sh writes it to OC/ACPI): WhateverXe's README asks for it for panel
   brightness; without it the panel is an AppleDisplay with no brightness (XE-7).
+- boot-args (XE-13): revpatch=sbvmm,cpuname -> revpatch=sbvmm (cpuname crashed System Settings and system_profiler
+  in AppleSystemInfo) and -vi2c-force-polling dropped (touchpad on GPIO interrupts; VoodooI2C polls if none).
 csr-active-config 0xa43 already contains the 0x803 WhateverXe asks for; amfi flags stay (not required, harmless).
 """
 import plistlib
@@ -26,7 +28,8 @@ import sys
 
 APPLE_BOOT = "7C436110-AB2A-4BBB-A880-FE41995C9F82"
 IGPU = "PciRoot(0x0)/Pci(0x2,0x0)"
-DROP_ARGS = {"-v", "nvaccel=1"}
+DROP_ARGS = {"-v", "nvaccel=1", "-vi2c-force-polling"}
+SWAP_ARGS = {"revpatch=sbvmm,cpuname": "revpatch=sbvmm"}
 WEX_ARGS = "-allow3d -disablegfxfirmware msgbuf=400000 -nvoff".split()
 PNLF_ENTRY = {"Comment": "WhateverXe route: panel brightness (PNLF, UID 19)", "Enabled": True, "Path": "SSDT-PNLF.aml"}
 WEX_ENTRY = {
@@ -52,7 +55,7 @@ def make(c: dict, rtx: bool = False) -> dict:
     c["DeviceProperties"]["Add"].setdefault(IGPU, {})["nmx-wex"] = b"\x01"
     boot = c["NVRAM"]["Add"][APPLE_BOOT]
     drop, extra = (DROP_ARGS - {"nvaccel=1"}, WEX_ARGS[:-1] + ["-nmintelfboff"]) if rtx else (DROP_ARGS, WEX_ARGS)
-    args = [a for a in boot["boot-args"].split() if a not in drop]
+    args = [SWAP_ARGS.get(a, a) for a in boot["boot-args"].split() if a not in drop]
     boot["boot-args"] = " ".join(args + [a for a in extra if a not in args])
     return c
 
