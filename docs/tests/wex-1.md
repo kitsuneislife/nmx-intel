@@ -625,3 +625,16 @@ Lukas: XE-13's 144 Hz feels lighter but not right; there is a visible delay even
 - LAT-2 prepared: `tools/hybrid/lat-elevate.sh` (`850482c4`) runs `xe-lattest` normal, then with its PID in
   `debug.intel.schedPriElevatePID`, and puts -1 back on exit. If the elevated run's p90 falls to ~1 ms, the band model
   holds and the fix is priority (e.g. elevate WindowServer or lower background clients).
+
+### LAT-2 result (2026-11-14 ~00:10)
+
+- First run invalid: the pid file sat in root's `mktemp` dir, the probe could not write it, the sysctl got -1
+  (fixed `89f0249`).
+- [measured] Second run, Claude visible: normal `kernel->gpu` p90 13.6 / 14.1 / 6.4 ms (gaps 0/8/16), elevated
+  (`schedPriElevatePID: -1 -> 4185`, read back) p90 13.6 / 13.6 / 6.5 ms. No change.
+- [inferred] Either Apple's band priority is not the lever, or `schedPriElevatePID` is ignored on this path. Not
+  conclusive for the band model as a whole. `-wex-adln-qtrace` (LAT-3) only installs when Alder Lake-N is detected
+  (`adlnDetected`, kern_xe.cpp:11791), so it will not run on RPL-P without a fork change.
+- Next: LAT-4, Apple's `-disablegfxpreemption`, added through the new `WEX_EXTRA` hook of `wex-config.py`
+  (`d5fe0750`): `sudo WEX_EXTRA="-disablegfxpreemption" bash tools/hybrid/efi.sh wexrtx-keep`. XE-13 goes first on its
+  own reboot, to get a new baseline.
