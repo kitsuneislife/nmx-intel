@@ -23,6 +23,7 @@ Only these change, everything else stays as in the GPU-only config:
   in AppleSystemInfo) and -vi2c-force-polling dropped (touchpad on GPIO interrupts; VoodooI2C polls if none).
 csr-active-config 0xa43 already contains the 0x803 WhateverXe asks for; amfi flags stay (not required, harmless).
 """
+import os
 import plistlib
 import sys
 
@@ -56,6 +57,7 @@ def make(c: dict, rtx: bool = False) -> dict:
     boot = c["NVRAM"]["Add"][APPLE_BOOT]
     drop, extra = (DROP_ARGS - {"nvaccel=1"}, WEX_ARGS[:-1] + ["-nmintelfboff"]) if rtx else (DROP_ARGS, WEX_ARGS)
     args = [SWAP_ARGS.get(a, a) for a in boot["boot-args"].split() if a not in drop]
+    extra = extra + os.environ.get("WEX_EXTRA", "").split()   # one-off test args, e.g. WEX_EXTRA=-disablegfxpreemption
     boot["boot-args"] = " ".join(args + [a for a in extra if a not in args])
     return c
 
