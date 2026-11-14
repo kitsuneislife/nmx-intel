@@ -881,3 +881,22 @@ LAT-12 note (2026-11-14 ~09:25): **dropped by Lukas before it ran.** He does not
 experience it is very slow and costs more resources overall. `claude-gpu.sh off` never took effect (Claude ignored the
 Apple Event quit while busy; the run was stopped), `status` afterwards: both apps "GPU on", 6 Intel clients each
 [measured]. Rule from now on: fixes must keep apps on a GPU; reduce or move GPU work, never fall back to software.
+
+### LAT-13 prepared (2026-11-14): all three Claude apps render on the RTX
+
+Lukas chose this lever after the research in [../research/xe-alternatives.md](../research/xe-alternatives.md): move
+the Metal work of every Claude app (main, 2 and 3) to the RTX through the hybrid allow-list, so the Iris Xe only
+composites their windows. Every app stays on a GPU.
+
+- Chromium's GPU work runs in `Claude Helper --type=gpu-process` in all three apps (pids 572, 733, 735) [measured,
+  `ps`]. The clones use the same executable names, so two list entries cover the three apps: `Claude` and
+  `Claude Helper` (same lesson as Chrome's Aperitif helper, pitfalls.md).
+- `ondemand.sh add|remove` now takes several names (dry-run on a copy of the list: add, re-add, remove all
+  behave) [measured].
+- Steps: `sudo bash tools/hybrid/ondemand.sh add "Claude" "Claude Helper"`, then quit (Cmd+Q) and reopen all three
+  apps. No reboot.
+- Checks: `ondemand.sh status` lists the Claude processes as RTX holders; `claude-gpu.sh status` shows fewer Intel
+  GPU clients than the 6 per app baseline; windows draw (risk: blank windows, as with Chrome's own GPU path on
+  Julio's build); same load as LAT-5 part 3; `lat-busy.sh lat13` vs LAT-8 08:24 (max 20-24 ms) and LAT-5 (42-72).
+  Unknown: whether Chromium picks the RTX or still the default Iris Xe device when both are visible [unverified].
+- Undo: `sudo bash tools/hybrid/ondemand.sh remove "Claude" "Claude Helper"` and reopen the apps.

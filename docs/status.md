@@ -45,6 +45,6 @@
 - RTX-only route: our bridge worked on nullmoth 2.3.6 only. **NMH-1 failed** (11-14): nullmoth 3.0's `nmhybrid=1`
   hung the boot with no log; parked. nullmoth 3.0 stays on the daily hybrid ([tests/wex-1.md](tests/wex-1.md)).
 - **LAT-5 worse** (11-14): timer 500 us, three busy Claude apps: max 42-72 ms (LAT-8 08:24: 20-24); reverts by itself next boot.
-- **Approach changed** (11-14): cut the Iris Xe load instead of tuning its scheduler, but keep every app on a GPU (LAT-12, CPU drawing, dropped by Lukas). Research 11-14: no community driver or patch beats WhateverXe here; GPU-only levers ranked in [research/xe-alternatives.md](research/xe-alternatives.md). Next test to be chosen.
+- **Approach changed** (11-14): cut the Iris Xe load instead of tuning its scheduler, but keep every app on a GPU (LAT-12, CPU drawing, dropped by Lukas). Research 11-14: no community driver or patch beats WhateverXe here; GPU-only levers ranked in [research/xe-alternatives.md](research/xe-alternatives.md). Next: **LAT-13**, all three Claude apps on the RTX (allow-list, no reboot).
 - Wi-Fi MT7921 at the line's ceiling (WIFI-8), [knowledge/wifi.md](knowledge/wifi.md).
 - Previous status text (verbatim): [archive/status-2026-10-29.md](archive/status-2026-10-29.md).
