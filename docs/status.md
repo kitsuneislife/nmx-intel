@@ -38,7 +38,7 @@
    clean desktop p99 <0.25 ms. Not CPU, not vblank (same at 144 Hz), not fixed by Claude on the RTX
    ([tests/wex-1.md](tests/wex-1.md)), not priority elevation (LAT-2). XE-13 installed: Settings crash fixed,
    touchpad stays on polling (GPIO interrupts do not match); latency unchanged. LAT-4 `-disablegfxpreemption`: worse (max 25-31 ms), so
-   preemption helps. LAT-8 (object preemption on, `8dfa6775`) pending ([research/xe-latency.md](research/xe-latency.md)).
+   preemption helps. LAT-8 (object preemption on, `8dfa6775`): max wait 6-10 ms (was 14-18), soak pending ([research/xe-latency.md](research/xe-latency.md)).
 
 ## Other areas
 

@@ -696,3 +696,15 @@ preemption globally on). CS_CHICKEN1, FF DOP clock gating and compute mode are u
 - Checks: registry `TGLObjectPreemptionKnob` = Yes; `xe-lattest` with Claude on screen vs the XE-13 baseline
   (max 14-18 ms); no corruption; `recoveryCount` 0.
 - Keep: run the same command with `wexrtx-keep`. Undo: `sudo bash tools/hybrid/efi.sh wexrtx-keep`.
+
+### LAT-8 result, part 1 (2026-11-14 ~00:25)
+
+- [measured] Booted with `-wex-objpreempt`; WhateverXe 0.8.2 loaded; registry `TGLObjectPreemptionKnob` = Yes (and
+  the r135/r144/r145 flags still Yes); no `recoveryCount` property, no GPU reset seen. boot-once put GPU-only back
+  for the next start, as designed.
+- [measured] `xe-lattest`, three runs (`~/lat-lat8a..c.txt`), Claude app on screen, 144 Hz, uptime 2 min, load ~30:
+  kernel->gpu p90 0.1-5.8 ms, p99 2.9-7.7 ms, max 6.2-10.1 ms (all gaps). XE-13 baseline: p90 6-14, p99 12-18,
+  max 14-18 ms; LAT-4: max 25-31 ms.
+- [inferred] The worst-case wait roughly halves: the busy client's long draw is now preempted at object
+  granularity. This supports the queueing model. Still open: corruption over longer use (r135's TGL B0 erratum,
+  RPL-P stepping unverified) and whether Lukas feels it.
