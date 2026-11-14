@@ -708,3 +708,5 @@ preemption globally on). CS_CHICKEN1, FF DOP clock gating and compute mode are u
 - [inferred] The worst-case wait roughly halves: the busy client's long draw is now preempted at object
   granularity. This supports the queueing model. Still open: corruption over longer use (r135's TGL B0 erratum,
   RPL-P stepping unverified) and whether Lukas feels it.
+- Lukas (~00:30), after a few minutes of use: the general feel improved; no artefacts reported. Kept as daily
+  (`wexrtx-keep` with the same `WEXDIR`/`WEX_EXTRA`); longer soak still watches for corruption.
