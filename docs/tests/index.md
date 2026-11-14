@@ -128,5 +128,5 @@ changes), then [../status.md](../status.md).
 | LAT-4 | 11-14 | XE-13 | `-disablegfxpreemption` (WEX_EXTRA) | worse: submit wait max 25-31 ms (was 14-18); preemption helps; undone | [wex-1](wex-1.md) |
 | LAT-8 | 11-14 | XE-13 | WhateverXe `8dfa6775` + `-wex-objpreempt` (object-level preemption on), one boot | better: max 6-10 ms (was 14-18); no GPU reset; soak pending | [wex-1](wex-1.md) |
 | LAT-5 | 11-14 | LAT-8 | WhateverXe `fa17909c` + `wexdev` property `PreemptionTimerIntervalUS=500` | worse: three busy apps max 42-72 ms (LAT-8 08:24: 20-24); LAT-8 control under same load next | [wex-1](wex-1.md) |
-| LAT-12 | 11-14 | LAT-5 boot | Claude 2 and 3 restarted with `--disable-gpu --disable-gpu-compositing` (`claude-gpu.sh off`) | prepared, no reboot needed | [wex-1](wex-1.md) |
+| LAT-12 | 11-14 | LAT-5 boot | Claude 2 and 3 restarted with `--disable-gpu --disable-gpu-compositing` (`claude-gpu.sh off`) | **dropped** by Lukas before running: no CPU drawing | [wex-1](wex-1.md) |
 | NMH-1 | 11-14 | LAT-8 daily + nullmoth 3.0 (NVRM `ba6184e9`, NVAccel `d4ced924`, NMIntelFB `4b8afbcf`) | RTX-only for one boot through nullmoth's own hybrid path, `nmhybrid=1` (copy) | **fail**: boot hung after the kexts were allowed, no NVRM/NVAccel/NMIntelFB line, no panic; daily config came back by itself | [wex-1](wex-1.md) |

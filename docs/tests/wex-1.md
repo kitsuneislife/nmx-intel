@@ -876,3 +876,8 @@ runs in it), so it is the remaining Electron load.
   feel; CPU of the two apps.
 - Keep: make the flags part of the clones' `launch` script (`~/.config/claude-instances/build.sh`). Undo:
   `claude-gpu.sh on`, or just quit and reopen the apps.
+
+LAT-12 note (2026-11-14 ~09:25): **dropped by Lukas before it ran.** He does not accept apps drawn on the CPU: in his
+experience it is very slow and costs more resources overall. `claude-gpu.sh off` never took effect (Claude ignored the
+Apple Event quit while busy; the run was stopped), `status` afterwards: both apps "GPU on", 6 Intel clients each
+[measured]. Rule from now on: fixes must keep apps on a GPU; reduce or move GPU work, never fall back to software.
