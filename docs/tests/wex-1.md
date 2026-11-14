@@ -647,3 +647,10 @@ Lukas: XE-13's 144 Hz feels lighter but not right; there is a visible delay even
   `VoodooI2CDeviceNub` stays `!registered, !matched` and no VoodooI2CHID instance attaches. Without the GPIO
   controller and without force-polling, VoodooI2C does not fall back to polling (the `[unverified]` note above was
   wrong). Fix: `wex-config.py` (`fa63d59e`) keeps `-vi2c-force-polling`.
+
+### XE-13 result, part 2 (2026-11-14, after the polling fix)
+
+- [measured] boot-args carry `-vi2c-force-polling` again; PIXA3848 `"Interrupt Mode" = "Polling"`; Lukas: touchpad works.
+- [measured] Lukas: System Settings opens About and Displays without crashing; no new `system_profiler` report.
+  The `revpatch=cpuname` removal fixed the AppleSystemInfo crash [inferred link, now consistent with the evidence].
+- [measured] `refresh.sh set 144`: ok.
