@@ -776,3 +776,29 @@ patches, last good on 2.3.6), so none of our RTX patches are needed.
 - Rollback: the next boot is the daily config by itself; a frozen boot → OpenCore Space → "Start once without
   NVIDIA driver" (NMIntelFB stands down on `-nvoff`), the daemon then restores the daily config. Driver:
   `sudo bash tools/upgrade/rollback.sh /Library/NullMoth/backup-…`.
+
+### NMH-1 result (2026-11-14): fail, the boot hung without a trace
+
+- Boot 08:47 with `... -v nmhybrid=1` [measured, `/var/log/nmx-hybrid.log` boot-back line]. The one-boot daemon
+  ran and evidently copied `config-back.plist` back (the next boot was the daily LAT-8 config), but its "put back"
+  line never reached the log: the system hung right after.
+- Unified log of that boot (08:47:11 to the forced reboot at 08:50:54) [measured]: no kernel line from NVRM, NVAccel,
+  NVRMFB or NMIntelFB at all, no `hybrid:` line. The last activity is syspolicyd allowing the nullmoth kexts at
+  08:47:32, then nothing. No panic report for that boot (only `shutdown_stall_2026-11-14-084652`, from the shutdown
+  before it). `nvram nullmoth-ifb-step` absent, only `nullmoth-nv-ok 1` [measured].
+- Lukas saw the system not start. Where it stopped is unknown: the hang came before (or took down) the log writer
+  [inferred]. No simple fix with a guaranteed result, so by Lukas's rule (11-14) we go back to LAT-5; the route stays
+  parked until upstream reports a working hybrid laptop.
+- nullmoth 3.0 stays installed on the daily hybrid: the boot after NMH-1 works with it (NVRM "boot guard: start 1
+  without a display so far" is its normal headless line) [measured]. NMIntelFB 3.0 is inert there (`-nmintelfboff`).
+
+## LAT-5 (run 2026-11-14 after NMH-1): one command
+
+- Bug found while preparing it: `efi.sh wexrtx` (one boot) armed `boot-once`, which puts `config-gpu-only.plist`
+  back, i.e. the RTX-only bridge that does not work on nullmoth 2.9+. Fixed: when config.plist is already a route
+  config (the daily `wexrtx-keep`), one boot saves it as `config-back.plist` and arms `boot-back` instead.
+- `sudo bash tools/hybrid/lat5.sh`: checks wex-lat5 is `fa17909c`; `ondemand.sh on` + `add` Roblox, RobloxPlayer,
+  Google Chrome, Google Chrome Helper (Aperitif) (the 3.0 install had put back `*`); then
+  `WEXDIR=wex-lat5 WEX_EXTRA=-wex-objpreempt WEX_DEV=PreemptionTimerIntervalUS=500 efi.sh wexrtx` (one boot).
+- Checks as planned above: `ioreg` Development shows 500 (or the clamp in the log); `xe-lattest` with the three
+  Claude apps busy vs LAT-8 (max wait 6-10 ms).

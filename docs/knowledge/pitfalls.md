@@ -393,3 +393,20 @@ copies with the new kernel range (`sudo tahoe.sh patch`); never just widen MaxKe
 - **Cause:** Chrome 157 runs `--type=gpu-process` in the `Google Chrome Helper (Aperitif)` helper [measured, `ps`].
 - **Fix:** list the executable name of the process that does the drawing (`ps -axo args | grep type=gpu-process`).
   With both names listed, `ondemand.sh status` shows two holders (main + Aperitif) [measured].
+
+## One-boot route modes put GPU-only back, not the daily route (LAT-5 prep, 11-14)
+
+- **Symptom:** `efi.sh wexrtx` (one boot) on a machine whose daily config is `wexrtx-keep` would have come back to
+  `config-gpu-only.plist`, the RTX-only bridge, which hangs or goes black on nullmoth 2.9+ [inferred, NMH-1 / UPG].
+- **Cause:** `boot-once` was written when GPU-only was the daily config [measured, `efi.sh`].
+- **Fix:** one-boot route modes now save the current route config as `config-back.plist` and arm `boot-back`. After
+  any change of daily route, check what the one-boot daemon will put back (`ProgramArguments` in
+  `/Library/LaunchDaemons/com.nmx.hybrid-once.plist`).
+
+## nullmoth's nmhybrid=1 hangs this laptop before anything is logged (NMH-1, 11-14)
+
+- **Symptom:** boot hangs after syspolicyd allows the nullmoth kexts; no NVRM/NVAccel/NMIntelFB line, no panic, no
+  `nullmoth-ifb-step` in NVRAM [measured].
+- **Cause:** unknown; the hang comes before the log writer flushes [inferred].
+- **Fix:** none yet. Recovery is automatic (the `boot-back` daemon restored the daily config in that same boot).
+  Retrying needs a way to see the kernel console (`-v` on screen, a photo of the last lines) before changing code.
