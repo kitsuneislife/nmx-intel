@@ -638,3 +638,12 @@ Lukas: XE-13's 144 Hz feels lighter but not right; there is a visible delay even
 - Next: LAT-4, Apple's `-disablegfxpreemption`, added through the new `WEX_EXTRA` hook of `wex-config.py`
   (`d5fe0750`): `sudo WEX_EXTRA="-disablegfxpreemption" bash tools/hybrid/efi.sh wexrtx-keep`. XE-13 goes first on its
   own reboot, to get a new baseline.
+
+### XE-13 result, part 1 (2026-11-14 ~00:00)
+
+- [measured] boot-args active: no `cpuname`, no `-vi2c-force-polling`. `system_profiler SPHardwareDataType` returns
+  rc=0 ("Processor Name: Unknown"): the AppleSystemInfo crash is gone.
+- [measured] Touchpad dead. Kernel log: `Couldn't alloc class "VoodooGPIOTigerLakeLP"`; the PIXA3848
+  `VoodooI2CDeviceNub` stays `!registered, !matched` and no VoodooI2CHID instance attaches. Without the GPIO
+  controller and without force-polling, VoodooI2C does not fall back to polling (the `[unverified]` note above was
+  wrong). Fix: `wex-config.py` (`fa63d59e`) keeps `-vi2c-force-polling`.
