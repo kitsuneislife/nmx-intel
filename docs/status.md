@@ -36,8 +36,9 @@
 5. `ASSERT(linkBW)` warning in the XE-7 log, harmless so far.
 6. Feels slow (11-13): Iris Xe submits wait p90 10-15 ms, max ~20 ms whenever a busy app (Claude) is on screen;
    clean desktop p99 <0.25 ms. Not CPU, not vblank (same at 144 Hz), not fixed by Claude on the RTX
-   ([tests/wex-1.md](tests/wex-1.md)). Daily: 144 Hz, Claude on the RTX (feels better). Next: GPU clock probe.
-   XE-13 pending: no cpuname (Settings crash), touchpad interrupts.
+   ([tests/wex-1.md](tests/wex-1.md)), not priority elevation (LAT-2). XE-13 installed: Settings crash fixed,
+   touchpad stays on polling (GPIO interrupts do not match); latency unchanged. Next: LAT-4
+   `-disablegfxpreemption` ([research/xe-latency.md](research/xe-latency.md)).
 
 ## Other areas
 

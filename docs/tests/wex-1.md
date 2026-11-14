@@ -654,3 +654,6 @@ Lukas: XE-13's 144 Hz feels lighter but not right; there is a visible delay even
 - [measured] Lukas: System Settings opens About and Displays without crashing; no new `system_profiler` report.
   The `revpatch=cpuname` removal fixed the AppleSystemInfo crash [inferred link, now consistent with the evidence].
 - [measured] `refresh.sh set 144`: ok.
+- [measured] `xe-lattest` with Claude on screen, 144 Hz (`~/lat-xe13.txt`): kernel->gpu p90 7.8 / 13.9 / 6.2 ms and
+  max 17.8 / 14.9 / 14.2 ms for gaps 0 / 8 / 16 ms. Same band as before XE-13, as expected (XE-13 did not touch
+  the GPU). Next: LAT-4 `-disablegfxpreemption`.
