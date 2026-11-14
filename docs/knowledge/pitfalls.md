@@ -410,3 +410,11 @@ copies with the new kernel range (`sudo tahoe.sh patch`); never just widen MaxKe
 - **Cause:** unknown; the hang comes before the log writer flushes [inferred].
 - **Fix:** none yet. Recovery is automatic (the `boot-back` daemon restored the daily config in that same boot).
   Retrying needs a way to see the kernel console (`-v` on screen, a photo of the last lines) before changing code.
+
+## "Device Utilization %" is always 0 under WhateverXe (LAT-12 prep, 11-14)
+
+- **Symptom:** `ioreg` `PerformanceStatistics` on IntelAccelerator shows "Device Utilization %" and "... at cur
+  p-state" = 0 even with three busy Claude apps and a 40-70 ms submit wait [measured, six reads].
+- **Cause:** the counter is not fed on this path (no GuC) [inferred].
+- **Lesson:** do not use it to judge GPU load; use `xe-lattest` (wait) and the per-process Intel user client count
+  (`claude-gpu.sh status`). Scheduler knobs only reshuffle a saturated 48 EU engine; removing work is the bigger lever.

@@ -44,6 +44,7 @@
 
 - RTX-only route: our bridge worked on nullmoth 2.3.6 only. **NMH-1 failed** (11-14): nullmoth 3.0's `nmhybrid=1`
   hung the boot with no log; parked. nullmoth 3.0 stays on the daily hybrid ([tests/wex-1.md](tests/wex-1.md)).
-- **LAT-5 worse** (11-14): timer 500 us, three busy Claude apps: max 42-72 ms (LAT-8 08:24: 20-24). Next: reboot (LAT-8 back by itself) and the same three-app run as control; then LAT-6 `SchedThrottleCapMS`.
+- **LAT-5 worse** (11-14): timer 500 us, three busy Claude apps: max 42-72 ms (LAT-8 08:24: 20-24); reverts by itself next boot.
+- **Approach changed** (11-14): cut the Iris Xe load instead of tuning its scheduler. **LAT-12 next**, no reboot: `bash tools/hybrid/claude-gpu.sh off` (Claude 2 and 3 on the CPU), then `bash tools/hybrid/lat-busy.sh lat12` under the same load.
 - Wi-Fi MT7921 at the line's ceiling (WIFI-8), [knowledge/wifi.md](knowledge/wifi.md).
 - Previous status text (verbatim): [archive/status-2026-10-29.md](archive/status-2026-10-29.md).

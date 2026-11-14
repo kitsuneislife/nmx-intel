@@ -840,3 +840,39 @@ patches, last good on 2.3.6), so none of our RTX patches are needed.
   answer with its renderer at up to 126 %) may be heavier than at 08:24, so the LAT-8 control under the same load
   comes next, on the boot after this one (boot-back puts LAT-8 back by itself).
 - Verdict: LAT-5 with 500 us rejected for now; final after the control run.
+
+## Change of approach (2026-11-14 ~09:15): cut the Iris Xe's load instead of tuning its scheduler
+
+Lukas: eight latency tests (LAT-2, LAT-4, LAT-5, LAT-8, XE-13, refresh, Claude on the RTX, priority) and the desktop
+still feels slow under his normal load. Review of the evidence:
+
+- The only lever that ever moved the busy wait a lot was **less work on the Iris Xe**: twelve CPU burners starved the
+  Electron renderers and the wait fell to max ~9 ms; a clean desktop gives max <1 ms; three busy Claude apps give
+  20-72 ms [measured, see above]. Scheduler knobs moved it by a factor of ~2 at best (LAT-8), or made it worse
+  (LAT-4, LAT-5). The UHD (48 EU, ~1.1 GHz granted [measured]) is simply small for three Chromium compositors plus
+  WindowServer [inferred].
+- "Claude on the RTX" did not take the work off the Iris Xe: Chromium's GPU process still held 4 Intel user clients
+  and WindowServer copies the frames back [measured, research/xe-latency.md].
+- `PerformanceStatistics` "Device Utilization %" reads 0 at all times under WhateverXe [measured 09:10, six reads
+  under load], so GPU busy time cannot be read from the registry (pitfall added).
+- Web check (11-14): no WhateverXe release after 0.8.2 / Graphics 0.4.4 touches performance (0.4.4 fixes H.264
+  encode only); NootedGreen's `-ngreenpm` is a CPU XCPM fix for macOS 26.7.1, not GPU. Claude Desktop accepts
+  `--disable-gpu --disable-gpu-compositing` and renders correctly with them (anthropics/claude-code#26080). Reduce
+  Transparency cut WindowServer load ~25 % on one AMD hackintosh (single report) [unverified for us].
+
+## LAT-12 (prepared 2026-11-14): Claude 2 and 3 drawn on the CPU
+
+One variable, no reboot, same boot as the LAT-5 baseline (part 3, max 42-72 ms): Claude 2 and 3 restarted with
+`--disable-gpu --disable-gpu-compositing`. Chromium then rasterises and composites on the CPU (12 threads, ~80 % idle
+under this load [measured 08:24]) and hands WindowServer one finished surface per window, so its own Metal work on
+the Iris Xe goes away [inferred from Chromium's software compositor]. The main Claude app keeps its GPU (Claude Code
+runs in it), so it is the remaining Electron load.
+
+- `tools/hybrid/claude-gpu.sh off|on|status` (quits by bundle id `local.claude-instances.claude-N`, never the main
+  app); `status` counts Intel GPU user clients per instance (baseline: 6 each).
+- `tools/hybrid/lat-busy.sh TAG`: three `xe-lattest` runs, each after a CPU snapshot of the Claude processes.
+- Checks: `status` shows "GPU off" and fewer Intel clients; Claude 2 and 3 windows render (risk: a blank window, seen
+  with other Electron apps); same load as part 3 (long answers in 2 and 3); `lat-busy.sh lat12` vs part 3; Lukas's
+  feel; CPU of the two apps.
+- Keep: make the flags part of the clones' `launch` script (`~/.config/claude-instances/build.sh`). Undo:
+  `claude-gpu.sh on`, or just quit and reopen the apps.
