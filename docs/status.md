@@ -10,7 +10,8 @@
 - OpenCore config from `sudo bash tools/hybrid/efi.sh wexrtx-keep`: WhateverXe 0.8.2 `96545d6d` (our wex 0.8.2/0001..0005) + Graphics 0.4.3,
   nullmoth NVRM 3.0 + NVAccel headless, `/Library/NullMoth/no-wsreset` (UPG-6b), NMIntelFB gated off (`-nmintelfboff`), `SSDT-PNLF.aml`.
 - RTX for apps: `sudo bash tools/hybrid/ondemand.sh add NAME` (then reopen the app); list now `Roblox`,
-  `RobloxPlayer`, `Google Chrome`, `Google Chrome Helper (Aperitif)` (Chrome 157's GPU process) [measured 11-13];
+  `RobloxPlayer`, `Google Chrome`, `Google Chrome Helper (Aperitif)` (Chrome 157's GPU process) [measured 11-13],
+  `Claude`, `Claude Helper`, `horizon-launcher`, `horizon-launche`, `horizon-client` (Horizon game logs "RTX 3050 (Metal, DiscreteGpu)" [measured 11-15]);
   boost back to nullmoth's per-burst default (`BOOST=0` gone after the 2.9 install). After any nullmoth install: `on` + `add` again (pitfall).
 - Wi-Fi: AirportMtkWlan `dd967442` (WIFI-9, no repeat of the mbuf panic); WIFI-10 `274f4c6a` built (Disconnect
   mid-scan left Wi-Fi stuck busy), install pending.
