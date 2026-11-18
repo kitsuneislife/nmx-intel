@@ -4,9 +4,12 @@
 #   graphify  - knowledge graph of the docs (CLI via uv; installs uv if missing)
 #   ponytail  - smallest complete change; reviews and audits     (prompt files only; plugin hooks not installed)
 #   caveman   - terse replies, code/commands kept verbatim       (prompt files only; installer/proxy not installed)
+#   no-ai-slop, humanizer - edit prose to remove AI writing patterns (prompt files only)
 set -euo pipefail
 PONYTAIL_REV=6f1c2bf     # dietrichgebert/ponytail, 2026-10-16
 CAVEMAN_REV=d262ab3      # JuliusBrussee/caveman, 2026-10-13
+NOAISLOP_REV=000650b     # petergyang/no-ai-slop, 2026-09-01
+HUMANIZER_REV=b48c832    # blader/humanizer v4.0.0, 2026-11-09
 GRAPHIFY_VER=0.9.92      # graphifyy on PyPI (Graphify-Labs/graphify 86c57be)
 SK=${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills
 TMP=$(mktemp -d)
@@ -28,10 +31,16 @@ for s in caveman ultracave megacave caveman-help; do
     mkdir -p "$SK/$s" && cp "$TMP/caveman/skills/$s/SKILL.md" "$SK/$s/SKILL.md"
 done
 
+fetch petergyang/no-ai-slop "$NOAISLOP_REV" no-ai-slop
+mkdir -p "$SK/no-ai-slop" && cp "$TMP/no-ai-slop/skills/no-ai-slop/"{SKILL.md,eval.md} "$SK/no-ai-slop/"
+
+fetch blader/humanizer "$HUMANIZER_REV" humanizer
+mkdir -p "$SK/humanizer" && cp "$TMP/humanizer/SKILL.md" "$SK/humanizer/SKILL.md"
+
 export PATH=$HOME/.local/bin:$PATH
 command -v uv >/dev/null || { curl -LsSf https://astral.sh/uv/install.sh -o "$TMP/uv.sh"; sh "$TMP/uv.sh"; }
 uv tool install --force "graphifyy==$GRAPHIFY_VER" >/dev/null
 graphify install --platform claude >/dev/null
 
-ls -d "$SK"/{graphify,ponytail*,caveman*,ultracave,megacave}
+ls -d "$SK"/{graphify,ponytail*,caveman*,ultracave,megacave,no-ai-slop,humanizer}
 echo "graphify $(graphify --version 2>&1 | awk '{print $2}') at $(command -v graphify)"
