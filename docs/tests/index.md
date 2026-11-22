@@ -140,3 +140,4 @@ changes), then [../status.md](../status.md).
 | XE-14b | 11-22 | WhateverXe `b2bb8e95` | latency 8 min after boot, load 2.3 | no hang; kernel->gpu p50 ~0.5 ms but max 28-40 ms (LAT-8a 7.3-7.5); daily control run pending | [wex-1](wex-1.md) |
 | XE-14b | 11-22 | WhateverXe `b2bb8e95` | control: daily boot, same load | daily p50 6-20 ms against XE-14b ~0.5 ms; max about equal (23-35 against 28-40); **keep XE-14b** | [wex-1](wex-1.md) |
 | LAT-14 | 11-22 | XE-14b boot | `Claude`/`Claude Helper` off the RTX list (LAT-13 undone), Chromium on the Iris Xe | prepared | [wex-1](wex-1.md) |
+| LAT-14 | 11-22 | XE-14b boot | result: Claude off the RTX | no change for the probe (p50 ~0.5, max 29-38 ms); panel found at 60 Hz, 144 Hz run next | [wex-1](wex-1.md) |

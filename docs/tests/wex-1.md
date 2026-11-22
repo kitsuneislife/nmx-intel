@@ -1022,3 +1022,17 @@ typing here". Evidence from that boot [measured]:
 - Test, one variable, no rebuild: after the XE-14b reboot, take `Claude` and `Claude Helper` off the RTX list, so
   Chromium renders on the Iris Xe, which now has `-wex-noccs`. Record the gpu-process CPU %, `lat-busy.sh lat14`
   and Lukas's typing feel, against the same apps on the RTX (`lat14-rtx`). Undo: `ondemand.sh add "Claude" "Claude Helper"`.
+
+### LAT-14 result (2026-11-22 14:27 boot, XE-14b + Claude off the RTX)
+
+- Boot [measured]: `-wex-objpreempt -wex-noccs`, `WhateverXeNoCCS` 1,1, no `Claude` entry in `nvmtl-allow.txt`.
+  Both changes were taken in one boot (Lukas rebooted right after `remove`), so they are not separated yet.
+- `~/lat-lat14.txt`, 4 min up, load 6.8 / 8.8 / 4.3, Claude's gpu-process at 45 %: kernel->gpu p50 0.48-0.64 ms,
+  p90 1.1-10.4 ms, max 28.8-38.2 ms. The same as XE-14b part 2 with Claude on the RTX (p50 ~0.5, max 28-40), so for
+  the probe, moving Claude off the RTX changes nothing [measured]. The gpu-process CPU stays at 45-60 % on either GPU,
+  so the cross-GPU copy is not what keeps it busy [inferred].
+- **New lead:** `refresh.sh status` shows the panel at **60.02 Hz** (the known "60 Hz after boot", status item 3).
+  Every run since 11-22 shows a max of 23-40 ms, about two 60 Hz frames (33 ms). The 144 Hz runs had much shorter
+  tails: XE-13 14-18 ms, LAT-8a 7.3-7.5 ms. The tail may be counted in vsync periods, and the
+  panel at 60 Hz would then double or triple it [inferred]. Next, one variable: `refresh.sh set 144`, then
+  `lat-busy.sh lat15-144`.
