@@ -1063,3 +1063,7 @@ typing here". Evidence from that boot [measured]:
   - Claude visible next to it (Terminal pane still open, idle): Claude Helper 93.5 %, WindowServer 3.3 %.
   - The lag follows the visible Claude window. Next, one variable at a time: Terminal pane closed, then macOS Reduce
     transparency, then Reduce motion.
+- **Cause found, 14:47** [measured]: Lukas turned off the Claude app's own chat wallpaper (`/wallpaper default off`;
+  the screenshot showed a blurred, block-patterned picture behind the chat). `gpu-top.sh 5` right after: Claude Helper
+  **0.1 %** (it was 90-93.5 %), WindowServer 0.2 %. The wallpaper layer made Chromium redraw the window all the time.
+  Keep it off. Lukas's typing feel and a `lat-busy.sh` run with it off are still to come.

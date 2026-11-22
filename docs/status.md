@@ -27,8 +27,9 @@
 - Radar 11-22 ([research/radar-2026-11-22.md](research/radar-2026-11-22.md)): 20 iGPU hangs on 11-20/21, 19 on the CCS
   ring (`mediaanalysisd`, WhateverXe #163). Hangs may leave compositing slow until reboot [inferred for us]. Without
   GuC the CPU drives submission, so CPU load raises iGPU latency (#182) [inferred]; take runs with the CPU idle.
-- **XE-14b** `b2bb8e95`: knob works, no hang. Against the daily boot under the same load: kernel->gpu p50 ~0.5 ms
-  against 6-20 ms, max about equal (28-40 against 23-35 ms). Verdict keep: `sudo bash tools/hybrid/xe14.sh keep`.
+- **XE-14b** `b2bb8e95` kept on the ESP (`xe14.sh keep`, 14:27 boot): knob works, no hang; p50 ~0.5 ms.
+- **Lag cause (LAT-15, 11-22)**: Claude Desktop's chat **wallpaper** kept its gpu-process at 90-93 % of the Iris Xe
+  (`tools/hybrid/gpu-top.sh`). Off: 0.1 %. Keep `/wallpaper default off`. Typing in Ghostty was smooth.
 - **XE-15** built: `1c70dbd2` (with the XE-14b fix), same changes on WhateverXe 0.8.3 (recovery fix; upstream covers our 0003/0004). After
   XE-14's verdict, with a kext rollback. **XE-16** (#182 144 Hz fixes) dropped: not our failure.
 
