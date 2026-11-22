@@ -488,3 +488,11 @@ copies with the new kernel range (`sudo tahoe.sh patch`); never just widen MaxKe
 - Note 2026-11-22 (CPUFRIEND-2): confirmed in effect [measured]. With `hwp` off in the board-id vectors
   (CPUFriend, `HWP=off tools/cpu/cpufriend.sh`), P-cores run 4.5 GHz all-core and 4.45 GHz single thread. The
   cost is idle power, 7.2 → 10.8 W.
+
+## IOACPIPlatformDevice::evaluateObject refuses the RTX's `PXP_._OFF` (RTD3-1, 2026-11-22)
+
+- nullmoth's `nvrtd3res=\_SB.PC00.PEG0.PXP_` got `_OFF -> 0xe00002c2` (kIOReturnBadArgument) at once, with no
+  ACPI error line and the GPU unchanged afterwards [measured]. A failed `_OFF` costs a full RM suspend/resume
+  (~4.8 s) every 60 s, so do not leave a failing `nvrtd3res` armed.
+- Cause [unverified]: either the method returns no value while a result is requested (tested by RTD3-2's
+  wrapper), or the absolute path / object type is rejected by Apple's evaluator.
