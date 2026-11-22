@@ -1053,3 +1053,8 @@ typing here". Evidence from that boot [measured]:
   - So Claude Desktop's Chromium keeps the Iris Xe ~90 % busy. Apple's scheduler has no timeslice, so the compositor's
     and the probe's work queue behind it (`xe-latency.md`), which fits the typing lag [inferred causal link].
   - Taken while the app streamed a Claude Code answer with tool output; idle and hidden runs are next.
+- `gpu-top.sh`, Lukas, 14:40 [measured]:
+  - Claude visible and idle (no answer streaming): Claude Helper 90.0 %, WindowServer 0.1 %.
+  - Claude hidden (Cmd+H), 14:40:44: no client had any GPU time, and the same gpu-process (pid 626) was still alive.
+  - So the load comes from the visible Claude window, which keeps drawing when nothing changes. Next: the same check
+    with the app's Terminal pane closed (an xterm-style WebGL terminal is the first suspect [unverified]).
