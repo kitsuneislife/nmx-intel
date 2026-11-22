@@ -448,3 +448,17 @@ copies with the new kernel range (`sudo tahoe.sh patch`); never just widen MaxKe
   port took skmaiti's `f2d016b` but not the one-line fix `bd5940e`.
 - **Lesson:** pass `sizeof(find)+1` (every other WhateverXe patch does). When porting a series, diff the result
   against the source branch's tip, not against its first commit.
+
+## The Claude Desktop chat wallpaper keeps the Iris Xe ~90 % busy (LAT-15, 2026-11-22)
+
+- **Symptom:** typing lag in every app while the Claude window is visible; `gpu-top.sh` shows Claude Helper's
+  gpu-process at 90-93 % of the Iris Xe even when idle, 0 when the window is hidden [measured].
+- **Cause:** the app's chat wallpaper (blurred picture) made Chromium redraw all the time; `/wallpaper default off`
+  dropped it to 0.1 % [measured]. Without GuC, Apple's scheduler has no timeslice, so the compositor queues behind it.
+- **Lesson:** for "laggy desktop", run `gpu-top.sh` first: one busy client explains it before any driver theory.
+
+## The GT never enters RC6 on this machine (XE-15c baseline, 2026-11-22)
+
+- `N97GTPowerSample` q[4] (RC6 residency, `0x138108`) stays at `0x18cd86a` across samples on the 0.8.2 boot
+  [measured]. Any governor or power estimate built on RC6 residency reads 100 % busy here (e.g. #176's RC6 variant).
+  Why RC6 is off (no GuC, or the TGL driver on RPL-P) is not known [unverified].

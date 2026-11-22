@@ -113,3 +113,9 @@ with the same registers after. Remove the boot-arg from `tools/hybrid/hybrid-con
   `-wex-noccs` (XE-14). `-wex-noccs` writes `WhateverXeNoCCS = {count, patched}` on the registry root (want 1,1;
   `ioreg -l -w0 -d1`) and Apple's driver logs `[IGPU] Multi-Context (Compute Command Streamer) Disabled!`.
   `bash tools/hybrid/xe14.sh check TAG` gathers both, this boot's `.gpuRestart` files and `lat-busy.sh`.
+- Upstream knob `-wex-hostrps-max` (0.8.3 + #176, XE-15c): keep the old RP0 pmNotify answer, i.e. governor off.
+- GT power: the `N97GTPowerSample` property (`ioreg -l -w0`) is 16 little-endian u64s, read fresh each time (max 512
+  per boot): q[2] ns, q[3] RPSTAT1 (actual MHz = bits 19:11 * 50/3), q[4] RC6 ticks (1.28 µs), q[7]/q[8]
+  requested/boost (50 MHz units), q[12]/q[13] pmNotify calls/answered, q[14] last answer ((MHz/50*3)<<23), q[15] caps
+  (RPn bits 23:16, RP0 bits 7:0, 50 MHz units). `xe15.sh check TAG` decodes 20 samples.
+- Per-process Iris Xe time: `bash tools/hybrid/gpu-top.sh [SECONDS [DELAY]]` (`accumulatedGPUTime` per user client).

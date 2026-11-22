@@ -2,22 +2,21 @@
 
 > **Summary.** Last updated 2026-11-22. Daily setup is the **WhateverXe hybrid** (XE-8): the Iris Xe drives the
 > desktop with Metal, the RTX runs nullmoth 3.0 headless and only apps listed by `ondemand.sh` open it. Staying on
-> Sequoia 15.8.1 (Tahoe trial in [tests/tahoe-1.md](tests/tahoe-1.md)). Next: make XE-14b permanent (`xe14.sh keep`), then XE-15.
+> Sequoia 15.8.1 (Tahoe trial in [tests/tahoe-1.md](tests/tahoe-1.md)). Next: XE-15 boot (`xe15.sh`), then XE-15g (governor on).
 
 ## Daily setup (how the machine boots now)
 
-- OpenCore config from `sudo WEXDIR=wex-daily WEX_EXTRA=-wex-objpreempt bash tools/hybrid/efi.sh wexrtx-keep`:
-  WhateverXe 0.8.2 `fa17909c` on the ESP [measured 11-22] (the LAT-5 build; with no `wexdev` property it runs LAT-8's
-  code) + Graphics 0.4.3, nullmoth NVRM/NVAccel 3.0 headless, `no-wsreset`, NMIntelFB
+- OpenCore config from `xe14.sh keep` (11-22): WhateverXe 0.8.2 `b2bb8e95` (XE-14b) with `-wex-objpreempt -wex-noccs`
+  + Graphics 0.4.3, nullmoth NVRM/NVAccel 3.0 headless, `no-wsreset`, NMIntelFB
   gated off (`-nmintelfboff`), `SSDT-PNLF.aml`.
 - RTX for apps: `sudo bash tools/hybrid/ondemand.sh add NAME` (then reopen the app). List: Roblox, Chrome (+ its
-  Aperitif helper), `Claude`, `Claude Helper` (all three Claude apps, LAT-13), Horizon. After any nullmoth install:
+  Aperitif helper), Horizon (Claude moved back to the Iris Xe, LAT-14). After any nullmoth install:
   `on` + `add` again (pitfall).
 - Wi-Fi: AirportMtkWlan `dd967442` (WIFI-9); WIFI-10 `274f4c6a` built, install pending.
 - Recovery: OpenCore Space → "Start once without NVIDIA driver". Tests: [tests/wex-1.md](tests/wex-1.md); route
   background: [knowledge/hybrid-route.md](knowledge/hybrid-route.md).
 - `~/nmx-build` was lost on 11-22 and rebuilt for WhateverXe only (clone, SDK, Lilu); nullmoth/drm-kmod trees not yet.
-- Disk: 17 GiB free on `/` (under 10%) [measured 11-22]: cleanup due.
+- Disk: 18 GiB free on `/` (91 % used) [measured 11-22]; safe prunes freed 266 MB; big items await Lukas's OK.
 
 ## Lag work (main open problem)
 
@@ -27,11 +26,10 @@
 - Radar 11-22 ([research/radar-2026-11-22.md](research/radar-2026-11-22.md)): 20 iGPU hangs on 11-20/21, 19 on the CCS
   ring (`mediaanalysisd`, WhateverXe #163). Hangs may leave compositing slow until reboot [inferred for us]. Without
   GuC the CPU drives submission, so CPU load raises iGPU latency (#182) [inferred]; take runs with the CPU idle.
-- **XE-14b** `b2bb8e95` kept on the ESP (`xe14.sh keep`, 14:27 boot): knob works, no hang; p50 ~0.5 ms.
 - **Lag cause (LAT-15, 11-22)**: Claude Desktop's chat **wallpaper** kept its gpu-process at 90-93 % of the Iris Xe
   (`tools/hybrid/gpu-top.sh`). Off: 0.1 %. Keep `/wallpaper default off`. Typing in Ghostty was smooth.
-- **XE-15** built: `1c70dbd2` (with the XE-14b fix), same changes on WhateverXe 0.8.3 (recovery fix; upstream covers our 0003/0004). After
-  XE-14's verdict, with a kext rollback. **XE-16** (#182 144 Hz fixes) dropped: not our failure.
+- **XE-15c** `8516faf3` built: 0.8.3 + our 3 patches + #176 governor (`-wex-hostrps-max` = off). GT answer is pinned at
+  RP0 1400 MHz and **RC6 is never entered** [measured], so the RC6 governor is likely a no-op here. **XE-16** dropped.
 
 ## Other open problems
 

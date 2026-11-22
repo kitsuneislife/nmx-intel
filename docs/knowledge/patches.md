@@ -155,3 +155,6 @@ source-fixes/00NN-<slug>.patch`, add an `apply` line to `build/apply-fixes.sh` (
 - `source-fixes/wex/0.8.2/0009-xe14b-noccs-lookup-window.patch` (XE-14b, on top of 0008) — the lookup window is one
   byte longer than the key, so the patch applies (XE-14 recorded {1,0}). WhateverXe `b2bb8e95`, `kexts/wex-xe14b/`.
   The same fix on 0.8.3: `0.8.3/0003`, WhateverXe `1c70dbd2`, `kexts/wex-xe15b/`.
+- `source-fixes/wex/0.8.3/0004-host-rps-governor-rc6-busyness-176.patch` (XE-15c) — verbatim cherry-pick of
+  lucaseduardo1656 `06c9ccc` (#176): host pmNotify answer chosen from RC6 busyness; `-wex-hostrps-max` = old RP0
+  answer. WhateverXe `8516faf3`, `kexts/wex-xe15c/`.

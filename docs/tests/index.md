@@ -143,3 +143,4 @@ changes), then [../status.md](../status.md).
 | LAT-14 | 11-22 | XE-14b boot | result: Claude off the RTX | no change for the probe (p50 ~0.5, max 29-38 ms); panel found at 60 Hz, 144 Hz run next | [wex-1](wex-1.md) |
 | LAT-15 | 11-22 | XE-14b boot | 144 Hz; `xe-lattest render`; `gpu-top.sh` | 144 Hz no change; render probe p50 up to 39-60 ms; **Claude gpu-process ~91 % of the Iris Xe**, WindowServer 0.1 % | [wex-1](wex-1.md) |
 | LAT-15 | 11-22 | XE-14b boot | Claude chat wallpaper off | **Claude gpu-process 93 % → 0.1 %**: the wallpaper was the load | [wex-1](wex-1.md) |
+| XE-15c | 11-22 | WhateverXe `8516faf3` | XE-15b + #176 host-RPS governor (upstream RC6 variant), `-wex-hostrps-max` knob | built, 222 tests pass; baseline: answer pinned at RP0 1400 MHz, **RC6 never entered** (counter frozen) | [wex-1](wex-1.md) |

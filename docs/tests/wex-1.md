@@ -1067,3 +1067,25 @@ typing here". Evidence from that boot [measured]:
   the screenshot showed a blurred, block-patterned picture behind the chat). `gpu-top.sh 5` right after: Claude Helper
   **0.1 %** (it was 90-93.5 %), WindowServer 0.2 %. The wallpaper layer made Chromium redraw the window all the time.
   Keep it off. Lukas's typing feel and a `lat-busy.sh` run with it off are still to come.
+
+### XE-15c: 0.8.3 with the #176 host-RPS governor, built (2026-11-22)
+
+- **Goal:** item 1 (move to WhateverXe 0.8.3) and item 3 (#176: without GuC the host pmNotify answer pins the GT at
+  RP0) from the radar, as two one-boot steps with one variable each.
+- **Build:** `src-083` branch `nmx-083`, tag `xe-15c`: 0.8.3 `f26a368` + `0.8.3/0001..0003` + a verbatim cherry-pick
+  of lucaseduardo1656's `06c9ccc` (branch `fix/hostrps-activity-governor`, `0.8.3/0004`; only the
+  `boot_argument_names.json` fixture needed a merge). WhateverXe `8516faf3`, `kexts/wex-xe15c/`, CFBundleVersion 0.8.3;
+  strings `wex-objpreempt`, `wex-noccs`, `wex-hostrps-max` present. `tools/test.py`: 222 passed, 0 failed (with the new
+  `host_rps_governor` CPU test) [measured].
+- **Governor (upstream code, not ours):** busy % = 1 - RC6 residency delta (counter `0x138108`, 1.28 µs ticks) over
+  >= 16 ms windows; RP0 at >= 90 %, a quarter-range step up at >= 70 %, a step down under 30 %, RPn after a 100 ms
+  callback gap. On by default; `-wex-hostrps-max` restores 0.8.2's RP0 answer.
+- **Baseline on the running XE-14b boot (0.8.2), `N97GTPowerSample`, 14:5x** [measured]:
+  - answer 1400 MHz every sample (caps RPn 100 / RP0 1400 MHz, requested/boost 28/28), actual (RPSTAT1) 1100 MHz;
+    ~150 pmNotify calls/s, all answered.
+  - **RC6 counter frozen at `0x18cd86a`** over 4.5 s: the GT never enters RC6 on this machine at runtime.
+  - So the RC6-based governor would read 100 % busy and keep answering RP0, i.e. no change for us [inferred]. The
+    issue's first variant (polling `RING_MI_MODE` idle) does not depend on RC6 but busy-waits ~140 µs per call.
+- **Plan:** XE-15 = `sudo bash tools/hybrid/xe15.sh` (governor off: the only change against the kept XE-14b is
+  0.8.2 -> 0.8.3); then XE-15g = `xe15.sh arm gov` to confirm the governor's effect with numbers. `xe15.sh check TAG`
+  logs 20 GT power samples (answer, actual, RC6 %) and a `lat-busy.sh` run to `~/xe15-TAG.txt`.
