@@ -1,0 +1,65 @@
+From 5fdc06e574502d976cb7268cb2918cf8325e532a Mon Sep 17 00:00:00 2001
+From: nmx <nmx@localhost>
+Date: Sun, 22 Nov 2026 13:23:43 -0300
+Subject: [PATCH] xe14: -wex-noccs keeps compute off the CCS (port of
+ skmaiti2050 f2d016b + bd5940e)
+
+Apple's TGL Info.plist sets EnableMultiContext=1, which puts Metal
+compute on the CCS. TGL PRM Vol14 'SVSM: Dual Context - Invalidate
+hang' forbids CCS and RCS running in parallel; here 19 of 20
+gpuRestart reports hung the CCS (b00t0x/WhateverXe#163). The knob
+renames the only lookup of the key so it reads its default 0.
+WhateverXeNoCCS = {occurrences, patched}.
+---
+ WhateverXe/kern_xe.cpp                  | 22 ++++++++++++++++++++++
+ tests/fixtures/boot_argument_names.json |  3 ++-
+ 2 files changed, 24 insertions(+), 1 deletion(-)
+
+diff --git a/WhateverXe/kern_xe.cpp b/WhateverXe/kern_xe.cpp
+index 2a2d6be..04a96eb 100644
+--- a/WhateverXe/kern_xe.cpp
++++ b/WhateverXe/kern_xe.cpp
+@@ -11355,6 +11355,28 @@ bool XE::processAlderLakeNTaskBoundary(KernelPatcher &patcher, size_t index, mac
+ 
+ bool XE::processTGLAccelerator(KernelPatcher &patcher, size_t index, mach_vm_address_t address, size_t size) {
+  if(adlnDetected && tglAcceleratorRequested)dsiBackingHooksReady=processDSIBackingHooks(patcher,index,address,size);
++ // -wex-noccs (opt-in, from b00t0x/WhateverXe#163): keep compute off the Compute Command
++ // Streamer. Apple's Info.plist sets EnableMultiContext=1; TGL PRM Vol14 "SVSM: Dual Context -
++ // Invalidate hang" requires CCS and RCS never run in parallel, and i915 never uses the CCS on
++ // Gen12 LP. Rename the only lookup of the key (populateAccelConfig) so it reads its code
++ // default 0 ("Multi-Context (Compute Command Streamer) Disabled!"). Matched by content, and
++ // only if the NUL-terminated key occurs exactly once in the image.
++ // WhateverXeNoCCS: {occurrences, patched}.
++ if(checkKernelArgument("-wex-noccs") && currentGraphics) {
++  static const uint8_t f[]="EnableMultiContext",r[]="EnableMultiContexX";
++  uint32_t rec[2] {};
++  auto base=reinterpret_cast<const uint8_t *>(address);
++  const uint8_t *site=nullptr;
++  for(size_t i=0;size>=sizeof(f) && i<=size-sizeof(f);i++)
++   if(base[i]=='E' && !memcmp(base+i,f,sizeof(f))) {rec[0]++;site=base+i;}
++  if(rec[0]==1) {
++   KernelPatcher::LookupPatch patch {currentGraphics,f,r,sizeof(f),1};
++   patcher.applyLookupPatch(&patch,const_cast<uint8_t *>(site),sizeof(f));
++   rec[1]=patcher.getError()==KernelPatcher::Error::NoError && !memcmp(site,r,sizeof(r));
++  }
++  patcher.clearError();
++  IORegistryEntry::getRegistryRoot()->setProperty("WhateverXeNoCCS",rec,sizeof(rec));
++ }
+  // Framebuffer-only mode must never enter the donor accelerator probe.
+  // The bring-up payload omits this bundle; also reject it if already present.
+  if (!tglAcceleratorRequested) {
+diff --git a/tests/fixtures/boot_argument_names.json b/tests/fixtures/boot_argument_names.json
+index 529ec33..0c42ce9 100644
+--- a/tests/fixtures/boot_argument_names.json
++++ b/tests/fixtures/boot_argument_names.json
+@@ -149,5 +149,6 @@
+   "-wex-display13-offline": [],
+   "-wex-dsi-hdmi-test": [],
+   "-wex-dsi-power-test": [],
+-  "-wex-objpreempt": []
++  "-wex-objpreempt": [],
++  "-wex-noccs": []
+ }
+-- 
+2.39.5 (Apple Git-154)
+
