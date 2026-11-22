@@ -82,6 +82,11 @@ hybrid|hybrid-keep|wex|wex-keep|wexrtx|wexrtx-keep)
     *)       HYB=$OC/config-wex.plist; GEN=(wex-config.py); PUT=("$WXK/$WEXDIR/WhateverXe.kext" "$WXK/AMFIPassMod.kext"); NAME=wex ;;
     esac
     for k in "${PUT[@]}"; do [ -d "$k/Contents/MacOS" ] || { echo "no $k: build or download it first"; exit 1; }; done
+    # AGPM-1 knob: AGPM_KEXT=/path/X.kext (codeless, no MacOS dir) is copied too; wex-config.py adds its entry
+    if [ -n "${AGPM_KEXT:-}" ]; then
+        [ -f "$AGPM_KEXT/Contents/Info.plist" ] || { echo "no $AGPM_KEXT"; exit 1; }
+        PUT+=("$AGPM_KEXT")
+    fi
     if is_hybrid "$CFG"; then
         [ -f "$GPU" ] || { echo "config.plist loads NootedGreen and there is no config-gpu-only.plist; nothing changed"; exit 1; }
     elif cmp -s "$CFG" "$OC/config-plain.plist"; then
@@ -114,7 +119,8 @@ hybrid|hybrid-keep|wex|wex-keep|wexrtx|wexrtx-keep)
     sync
     [ "$1" = "$NAME" ] && [ "$ACT" = boot-back ] && echo "one boot only: that boot puts the current config back by itself ($NAME-keep to stay)"
     [ "$1" = "$NAME" ] && [ "$ACT" = boot-once ] && echo "one boot only: that boot puts GPU-only back by itself ($NAME-keep to stay)"
-    for k in "${PUT[@]}"; do b=${k##*/}; echo "route: $NAME, ${b%.kext} $(shasum -a 256 "$OC/Kexts/$b/Contents/MacOS/"* | cut -c1-8)"; done
+    for k in "${PUT[@]}"; do b=${k##*/}; [ -d "$k/Contents/MacOS" ] || { echo "route: $NAME, ${b%.kext} (codeless)"; continue; }
+        echo "route: $NAME, ${b%.kext} $(shasum -a 256 "$OC/Kexts/$b/Contents/MacOS/"* | cut -c1-8)"; done
     echo "boot-args: $(/usr/libexec/PlistBuddy -c 'Print :NVRAM:Add:7C436110-AB2A-4BBB-A880-FE41995C9F82:boot-args' "$CFG")"
     ;;
 rtx|rtx-keep)

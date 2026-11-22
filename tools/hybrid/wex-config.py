@@ -51,6 +51,11 @@ def make(c: dict, rtx: bool = False) -> dict:
         sys.exit("no Lilu.kext or AMFIPass.kext in Kernel/Add")
     add[paths.index("AMFIPass.kext")]["BundlePath"] = "AMFIPassMod.kext"
     add.insert(paths.index("Lilu.kext") + 1, dict(WEX_ENTRY))
+    # AGPM-1 test knob: AGPM_KEXT=/path/X.kext loads a codeless kext (an AGPM profile override) after WhateverXe
+    agpm = os.environ.get("AGPM_KEXT", "")
+    if agpm:
+        add.insert(paths.index("Lilu.kext") + 2, {**WEX_ENTRY, "BundlePath": os.path.basename(agpm),
+                   "Comment": "AGPM profile override (test)", "ExecutablePath": ""})
     acpi = c["ACPI"]["Add"]
     if not any(e.get("Path") == PNLF_ENTRY["Path"] for e in acpi):
         acpi.append(dict(PNLF_ENTRY))
