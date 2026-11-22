@@ -8,14 +8,16 @@
 # RTD3-1, the daily config (HWP=off) plus nullmoth's D3cold with that resource:
 #   sudo bash tools/hybrid/rtd3.sh arm            ONE boot (keep: same, as the daily config)
 #   sudo bash tools/hybrid/rtd3.sh check TAG      on battery, apps closed: RTD3 log lines + battery watts over 60 s
-# RTD3-1 result: PXP_._OFF -> 0xe00002c2 (kIOReturnBadArgument) at once, GPU resumed. PXP_'s methods return no value;
-# RTD3-2 (the default now) loads SSDT-NXRTD3.aml (rtd3-aml.py): PowerResource \_SB.PC00.PEG0.NXPR whose _ON_/_OFF
-# call PXP_'s and Return (One), and points nvrtd3res at it. DIRECT=1 arms RTD3-1 again (PXP_ itself, no SSDT).
+# RTD3-1 result: PXP_._OFF -> 0xe00002c2 (kIOReturnBadArgument) at once, GPU resumed. RTD3-2 (PowerResource wrapper
+# \_SB.PC00.PEG0.NXPR) failed the same way: macOS's evaluateObject refuses names longer than 4 characters.
+# RTD3-3 (now): arm installs nullmoth's NVRM with three byte patches (tools/nvrm/rtd3-patch.sh) so it evaluates
+# NXOF / NXO_ on \_SB.PC00, and loads SSDT-NXRTD3.aml (rtd3-aml.py), whose NXOF / NXO_ call PXP_._OFF / _ON_.
+# nvrtd3res only has to start with a backslash now (nullmoth logs it). The patched NVRM is inert without nvrtd3=1.
+#   sudo bash tools/hybrid/rtd3.sh restore        nullmoth's original NVRM back (~/NVRM.kext.original), then reboot
 # Rollback from keep: sudo HWP=off bash tools/cpu/cpufriend.sh keep
 set -uo pipefail
 HERE=$(cd "$(dirname "$0")" && pwd)
-RES='\_SB.PC00.PEG0.NXPR'; AML=1
-[ "${DIRECT:-}" = 1 ] && { RES='\_SB.PC00.PEG0.PXP_'; AML=; }
+RES='\_SB.PC00'
 HOMEU=$(eval echo "~${SUDO_USER:-$USER}")
 DST=$HOMEU/nmx-build/acpi
 die() { echo "STOP: $*"; exit 1; }
@@ -64,8 +66,10 @@ EOF
     echo "saved $OUT and the dump in $DST"
     ;;
 arm|keep)
-    HWP=off RTD3_AML=$AML WEX_ADD="nvrtd3=1 nvrtd3res=$RES" bash "$HERE/../cpu/cpufriend.sh" "$1" || die "cpufriend.sh $1 failed"
-    echo "RTD3 ($1, nvrtd3res=$RES, wrapper SSDT ${AML:-no}) installed. Reboot now."
+    bash "$HERE/../nvrm/rtd3-patch.sh" || die "could not build the patched NVRM; nothing installed"
+    bash "$HERE/../nvrm/install.sh" || die "NVRM install failed (sudo bash $0 restore puts the original back)"
+    HWP=off RTD3_AML=1 WEX_ADD="nvrtd3=1 nvrtd3res=$RES" bash "$HERE/../cpu/cpufriend.sh" "$1" || die "cpufriend.sh $1 failed"
+    echo "RTD3-3 ($1: patched NVRM, SSDT-NXRTD3, nvrtd3res=$RES) installed. Reboot now."
     ;;
 check)
     TAG=${2:?usage: $0 check TAG}
@@ -96,5 +100,8 @@ EOF
     cat "$OUT"
     echo "saved $OUT"
     ;;
-*) die "usage: sudo bash $0 acpi | arm | keep | check TAG" ;;
+restore)
+    bash "$HERE/../nvrm/install.sh" restore || die "restore failed"
+    ;;
+*) die "usage: sudo bash $0 acpi | arm | keep | check TAG | restore" ;;
 esac

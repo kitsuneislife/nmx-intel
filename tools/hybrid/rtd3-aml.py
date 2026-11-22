@@ -1,17 +1,17 @@
 #!/usr/bin/env python3
-"""Write SSDT-NXRTD3.aml for RTD3-2: PowerResource \\_SB.PC00.PEG0.NXPR whose _ON_ and _OFF call the firmware's
-\\_SB.PC00.PEG0.PXP_ methods and then Return (One).
+"""Write SSDT-NXRTD3.aml: Methods \\_SB.PC00.NXOF and \\_SB.PC00.NXO_ that call the firmware's RTX power resource
+\\_SB.PC00.PEG0.PXP_ (_OFF / _ON_) and then Return (One).
 
-Why: in RTD3-1 nullmoth's evaluateObject("\\_SB.PC00.PEG0.PXP_._OFF") returned 0xe00002c2 (kIOReturnBadArgument) at
-once and the RTX answered right after, unchanged. PXP_._OFF returns no value (ACPI spec: _ON/_OFF return nothing);
-this wrapper tests whether macOS rejects a method with no return value when the caller asks for a result object.
-nvrtd3res=\\_SB.PC00.PEG0.NXPR then points nullmoth at the wrapper. Nothing else references NXPR, so no OS calls it
-on its own (macOS does not manage power resources; Windows only follows _PR0/_PR3, which still name PXP_).
+Why (RTD3-3): macOS's evaluateObject only takes a name of at most 4 characters, relative to the device it is called on
+(AppleACPIPlatformExpert::evaluateObject returns 0xe00002c2 otherwise) [measured by disassembly]. nullmoth evaluates
+on \\_SB.PC00, the first ACPI device above NVRM, so tools/nvrm/rtd3-patch.sh makes it evaluate "NXOF" / "NXO" (padded
+to NXO_ by ACPICA) there, and these methods forward to PXP_. Custom names, not _ON_/_OFF, because those are reserved
+for power resources; nothing else calls NXOF/NXO_. RTD3-2's PowerResource wrapper (NXPR, absolute path) failed the same
+length check and is gone.
 
-Hand-assembled AML (iasl is not installed): Scope (\\_SB.PC00.PEG0) { PowerResource (NXPR, 0, 0) {
-Method (_STA) { Return (One) }  Method (_ON_) { \\_SB.PC00.PEG0.PXP_._ON_ () Return (One) }
-Method (_OFF) { \\_SB.PC00.PEG0.PXP_._OFF () Return (One) } } }. The calls take no arguments, so they need no
-External: a bare NameString in a method body is resolved when the method runs.
+Hand-assembled AML (iasl is not installed): Scope (\\_SB.PC00) { Method (NXOF) { \\_SB.PC00.PEG0.PXP_._OFF ()
+Return (One) }  Method (NXO_) { \\_SB.PC00.PEG0.PXP_._ON_ () Return (One) } }. The calls take no arguments, so they
+need no External: a bare NameString in a method body is resolved when the method runs.
 
 Usage: rtd3-aml.py OUT.aml
 """
@@ -47,12 +47,11 @@ def method(name: str, body: bytes) -> bytes:
 
 
 RET_ONE = b"\xa4\x01"   # Return (One)
-PEG0 = ("_SB_", "PC00", "PEG0")
-BODY = b"\x10" + pkg(path(*PEG0) + b"\x5b\x84" + pkg(
-    b"NXPR" + b"\x00" + b"\x00\x00"   # SystemLevel 0, ResourceOrder 0
-    + method("_STA", RET_ONE)
-    + method("_ON_", path(*PEG0, "PXP_", "_ON_") + RET_ONE)
-    + method("_OFF", path(*PEG0, "PXP_", "_OFF") + RET_ONE)))
+PC00 = ("_SB_", "PC00")
+PXP = (*PC00, "PEG0", "PXP_")
+BODY = b"\x10" + pkg(path(*PC00)
+                     + method("NXOF", path(*PXP, "_OFF") + RET_ONE)
+                     + method("NXO_", path(*PXP, "_ON_") + RET_ONE))
 
 
 def table() -> bytes:
