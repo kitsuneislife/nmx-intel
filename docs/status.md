@@ -31,11 +31,11 @@
   11.7 → 6.6 W, PC2 ~51 %. wxe study ([research/wxe-study-2026-11-22.md](research/wxe-study-2026-11-22.md)): macOS
   now ~55-60 % of Windows; no fork. Still no all-core turbo (12 threads ~2.4 GHz / 16 W).
   AGPM kept as daily (11-22). **CPUFRIEND-2 (11-22): `hwp` off in the vector → P-cores 4.5 GHz**:
-  12 threads 23.6 → 45.4 GHz-equiv, 1 thread 2.4 → 4.45 GHz; idle 7.2 → 10.8 W. Kept (11-22). RTD3-1: `PXP_._OFF -> 0xe00002c2`, RTX stays on. **Next: RTD3-2** (`rtd3.sh arm`, value-returning wrapper `NXPR`).
+  12 threads 23.6 → 45.4 GHz-equiv, 1 thread 2.4 → 4.45 GHz; idle 7.2 → 10.8 W. Kept (11-22). RTD3-1/2: macOS evaluateObject refuses names > 4 chars. **Next: RTD3-3** (`rtd3.sh arm`: patched NVRM + `\_SB.PC00.NXOF`).
 
 ## Other open problems
 
-1. RTX never powers off at runtime; 3.x RTD3 (`nvrtd3`) `PXP_._OFF` refused (RTD3-1), wrapper under test (RTD3-2).
+1. RTX never powers off at runtime; 3.x RTD3 (`nvrtd3`) nullmoth's ACPI call refused (RTD3-1/2), RTD3-3 under test.
 2. Panic 2026-11-12 19:39, WindowServer spinlock timeout, driver unknown. Watch for a repeat.
 3. Refresh: 144 Hz works through `refresh.sh` (XE-13); WindowServer still defaults to 60 Hz after boot.
 4. Sleep: off; untested with WhateverXe. `ASSERT(linkBW)` warning in the XE-7 log, harmless so far.

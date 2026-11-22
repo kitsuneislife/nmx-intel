@@ -496,3 +496,7 @@ copies with the new kernel range (`sudo tahoe.sh patch`); never just widen MaxKe
   (~4.8 s) every 60 s, so do not leave a failing `nvrtd3res` armed.
 - Cause [unverified]: either the method returns no value while a result is requested (tested by RTD3-2's
   wrapper), or the absolute path / object type is rejected by Apple's evaluator.
+- Note 2026-11-22 (RTD3-2): cause found [measured by disassembly]. `AppleACPIPlatformExpert::evaluateObject`
+  returns 0xe00002c2 when the name is longer than 4 characters: only one NameSeg, relative to the device the call
+  is made on. Absolute paths never work through `IOACPIPlatformDevice::evaluateObject`; put a 4-character method
+  on that device instead (RTD3-3).
