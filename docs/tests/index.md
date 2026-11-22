@@ -137,3 +137,4 @@ changes), then [../status.md](../status.md).
 | XE-14 | 11-22 | WhateverXe `29a78c34` | result of the 13:37 boot | **no effect**: `WhateverXeNoCCS` 1,0 (key found, lookup window too short); no hang this boot | [wex-1](wex-1.md) |
 | XE-14b | 11-22 | WhateverXe `b2bb8e95` | XE-14 with the lookup window +1 (skmaiti `bd5940e`), one boot | prepared | [wex-1](wex-1.md) |
 | XE-14b | 11-22 | WhateverXe `b2bb8e95` | result of the 13:51 boot | knob works (1,1, `Multi-Context ... Disabled!`), no hang yet; latency run invalid (load 16.6 just after boot) | [wex-1](wex-1.md) |
+| XE-14b | 11-22 | WhateverXe `b2bb8e95` | latency 8 min after boot, load 2.3 | no hang; kernel->gpu p50 ~0.5 ms but max 28-40 ms (LAT-8a 7.3-7.5); daily control run pending | [wex-1](wex-1.md) |

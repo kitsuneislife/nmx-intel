@@ -2,7 +2,7 @@
 
 > **Summary.** Last updated 2026-11-22. Daily setup is the **WhateverXe hybrid** (XE-8): the Iris Xe drives the
 > desktop with Metal, the RTX runs nullmoth 3.0 headless and only apps listed by `ondemand.sh` open it. Staying on
-> Sequoia 15.8.1 (Tahoe trial in [tests/tahoe-1.md](tests/tahoe-1.md)). Next: **XE-14b** `-wex-noccs`, one boot.
+> Sequoia 15.8.1 (Tahoe trial in [tests/tahoe-1.md](tests/tahoe-1.md)). Next: daily control run against XE-14b.
 
 ## Daily setup (how the machine boots now)
 
@@ -28,7 +28,8 @@
   ring (`mediaanalysisd`, WhateverXe #163). Hangs may leave compositing slow until reboot [inferred for us]. Without
   GuC the CPU drives submission, so CPU load raises iGPU latency (#182) [inferred]; take runs with the CPU idle.
 - **XE-14b** `b2bb8e95` works (13:51 boot): `WhateverXeNoCCS` 1,1 and `Multi-Context ... Disabled!`, no hang so far.
-  Latency not yet comparable (run at load 16.6, 2 min after boot); redo `xe14.sh check c` with load below 2.
+  At load 2.3: kernel->gpu p50 ~0.5 ms, max 28-40 ms (tail in gpu exec) vs LAT-8a max 7.3-7.5 ms. Next: control run
+  in the daily boot under the same conditions (`lat-busy.sh daily-c`), then decide keep or drop.
 - **XE-15** built: `1c70dbd2` (with the XE-14b fix), same changes on WhateverXe 0.8.3 (recovery fix; upstream covers our 0003/0004). After
   XE-14's verdict, with a kext rollback. **XE-16** (#182 144 Hz fixes) dropped: not our failure.
 

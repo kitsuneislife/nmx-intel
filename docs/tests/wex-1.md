@@ -977,3 +977,17 @@ change], so XE-14 is still one variable. The rollback copy is renamed `kexts/wex
   after login [measured]. **Not comparable** to LAT-8 (pitfall: CPU idle). The low p50 against LAT-8's 1.0-1.5 ms is a
   hint only [unverified].
 - Next: the same check after ~15 min with load below 2 (`check` now prints `uptime`), then the day-long hang watch.
+
+### XE-14b result, part 2 (2026-11-22 13:59, 8 min after boot)
+
+- `~/xe14-c.txt` [measured]: load 2.27 / 3.92 / 2.98; `WhateverXeNoCCS` 1,1, `Multi-Context ... Disabled!`, no
+  `.gpuRestart` this boot (none by 14:01 either).
+- `~/lat-xe14-c.txt` [measured], three runs, each gap 0 / 8 / 16 ms; Claude's gpu-process at 52-54 % CPU and its
+  renderer at 37-44 % during the runs:
+  - kernel->gpu p50 0.48-0.59 ms, p90 1.1-2.8 ms, p99 16-32 ms, max 28-40 ms.
+  - gpu exec p50 0.05 ms, p99 16-40 ms, max 28-48 ms; wall max 42-67 ms.
+- Against LAT-8a (`~/lat-lat8a.txt`: p50 1.0-1.5 ms, max 7.3-7.5 ms, load ~30, 2 min up): p50 is about half, the
+  tail (p99/max) is about 4-5 times longer. The tail sits in gpu exec, not in submission, which would fit compute work
+  now queued on the render ring next to the compositor [inferred]. Not conclusive: LAT-8a was a different boot, with
+  a different Claude load. Next is a same-conditions control in the daily boot (no `-wex-noccs`), one variable:
+  ~8 min up, load near 2, the same Claude apps, `bash tools/hybrid/lat-busy.sh daily-c`.
