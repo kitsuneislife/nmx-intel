@@ -3,8 +3,10 @@
 # The kext is codeless: it re-injects the AGPMController personality for this board-id with a higher probe score,
 # built from this Mac's own AppleGraphicsPowerManagement.kext (Apple content, so it is generated, never committed).
 #   sudo bash tools/cpu/agpm.sh arm        build the kext, arm ONE boot of the daily XE-15 config plus the kext
+#   sudo bash tools/cpu/agpm.sh keep       same, but make it the daily config (efi.sh wexrtx-keep)
 #   sudo bash tools/cpu/agpm.sh check TAG  in that boot: AGPM state, then xe15.sh check TAG and cpu-study.sh TAG
-# The boot after the armed one is the daily config again (efi.sh boot-back). One variable: the AGPM profile.
+# After arm, the next boot is the daily config again (efi.sh boot-back). One variable: the AGPM profile.
+# Rollback from keep: sudo bash tools/hybrid/xe15.sh keep (the XE-15 daily without the kext).
 set -uo pipefail
 HERE=$(cd "$(dirname "$0")" && pwd)
 HOMEU=$(eval echo "~${SUDO_USER:-$USER}")
@@ -14,7 +16,8 @@ die() { echo "STOP: $*"; exit 1; }
 [ "$(id -u)" = 0 ] || die "run with sudo"
 
 case "${1:-}" in
-arm)
+arm|keep)
+    ROUTE=wexrtx; [ "$1" = keep ] && ROUTE=wexrtx-keep
     BID=$(ioreg -l -w0 -d2 -p IODeviceTree | sed -n 's/.*"board-id" = <"\(Mac-[0-9A-F]*\)">.*/\1/p' | head -1)
     [ -n "$BID" ] || die "no board-id in the device tree"
     mkdir -p "$K/Contents" || die "could not create $K"
@@ -41,8 +44,8 @@ EOF
     plutil -lint "$K/Contents/Info.plist" >/dev/null || die "Info.plist does not parse"
     chown -R "${SUDO_USER:-root}" "$HOMEU/nmx-build/agpm"
     AGPM_KEXT=$K WEXDIR=wex-xe15c WEX_EXTRA="-wex-objpreempt -wex-noccs -wex-hostrps-max" \
-        bash "$HERE/../hybrid/efi.sh" wexrtx || die "efi.sh wexrtx failed"
-    echo "AGPM-1 armed for one boot. Reboot now."
+        bash "$HERE/../hybrid/efi.sh" "$ROUTE" || die "efi.sh $ROUTE failed"
+    echo "AGPM ($1) installed. Reboot now."
     ;;
 check)
     TAG=${2:?usage: $0 check TAG}
@@ -62,5 +65,5 @@ check)
     bash "$HERE/cpu-study.sh" "agpm-$TAG"
     echo "saved $OUT, $HOMEU/xe15-agpm-$TAG.txt, $HOMEU/cpu-study-agpm-$TAG.txt"
     ;;
-*) die "usage: sudo bash $0 arm | check TAG" ;;
+*) die "usage: sudo bash $0 arm | keep | check TAG" ;;
 esac
