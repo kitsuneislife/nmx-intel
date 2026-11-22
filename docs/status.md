@@ -16,7 +16,7 @@
 - Recovery: OpenCore Space → "Start once without NVIDIA driver". Tests: [tests/wex-1.md](tests/wex-1.md); route
   background: [knowledge/hybrid-route.md](knowledge/hybrid-route.md).
 - `~/nmx-build` was lost on 11-22 and rebuilt for WhateverXe only (clone, SDK, Lilu); nullmoth/drm-kmod trees not yet.
-- Disk: 57.8 GB free [measured 11-22] after removing cargo `target/`s, magic-rush `tools/` and a NixOS ISO.
+- Disk: 65.7 GB free [measured 11-22] after removing cargo `target/`s, magic-rush `tools/` + `private/`, a NixOS ISO.
 
 ## Lag work (main open problem)
 
