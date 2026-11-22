@@ -474,3 +474,14 @@ copies with the new kernel range (`sudo tahoe.sh patch`); never just widen MaxKe
 
 - A dependent `add $1, %reg` chain read ~15 GHz on the P-cores: Golden Cove folds add-immediate chains at rename.
   Use `add %reg, %reg` with the increment in a register (`tools/cpu/clockprobe.c`) [measured].
+
+## XCPM on a hybrid Raptor Lake caps P-cores at 3.6 GHz (2026-11-22)
+
+> **Summary.** With the CPU spoofed to Comet Lake, XCPM writes HWP requests in 100 MHz ratio units, but a
+> Raptor Lake P-core's HWP unit is 78.741 MHz. Max ratio 46 becomes 3622 MHz.
+
+- No CPU exceeded 3600 MHz in four powermetrics runs (CPU-1, AGPM-1, AGPM-1b, CPUFRIEND-1) [measured]. The
+  78.741 MHz unit is intel_pstate's P-core `hybrid_scaling_factor` for ADL/RPL [measured upstream]. That XCPM
+  writes ratios into HWP_REQUEST is [inferred] (XCPM is closed source).
+- `machdep.xcpm.epp_override` is read only, even as root (EPP-1). EPP 0x20 through CPUFriend did not lift the
+  clocks (CPUFRIEND-1).
