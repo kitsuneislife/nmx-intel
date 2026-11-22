@@ -1036,3 +1036,20 @@ typing here". Evidence from that boot [measured]:
   tails: XE-13 14-18 ms, LAT-8a 7.3-7.5 ms. The tail may be counted in vsync periods, and the
   panel at 60 Hz would then double or triple it [inferred]. Next, one variable: `refresh.sh set 144`, then
   `lat-busy.sh lat15-144`.
+
+### LAT-15: 144 Hz, a render probe, and per-process GPU time (2026-11-22 14:32-14:36, XE-14b boot)
+
+- `refresh.sh set 144` (status: 144.0022 Hz) [measured]. `~/lat-lat15-144.txt`: kernel->gpu p50 0.48-0.64 ms,
+  max 31-53 ms, gpu exec max 31-41 ms, the same as at 60 Hz. **The vsync lead (LAT-14) is wrong** [measured].
+- `xe-lattest render` (new mode: an empty render pass that clears a 16x16 texture, so the probe rides the render
+  ring like WindowServer, whatever `-wex-noccs` does to compute). Two back-to-back runs, `~/lat-render-a.txt`
+  [measured]: in the first, kernel->gpu p50 0.52-0.57 ms and max 34-35 ms; in the second, **p50 39-60 ms**
+  and max 53-70 ms, with gpu exec ~0. Render work can wait whole frames to be submitted.
+- **Root lead:** the accelerator's per-client `accumulatedGPUTime` (ns, `ioreg -c IntelAccelerator`), read twice
+  (new `tools/hybrid/gpu-top.sh`) [measured]:
+  - 14:35, 10 s: Claude's gpu-process (pid 626) +9.14 s, i.e. ~91 % of the GPU; WindowServer +15 ms.
+  - 14:36, 5 s: Claude Helper 91.8 %, WindowServer 0.1 %.
+  - The total since boot (8 min) is 333 s for Claude Helper and 3.4 s for WindowServer.
+  - So Claude Desktop's Chromium keeps the Iris Xe ~90 % busy. Apple's scheduler has no timeslice, so the compositor's
+    and the probe's work queue behind it (`xe-latency.md`), which fits the typing lag [inferred causal link].
+  - Taken while the app streamed a Claude Code answer with tool output; idle and hidden runs are next.
