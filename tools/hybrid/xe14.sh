@@ -1,5 +1,5 @@
 #!/bin/bash
-# xe14.sh: XE-14, the daily LAT-8 config plus -wex-noccs (WhateverXe 29a78c34 = 0.8.2 + 0001..0006 + 0008), ONE boot.
+# xe14.sh: XE-14, the daily LAT-8 config plus -wex-noccs (WhateverXe b2bb8e95 = 0.8.2 + 0001..0006 + 0008 + 0009), ONE boot.
 #   sudo bash tools/hybrid/xe14.sh         arm it, then reboot; the boot after that is the daily config again
 #                                          (the new kext stays on the ESP, but without -wex-noccs it is LAT-8's source)
 #   bash tools/hybrid/xe14.sh check TAG    in the XE-14 boot: knob record, driver log line, hangs this boot, then
@@ -12,7 +12,7 @@ set -uo pipefail
 HERE=$(cd "$(dirname "$0")" && pwd)
 HOMEU=$(eval echo "~${SUDO_USER:-$USER}")
 WXK=$HOMEU/nmx-build/whateverxe/kexts
-K=$WXK/wex-xe14/WhateverXe.kext/Contents/MacOS/WhateverXe
+K=$WXK/wex-xe14b/WhateverXe.kext/Contents/MacOS/WhateverXe
 ARGS="-wex-objpreempt -wex-noccs"
 die() { echo "STOP: $*"; exit 1; }
 need_root() { [ "$(id -u)" = 0 ] || die "run with sudo"; }
@@ -21,7 +21,7 @@ CMD=${1:-arm}
 case "$CMD" in
 arm|keep)
     need_root
-    [ "$(shasum -a 256 "$K" 2>/dev/null | cut -c1-8)" = 29a78c34 ] || die "wex-xe14 is not WhateverXe 29a78c34: $K"
+    [ "$(shasum -a 256 "$K" 2>/dev/null | cut -c1-8)" = b2bb8e95 ] || die "wex-xe14b is not WhateverXe b2bb8e95: $K"
     diskutil mount disk0s1 >/dev/null 2>&1
     ESP=$(diskutil info disk0s1 2>/dev/null | sed -n 's/^ *Mount Point: *//p')
     [ -n "$ESP" ] || die "could not mount the ESP (disk0s1)"
@@ -38,13 +38,13 @@ arm|keep)
     echo "1. kept: wex-daily $(shasum -a 256 "$WXK/wex-daily/WhateverXe.kext/Contents/MacOS/WhateverXe" | cut -c1-8)," \
          "AMFIPassMod $(shasum -a 256 "$WXK/AMFIPassMod.kext/Contents/MacOS/"* | cut -c1-8)"
     MODE=wexrtx; [ "$CMD" = keep ] && MODE=wexrtx-keep
-    WEXDIR=wex-xe14 WEX_EXTRA="$ARGS" bash "$HERE/efi.sh" $MODE || die "efi.sh $MODE failed"
+    WEXDIR=wex-xe14b WEX_EXTRA="$ARGS" bash "$HERE/efi.sh" $MODE || die "efi.sh $MODE failed"
     echo "2. XE-14 armed ($MODE). Reboot now."
     ;;
 check)
     TAG=${2:?usage: $0 check TAG}
     OUT=$HOMEU/xe14-$TAG.txt
-    BOOT=$(sysctl -n kern.boottime | sed -E 's/.*sec = ([0-9]+).*/\1/')
+    BOOT=$(sysctl -n kern.boottime | sed -E 's/^\{ sec = ([0-9]+),.*/\1/')
     {
         echo "== $(date '+%F %T'), up since $(date -r "$BOOT" '+%F %T')"
         echo "boot-args: $(sysctl -n kern.bootargs)"
