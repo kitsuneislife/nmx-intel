@@ -6,3 +6,4 @@ graphify-out/
 graphify-out/cache/
 graphify-out/graph.html
 docs/graphify-out/
+tools/cpu/clockprobe
