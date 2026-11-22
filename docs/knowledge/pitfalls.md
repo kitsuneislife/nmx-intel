@@ -485,3 +485,6 @@ copies with the new kernel range (`sudo tahoe.sh patch`); never just widen MaxKe
   writes ratios into HWP_REQUEST is [inferred] (XCPM is closed source).
 - `machdep.xcpm.epp_override` is read only, even as root (EPP-1). EPP 0x20 through CPUFriend did not lift the
   clocks (CPUFRIEND-1).
+- Note 2026-11-22 (CPUFRIEND-2): confirmed in effect [measured]. With `hwp` off in the board-id vectors
+  (CPUFriend, `HWP=off tools/cpu/cpufriend.sh`), P-cores run 4.5 GHz all-core and 4.45 GHz single thread. The
+  cost is idle power, 7.2 → 10.8 W.
