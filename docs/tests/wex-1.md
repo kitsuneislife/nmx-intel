@@ -1058,3 +1058,8 @@ typing here". Evidence from that boot [measured]:
   - Claude hidden (Cmd+H), 14:40:44: no client had any GPU time, and the same gpu-process (pid 626) was still alive.
   - So the load comes from the visible Claude window, which keeps drawing when nothing changes. Next: the same check
     with the app's Terminal pane closed (an xterm-style WebGL terminal is the first suspect [unverified]).
+- 14:42-14:43, Lukas, measured from Ghostty [measured]:
+  - Claude off screen: ghostty 0.1 %, WindowServer 0.0 %. Typing in Ghostty is smooth ("no ghostty ta liso sim").
+  - Claude visible next to it (Terminal pane still open, idle): Claude Helper 93.5 %, WindowServer 3.3 %.
+  - The lag follows the visible Claude window. Next, one variable at a time: Terminal pane closed, then macOS Reduce
+    transparency, then Reduce motion.
