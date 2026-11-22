@@ -7,7 +7,7 @@
 #   sudo bash tools/cpu/cpufriend.sh keep      same, as the daily config
 #   sudo bash tools/cpu/cpufriend.sh check TAG in that boot: CPUFriend state, xe15.sh check, cpu-study.sh
 # Knobs (pass with sudo VAR=...): EPP=0x20 sets the epp tunable (CPUFRIEND-1), HWP=off switches XCPM's HWP off
-# (CPUFRIEND-2). Change one per test. With neither set it stops.
+# (CPUFRIEND-2). Change one per test. With neither set it stops. WEX_ADD="a=1 b=2" appends boot-args (rtd3.sh).
 # Rollback from keep: sudo bash tools/cpu/agpm.sh keep (the daily without CPUFriend).
 set -uo pipefail
 HERE=$(cd "$(dirname "$0")" && pwd)
@@ -75,7 +75,7 @@ plistlib.dump({
 EOF
     plutil -lint "$PROV/Contents/Info.plist" >/dev/null || die "Info.plist does not parse"
     chown -R "${SUDO_USER:-root}" "$B"
-    AGPM_KEXT=$AGPM EXTRA_KEXTS="$CPUF $PROV" WEXDIR=wex-xe15c WEX_EXTRA="-wex-objpreempt -wex-noccs -wex-hostrps-max" \
+    AGPM_KEXT=$AGPM EXTRA_KEXTS="$CPUF $PROV" WEXDIR=wex-xe15c WEX_EXTRA="-wex-objpreempt -wex-noccs -wex-hostrps-max${WEX_ADD:+ $WEX_ADD}" \
         bash "$HERE/../hybrid/efi.sh" "$ROUTE" || die "efi.sh $ROUTE failed"
     echo "CPUFRIEND ($1, epp ${EPP:-unchanged}, hwp ${HWP:-unchanged}) installed. Reboot now."
     ;;

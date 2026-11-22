@@ -4,7 +4,14 @@
 #   sudo SYSREPORT=1 HWP=off bash tools/cpu/cpufriend.sh arm    one boot of the daily config plus the dump
 #   sudo bash tools/hybrid/rtd3.sh acpi                         in that boot: copy the dump, list _PR3 and power resources
 # The RTX is \_SB.PC00.PEG0.PEGP [measured, ioreg acpi-path]; the resource we want is the one in PEG0/PEGP's _PR3.
+# RTD3-0 found it: PowerResource PXP_ in Scope \_SB.PC00.PEG0 of SSDT-12, returned by PEG0's _PR0/_PR3 methods.
+# RTD3-1, the daily config (HWP=off) plus nullmoth's D3cold with that resource:
+#   sudo bash tools/hybrid/rtd3.sh arm            ONE boot (keep: same, as the daily config)
+#   sudo bash tools/hybrid/rtd3.sh check TAG      on battery, apps closed: RTD3 log lines + battery watts over 60 s
+# Rollback from keep: sudo HWP=off bash tools/cpu/cpufriend.sh keep
 set -uo pipefail
+HERE=$(cd "$(dirname "$0")" && pwd)
+RES='\_SB.PC00.PEG0.PXP_'
 HOMEU=$(eval echo "~${SUDO_USER:-$USER}")
 DST=$HOMEU/nmx-build/acpi
 die() { echo "STOP: $*"; exit 1; }
@@ -52,5 +59,38 @@ EOF
     cat "$OUT"
     echo "saved $OUT and the dump in $DST"
     ;;
-*) die "usage: sudo bash $0 acpi" ;;
+arm|keep)
+    HWP=off WEX_ADD="nvrtd3=1 nvrtd3res=$RES" bash "$HERE/../cpu/cpufriend.sh" "$1" || die "cpufriend.sh $1 failed"
+    echo "RTD3-1 ($1, nvrtd3res=$RES) installed. Reboot now."
+    ;;
+check)
+    TAG=${2:?usage: $0 check TAG}
+    OUT=$HOMEU/rtd3-$TAG.txt
+    {
+        echo "== $(date '+%F %T') RTD3 check $TAG, up since $(sysctl -n kern.boottime)"
+        echo "boot-args: $(nvram boot-args 2>/dev/null)"
+        echo "RTD3 lines this boot:"
+        log show --last boot --predicate 'eventMessage CONTAINS "RTD3"' --style compact 2>/dev/null | tail -20
+        echo "ondemand list: $(grep -v '^#' /Library/GPUBundles/nvmtl-allow.txt 2>/dev/null | tr '\n' ' ')"
+        # battery: Voltage mV x InstantAmperage mA (negative while discharging); unplugged only
+        /usr/bin/python3 -I - <<'EOF'
+import re, subprocess, time
+w = []
+for _ in range(30):
+    t = subprocess.run(["ioreg", "-rn", "AppleSmartBattery", "-w0"], capture_output=True, text=True).stdout
+    g = lambda k: int(re.search(rf'"{k}" = (-?\d+|Yes|No)', t).group(1).replace("Yes", "1").replace("No", "0"))
+    if g("ExternalConnected"):
+        print("battery: charger connected, unplug it for a reading"); break
+    a = g("InstantAmperage"); a = a - (1 << 64) if a >= 1 << 63 else a
+    w.append(-a * g("Voltage") / 1e6)
+    time.sleep(2)
+if w:
+    print(f"battery draw over {len(w) * 2} s: mean {sum(w) / len(w):.2f} W, min {min(w):.2f}, max {max(w):.2f}")
+EOF
+    } > "$OUT" 2>&1
+    chown "${SUDO_USER:-root}" "$OUT"
+    cat "$OUT"
+    echo "saved $OUT"
+    ;;
+*) die "usage: sudo bash $0 acpi | arm | keep | check TAG" ;;
 esac
