@@ -1089,3 +1089,16 @@ typing here". Evidence from that boot [measured]:
 - **Plan:** XE-15 = `sudo bash tools/hybrid/xe15.sh` (governor off: the only change against the kept XE-14b is
   0.8.2 -> 0.8.3); then XE-15g = `xe15.sh arm gov` to confirm the governor's effect with numbers. `xe15.sh check TAG`
   logs 20 GT power samples (answer, actual, RC6 %) and a `lat-busy.sh` run to `~/xe15-TAG.txt`.
+
+### XE-15: result, 0.8.3 with the governor off (2026-11-22 15:02 boot)
+
+- `xe15.sh check a` at 15:06, 4 min uptime, load 3.2-5.5, Claude window hidden; `~/xe15-a.txt`, `~/lat-xe15-a.txt`
+  [measured]:
+  - boot-args end `-wex-objpreempt -wex-noccs -wex-hostrps-max`; WhateverXe 0.8.3 loaded; `WhateverXeNoCCS` 1,1;
+    no `.gpuRestart` this boot.
+  - GT: answer 1400 MHz in 20/20 samples, actual 1100 MHz, RC6 0.0 % (frozen again), ~20 pmNotify calls/s.
+  - Probe, three runs: kernel->gpu p50 **0.05-0.10 ms**, p99 0.09-0.18 ms, **max 0.18-1.99 ms** (gap 0 runs hold the
+    1-2 ms maxima; gaps 8 and 16 ms stay under 0.25 ms). gpu exec max 0.13 ms. Claude's processes at 0-0.5 % CPU.
+  - The XE-14b runs had max 28-40 ms. **Two things changed since then**: 0.8.2 -> 0.8.3 and the Claude chat wallpaper
+    off (LAT-15), and this run had the Claude window hidden. So the drop is not yet attributed [inferred: mostly the
+    wallpaper]. Next: the same check with Claude visible here, then the XE-14b boot (the next reboot) as control.

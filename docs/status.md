@@ -2,7 +2,7 @@
 
 > **Summary.** Last updated 2026-11-22. Daily setup is the **WhateverXe hybrid** (XE-8): the Iris Xe drives the
 > desktop with Metal, the RTX runs nullmoth 3.0 headless and only apps listed by `ondemand.sh` open it. Staying on
-> Sequoia 15.8.1 (Tahoe trial in [tests/tahoe-1.md](tests/tahoe-1.md)). Next: XE-15 boot (`xe15.sh`), then XE-15g (governor on).
+> Sequoia 15.8.1 (Tahoe trial in [tests/tahoe-1.md](tests/tahoe-1.md)). XE-15 (0.8.3) booted 11-22: kernel->gpu max 0.2-2 ms. Next: visible-Claude run, XE-14b control, then XE-15g.
 
 ## Daily setup (how the machine boots now)
 
