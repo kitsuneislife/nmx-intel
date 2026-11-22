@@ -30,7 +30,7 @@
 - **AGPM-1 (11-22)**: AGPM profile without `RCxControl`/`CPGControl` → **GT RC6 0 → 99 %**, idle package
   11.7 → 6.6 W, PC2 ~51 %. wxe study ([research/wxe-study-2026-11-22.md](research/wxe-study-2026-11-22.md)): macOS
   now ~55-60 % of Windows; no fork. Still no all-core turbo (12 threads ~2.4 GHz / 16 W).
-  AGPM kept as daily (11-22). EPP-1: `epp_override` is read only. **Next: CPUFRIEND-1** (vector with epp 0x20), then #130.
+  AGPM kept as daily (11-22). EPP-1: `epp_override` is read only. **Next: CPUFRIEND-1** (`cpufriend.sh arm`, epp 0x20), then #130.
 
 ## Other open problems
 
