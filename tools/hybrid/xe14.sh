@@ -47,6 +47,7 @@ check)
     BOOT=$(sysctl -n kern.boottime | sed -E 's/^\{ sec = ([0-9]+),.*/\1/')
     {
         echo "== $(date '+%F %T'), up since $(date -r "$BOOT" '+%F %T')"
+        echo "load: $(uptime)"
         echo "boot-args: $(sysctl -n kern.bootargs)"
         echo "WhateverXe: $(kextstat -l -b org.b00t0x.WhateverXe 2>/dev/null)"
         echo "WhateverXeNoCCS (occurrences, patched; want 1,1):"
