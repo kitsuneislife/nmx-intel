@@ -82,11 +82,12 @@ hybrid|hybrid-keep|wex|wex-keep|wexrtx|wexrtx-keep)
     *)       HYB=$OC/config-wex.plist; GEN=(wex-config.py); PUT=("$WXK/$WEXDIR/WhateverXe.kext" "$WXK/AMFIPassMod.kext"); NAME=wex ;;
     esac
     for k in "${PUT[@]}"; do [ -d "$k/Contents/MacOS" ] || { echo "no $k: build or download it first"; exit 1; }; done
-    # AGPM-1 knob: AGPM_KEXT=/path/X.kext (codeless, no MacOS dir) is copied too; wex-config.py adds its entry
-    if [ -n "${AGPM_KEXT:-}" ]; then
-        [ -f "$AGPM_KEXT/Contents/Info.plist" ] || { echo "no $AGPM_KEXT"; exit 1; }
-        PUT+=("$AGPM_KEXT")
-    fi
+    # test knobs: AGPM_KEXT and EXTRA_KEXTS (space-separated kext paths, codeless allowed) are copied too;
+    # wex-config.py adds their entries
+    for k in ${AGPM_KEXT:-} ${EXTRA_KEXTS:-}; do
+        [ -f "$k/Contents/Info.plist" ] || { echo "no $k"; exit 1; }
+        PUT+=("$k")
+    done
     if is_hybrid "$CFG"; then
         [ -f "$GPU" ] || { echo "config.plist loads NootedGreen and there is no config-gpu-only.plist; nothing changed"; exit 1; }
     elif cmp -s "$CFG" "$OC/config-plain.plist"; then

@@ -51,11 +51,14 @@ def make(c: dict, rtx: bool = False) -> dict:
         sys.exit("no Lilu.kext or AMFIPass.kext in Kernel/Add")
     add[paths.index("AMFIPass.kext")]["BundlePath"] = "AMFIPassMod.kext"
     add.insert(paths.index("Lilu.kext") + 1, dict(WEX_ENTRY))
-    # AGPM-1 test knob: AGPM_KEXT=/path/X.kext loads a codeless kext (an AGPM profile override) after WhateverXe
-    agpm = os.environ.get("AGPM_KEXT", "")
-    if agpm:
-        add.insert(paths.index("Lilu.kext") + 2, {**WEX_ENTRY, "BundlePath": os.path.basename(agpm),
-                   "Comment": "AGPM profile override (test)", "ExecutablePath": ""})
+    # test knobs: AGPM_KEXT=/path/X.kext (AGPM-1) and EXTRA_KEXTS="/path/A.kext /path/B.kext" (CPUFRIEND-1) load
+    # extra kexts right after WhateverXe, in that order; a kext with no Contents/MacOS is codeless
+    extra = (os.environ.get("AGPM_KEXT", "") + " " + os.environ.get("EXTRA_KEXTS", "")).split()
+    for i, k in enumerate(extra):
+        name = os.path.basename(k)
+        exe = f"Contents/MacOS/{name[:-5]}" if os.path.isdir(os.path.join(k, "Contents/MacOS")) else ""
+        add.insert(paths.index("Lilu.kext") + 2 + i, {**WEX_ENTRY, "BundlePath": name,
+                   "Comment": "test kext (agpm.sh / cpufriend.sh)", "ExecutablePath": exe})
     acpi = c["ACPI"]["Add"]
     if not any(e.get("Path") == PNLF_ENTRY["Path"] for e in acpi):
         acpi.append(dict(PNLF_ENTRY))
