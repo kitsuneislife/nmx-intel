@@ -6,7 +6,8 @@
 #   sudo bash tools/cpu/cpufriend.sh arm       ONE boot of the daily config (XE-15 + AGPMNoRC) plus CPUFriend
 #   sudo bash tools/cpu/cpufriend.sh keep      same, as the daily config
 #   sudo bash tools/cpu/cpufriend.sh check TAG in that boot: CPUFriend state, xe15.sh check, cpu-study.sh
-# EPP=0x40 sudo -E ... picks another value (default 0x20). One variable: the EPP in the vector.
+# Knobs (pass with sudo VAR=...): EPP=0x20 sets the epp tunable (CPUFRIEND-1), HWP=off switches XCPM's HWP off
+# (CPUFRIEND-2). Change one per test. With neither set it stops.
 # Rollback from keep: sudo bash tools/cpu/agpm.sh keep (the daily without CPUFriend).
 set -uo pipefail
 HERE=$(cd "$(dirname "$0")" && pwd)
@@ -15,13 +16,15 @@ B=$HOMEU/nmx-build/cpufriend
 CPUF=$B/dl/x/CPUFriend.kext
 PROV=$B/CPUFriendDataProvider.kext
 AGPM=$HOMEU/nmx-build/agpm/AGPMNoRC.kext
-EPP=${EPP:-0x20}
+EPP=${EPP:-}
+HWP=${HWP:-}
 die() { echo "STOP: $*"; exit 1; }
 [ "$(id -u)" = 0 ] || die "run with sudo"
 
 case "${1:-}" in
 arm|keep)
     ROUTE=wexrtx; [ "$1" = keep ] && ROUTE=wexrtx-keep
+    [ -n "$EPP$HWP" ] || die "set EPP=0x.. or HWP=off (one per test)"
     [ -f "$CPUF/Contents/MacOS/CPUFriend" ] || die "no $CPUF (unzip CPUFriend-1.3.0-RELEASE.zip into $B/dl/x)"
     [ -f "$AGPM/Contents/Info.plist" ] || die "no $AGPM (run agpm.sh keep first)"
     BID=$(ioreg -l -w0 -d2 -p IODeviceTree | sed -n 's/.*"board-id" = <"\(Mac-[0-9A-F]*\)">.*/\1/p' | head -1)
@@ -29,24 +32,37 @@ arm|keep)
     RES=/System/Library/Extensions/IOPlatformPluginFamily.kext/Contents/PlugIns/X86PlatformPlugin.kext/Contents/Resources/$BID.plist
     [ -f "$RES" ] || die "no X86PlatformPlugin resource plist for $BID"
     mkdir -p "$PROV/Contents" || die "could not create $PROV"
-    /usr/bin/python3 -I - "$RES" "$EPP" "$PROV/Contents/Info.plist" <<'EOF' || die "could not build the data provider"
+    /usr/bin/python3 -I - "$RES" "$EPP" "$HWP" "$PROV/Contents/Info.plist" <<'EOF' || die "could not build the data provider"
 import plistlib, sys
-res, epp, out = sys.argv[1], int(sys.argv[2], 0), sys.argv[3]
-if not 0 <= epp <= 255:
-    sys.exit("EPP must be 0-255")
+res, epp, hwp, out = sys.argv[1:]
 d = plistlib.load(open(res, "rb"))
 vecs = d["IOPlatformPowerProfile"]["FrequencyVectors"]
-name = b"epp".ljust(16, b"\0")  # tunables are 36-byte records: 16-byte name, 4-byte type, 4-byte value at +20
+# tunables are 36-byte records: 16-byte name, 4-byte type, 16-byte value at +20 (an int, or a string for type 1)
+def record(v, i, key):
+    hits = [o for o in range(0, len(v) - 36) if v[o:o + 16] == key.encode().ljust(16, b"\0")]
+    if len(hits) != 1:
+        sys.exit(f"vector {i}: expected one '{key}' record, found {len(hits)}")
+    return hits[0]
 for i, v in enumerate(vecs):
     v = bytearray(v)
-    hits = [o for o in range(0, len(v) - 36) if v[o:o + 16] == name]
-    if len(hits) != 1:
-        sys.exit(f"vector {i}: expected one 'epp' record, found {len(hits)}")
-    o = hits[0] + 20
-    old = int.from_bytes(v[o:o + 4], "little")
-    v[o:o + 4] = epp.to_bytes(4, "little")
+    if epp:
+        e = int(epp, 0)
+        if not 0 <= e <= 255:
+            sys.exit("EPP must be 0-255")
+        o = record(v, i, "epp") + 20
+        old = int.from_bytes(v[o:o + 4], "little")
+        v[o:o + 4] = e.to_bytes(4, "little")
+        print(f"vector {i}: epp 0x{old:x} -> 0x{e:x}")
+    if hwp:
+        if hwp not in ("on", "off"):
+            sys.exit("HWP must be on or off")
+        o = record(v, i, "hwp")
+        if v[o + 16:o + 20] != (1).to_bytes(4, "little"):
+            sys.exit(f"vector {i}: 'hwp' is not a string record")
+        old = bytes(v[o + 20:o + 36]).split(b"\0")[0].decode()
+        v[o + 20:o + 36] = hwp.encode().ljust(16, b"\0")
+        print(f"vector {i}: hwp {old} -> {hwp}")
     vecs[i] = bytes(v)
-    print(f"vector {i}: epp 0x{old:x} -> 0x{epp:x}")
 plistlib.dump({
     "CFBundleIdentifier": "org.acidanthera.driver.CPUFriendDataProvider", "CFBundleInfoDictionaryVersion": "6.0",
     "CFBundleName": "CPUFriendDataProvider", "CFBundlePackageType": "KEXT", "CFBundleShortVersionString": "1.0.1",
@@ -61,7 +77,7 @@ EOF
     chown -R "${SUDO_USER:-root}" "$B"
     AGPM_KEXT=$AGPM EXTRA_KEXTS="$CPUF $PROV" WEXDIR=wex-xe15c WEX_EXTRA="-wex-objpreempt -wex-noccs -wex-hostrps-max" \
         bash "$HERE/../hybrid/efi.sh" "$ROUTE" || die "efi.sh $ROUTE failed"
-    echo "CPUFRIEND ($1, epp $EPP) installed. Reboot now."
+    echo "CPUFRIEND ($1, epp ${EPP:-unchanged}, hwp ${HWP:-unchanged}) installed. Reboot now."
     ;;
 check)
     TAG=${2:?usage: $0 check TAG}
