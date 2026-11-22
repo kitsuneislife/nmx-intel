@@ -1102,3 +1102,7 @@ typing here". Evidence from that boot [measured]:
   - The XE-14b runs had max 28-40 ms. **Two things changed since then**: 0.8.2 -> 0.8.3 and the Claude chat wallpaper
     off (LAT-15), and this run had the Claude window hidden. So the drop is not yet attributed [inferred: mostly the
     wallpaper]. Next: the same check with Claude visible here, then the XE-14b boot (the next reboot) as control.
+- `xe15.sh check av`, 15:08, same boot, **Claude window visible** (wallpaper off), load 2.3-4.1; `~/xe15-av.txt`,
+  `~/lat-xe15-av.txt` [measured]: GT answer 1400 MHz 20/20, actual 1100 MHz, RC6 0.0 %; pmNotify calls rose to
+  ~300-1000/s for two samples, then ~20/s. Probe: kernel->gpu p50 0.04-0.10 ms, p99 0.10-0.18 ms, **max 0.18-1.97 ms**.
+  A visible Claude window no longer costs latency with the wallpaper off. Next: XE-14b control (next reboot).
