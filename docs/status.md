@@ -31,7 +31,7 @@
   11.7 → 6.6 W, PC2 ~51 %. wxe study ([research/wxe-study-2026-11-22.md](research/wxe-study-2026-11-22.md)): macOS
   now ~55-60 % of Windows; no fork. Still no all-core turbo (12 threads ~2.4 GHz / 16 W).
   AGPM kept as daily (11-22). **CPUFRIEND-2 (11-22): `hwp` off in the vector → P-cores 4.5 GHz**:
-  12 threads 23.6 → 45.4 GHz-equiv, 1 thread 2.4 → 4.45 GHz; idle 7.2 → 10.8 W. Next: keep it, then the #130 fence.
+  12 threads 23.6 → 45.4 GHz-equiv, 1 thread 2.4 → 4.45 GHz; idle 7.2 → 10.8 W. Kept (11-22). **Next: RTD3-0** (ACPI dump for nullmoth `nvrtd3res`, RTX off when idle).
 
 ## Other open problems
 
