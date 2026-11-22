@@ -1008,3 +1008,17 @@ change], so XE-14 is still one variable. The rollback copy is renamed `kexts/wex
 - No `.gpuRestart` from 13:51 to 14:11 (two boots).
 - **Verdict: keep XE-14b** (`xe14.sh keep`). It cuts the typical wait more than tenfold, does not change the worst
   case, and removes the CCS ring that caused 19 of the 20 hangs.
+
+### LAT-14 prepared (2026-11-22 14:15): Claude back on the Iris Xe, on top of XE-14b
+
+Lukas, still in the daily boot (14:04, `xe14.sh keep` armed but not rebooted): "still visible lag, even now while
+typing here". Evidence from that boot [measured]:
+- `ondemand.sh status`: the RTX holders are `Claude` (pid 431) and `Claude Helper --type=gpu-process` (pid 538).
+  LAT-13 (11-14) is still in effect and was **never measured** (index row still "prepared").
+- `ps`: the Claude gpu-process at 50-63 % CPU and its renderer at 47 % while one answer streams; WindowServer 10 %.
+- No MUX: every frame Chromium draws on the headless RTX has to reach the Iris Xe's WindowServer. Whether nullmoth
+  copies it through the CPU or over PCIe DMA is unknown [unverified]. A copy per frame would fit a gpu-process at
+  ~60 % CPU and a delay between key press and the glyph on screen [inferred].
+- Test, one variable, no rebuild: after the XE-14b reboot, take `Claude` and `Claude Helper` off the RTX list, so
+  Chromium renders on the Iris Xe, which now has `-wex-noccs`. Record the gpu-process CPU %, `lat-busy.sh lat14`
+  and Lukas's typing feel, against the same apps on the RTX (`lat14-rtx`). Undo: `ondemand.sh add "Claude" "Claude Helper"`.
