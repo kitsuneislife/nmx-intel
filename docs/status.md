@@ -2,7 +2,7 @@
 
 > **Summary.** Last updated 2026-11-22. Daily setup is the **WhateverXe hybrid** (XE-8): the Iris Xe drives the
 > desktop with Metal, the RTX runs nullmoth 3.0 headless and only apps listed by `ondemand.sh` open it. Staying on
-> Sequoia 15.8.1 (Tahoe trial in [tests/tahoe-1.md](tests/tahoe-1.md)). Daily is XE-15 (0.8.3), kernel->gpu max 0.2-2 ms. Optional next: XE-15g (governor on).
+> Sequoia 15.8.1 (Tahoe trial in [tests/tahoe-1.md](tests/tahoe-1.md)). Daily is XE-15 (0.8.3), kernel->gpu max 0.2-2 ms. Next: AGPM-1 kept as daily.
 
 ## Daily setup (how the machine boots now)
 
@@ -27,10 +27,10 @@
   GuC the CPU drives submission, so CPU load raises iGPU latency (#182) [inferred]; take runs with the CPU idle.
 - **Lag cause (LAT-15, 11-22)**: Claude Desktop's chat **wallpaper** kept its gpu-process at 90-93 % of the Iris Xe
   (`tools/hybrid/gpu-top.sh`). Off: 0.1 %. Keep `/wallpaper default off`. Typing in Ghostty was smooth.
-- XE-15c: GT pinned at RP0, **RC6 never entered** [measured]; likely AGPM `RCxControl` (#87) [inferred].
-- **wxe study** ([research/wxe-study-2026-11-22.md](research/wxe-study-2026-11-22.md)): macOS uses ~55 % (45-65) of
-  what Windows gets. No fork. CPU-1: idle package 11.7 W, never below C0; 12 threads stay at ~2.2 GHz / 19 W (no
-  turbo). **Next: AGPM-1** (`sudo bash tools/cpu/agpm.sh arm`), then CPUFriend, then the #130 fence poll.
+- **AGPM-1 (11-22)**: AGPM profile without `RCxControl`/`CPGControl` → **GT RC6 0 → 99 %**, idle package
+  11.7 → 6.6 W, PC2 ~51 %. wxe study ([research/wxe-study-2026-11-22.md](research/wxe-study-2026-11-22.md)): macOS
+  now ~55-60 % of Windows; no fork. Still no all-core turbo (12 threads ~2.4 GHz / 16 W).
+  **Next: `sudo bash tools/cpu/agpm.sh keep`, then `agpm.sh check 2`**, then CPUFriend, then the #130 fence poll.
 
 ## Other open problems
 

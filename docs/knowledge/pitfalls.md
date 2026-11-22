@@ -466,6 +466,9 @@ copies with the new kernel range (`sudo tahoe.sh patch`); never just widen MaxKe
   (`RC6_Wake_Limit 40, RC6_Threshold 520, RC_Eval_Interval 40000, RP_Idle_Hysteresis 25`) and `CPGControl`
   [measured, `ioreg`]. On a MacBookPro16,1 RPL-HX these exact values switch GT RC6 off 50-80 s after boot, and an
   AGPM personality without them brings RC6 back to 96 % (rodgod-rr, WhateverXe #87). Likely our cause [inferred].
+- Note 2026-11-22 (AGPM-1): confirmed [measured]. `AGPMNoRC.kext` (`tools/cpu/agpm.sh`) took GT RC6 from 0 % to
+  99 % (91 % at 5 min) and idle package power from 11.7 to 6.6 W. The kext is generated from the system AGPM
+  Info.plist, so rebuild it (`agpm.sh keep`) after a macOS update.
 
 ## Clock probes: an add-immediate chain is not one add per cycle (2026-11-22)
 
