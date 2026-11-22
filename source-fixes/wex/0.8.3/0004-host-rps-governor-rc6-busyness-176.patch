@@ -1,0 +1,203 @@
+From fa0a4efd141466873a87a8b0b54b0dfea6c82816 Mon Sep 17 00:00:00 2001
+From: lucaseduardo1656 <lucas@MacBook-Pro-de-lucas.local>
+Date: Sat, 21 Nov 2026 17:28:15 -0300
+Subject: [PATCH] Choose host RPS frequency from RC6 busyness (#176)
+
+Without GuC (-disablegfxfirmware) Apple's requested/boost fields stay at
+RP0 and the native usage values are zero, so the host pmNotify answer
+pinned the GT at its maximum frequency (observed 1200 MHz constantly on
+ADL-P 0x46A8 while RC6 residency was ~90%).
+
+Derive the answer from GT busyness instead: the complement of RC6
+residency (GEN6_GT_GFX_RC6, already read by the power sampler from the
+always-accessible mirror range), evaluated over >=16 ms windows. Jump to
+RP0 at >=90% busy, step up at >=70%, step down below 30%, and restart at
+RPn after a 100 ms callback gap. No forcewake, MMIO writes or busy-wait
+sampling in the callback. -wex-hostrps-max keeps the previous answer.
+
+The policy is header-only and covered by a CPU test.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ WhateverXe/kern_host_rps_governor.hpp   | 50 ++++++++++++++++++++
+ WhateverXe/kern_xe.cpp                  | 17 ++++++-
+ tests/fixtures/boot_argument_names.json |  3 +-
+ tests/host_rps_governor.cpp             | 62 +++++++++++++++++++++++++
+ 4 files changed, 129 insertions(+), 3 deletions(-)
+ create mode 100644 WhateverXe/kern_host_rps_governor.hpp
+ create mode 100644 tests/host_rps_governor.cpp
+
+diff --git a/WhateverXe/kern_host_rps_governor.hpp b/WhateverXe/kern_host_rps_governor.hpp
+new file mode 100644
+index 0000000..fff670d
+--- /dev/null
++++ b/WhateverXe/kern_host_rps_governor.hpp
+@@ -0,0 +1,50 @@
++// Host RPS governor for the non-GuC pmNotify frequency query (-disablegfxfirmware).
++// Without GuC, Apple's requested/boost fields stay at RP0 and the native usage
++// values are zero, so answering them pins the GT at its maximum frequency (#176).
++// This policy chooses the frequency from GT busyness instead, measured as the
++// complement of RC6 residency (GEN6_GT_GFX_RC6, 1.28 us ticks). That counter is
++// in the always-accessible mirror range already read by the power sampler, so the
++// hook needs no forcewake, no MMIO writes and no busy-wait sampling.
++// Thresholds follow the up/down evaluation idea of Linux i915 host RPS.
++#pragma once
++#include <stdint.h>
++namespace XeHostRPSGovernor {
++constexpr uint64_t windowNs=16000000ULL;      // minimum evaluation window
++constexpr uint64_t idleGapNs=100000000ULL;    // no callback for this long: idle
++constexpr uint32_t upPercent=70, maxPercent=90, downPercent=30;
++constexpr uint32_t rc6TickNs=1280;
++struct State {
++ uint64_t windowStart {};  // ns; 0 before the first callback
++ uint32_t rc6Start {};
++ uint64_t lastCall {};
++ uint32_t current {};      // 50 MHz units; 0 until initialized
++};
++// Busy percent of the window from RC6 residency ticks (32-bit wrapping counter).
++inline uint32_t busyPercent(uint64_t elapsedNs,uint32_t rc6StartTicks,uint32_t rc6NowTicks) {
++ if(!elapsedNs)return 0;
++ const uint64_t idleNs=uint64_t(uint32_t(rc6NowTicks-rc6StartTicks))*rc6TickNs;
++ if(idleNs>=elapsedNs)return 0;
++ return uint32_t((elapsedNs-idleNs)*100/elapsedNs);
++}
++// Returns the frequency to answer, in 50 MHz units within [lo,hi].
++// lo/hi are RPn/RP0 from RP_STATE_CAP; the caller rejects invalid caps.
++inline uint32_t decide(State &s,uint64_t nowNs,uint32_t rc6Ticks,uint32_t lo,uint32_t hi) {
++ const uint32_t step=(hi-lo+3)/4 ? (hi-lo+3)/4 : 1;
++ if(!s.current || s.current<lo || s.current>hi)s.current=lo;
++ const bool gap=!s.windowStart || nowNs<s.lastCall || nowNs-s.lastCall>idleGapNs;
++ s.lastCall=nowNs;
++ if(gap) {
++  // A long silence means the GT was idle; restart measurement from RPn.
++  s.current=lo;s.windowStart=nowNs;s.rc6Start=rc6Ticks;
++  return s.current;
++ }
++ const uint64_t elapsed=nowNs-s.windowStart;
++ if(elapsed<windowNs)return s.current;
++ const uint32_t busy=busyPercent(elapsed,s.rc6Start,rc6Ticks);
++ if(busy>=maxPercent)s.current=hi;
++ else if(busy>=upPercent)s.current=hi-s.current<step ? hi : s.current+step;
++ else if(busy<downPercent)s.current=s.current-lo<step ? lo : s.current-step;
++ s.windowStart=nowNs;s.rc6Start=rc6Ticks;
++ return s.current;
++}
++}
+diff --git a/WhateverXe/kern_xe.cpp b/WhateverXe/kern_xe.cpp
+index 85911f4..a86493f 100644
+--- a/WhateverXe/kern_xe.cpp
++++ b/WhateverXe/kern_xe.cpp
+@@ -13,6 +13,7 @@
+ #include "kern_dsi_native_backing.hpp"
+ #include "kern_dsi_native_mode.hpp"
+ #include "kern_xe.hpp"
++#include "kern_host_rps_governor.hpp"
+ #include "kern_framebuffer_donor.hpp"
+ #include "kern_xelp_os.hpp"
+ #include "kern_xelp_call_target.hpp"
+@@ -570,8 +571,20 @@ uint32_t tglHostPMNotify(void *controller,uint32_t priority,uint32_t event,uint6
+    auto base=*reinterpret_cast<volatile uint8_t **>(access+0x50);
+    if(base) {
+     const uint32_t caps=*reinterpret_cast<volatile uint32_t *>(base+0x145998);
+-    const uint32_t encoded=tglHostRPSEncode(*reinterpret_cast<uint32_t *>(c+0xec8),
+-      *reinterpret_cast<uint32_t *>(c+0xecc),caps);
++    uint32_t requested=*reinterpret_cast<uint32_t *>(c+0xec8);
++    uint32_t boost=*reinterpret_cast<uint32_t *>(c+0xecc);
++    // #176: Apple's fields stay at RP0 without GuC. Choose from RC6-derived
++    // busyness unless -wex-hostrps-max restores the previous RP0 answer.
++    static int maxMode=-1;
++    if(maxMode<0)maxMode=checkKernelArgument("-wex-hostrps-max") ? 1:0;
++    const uint32_t lo=(caps>>16)&255,hi=caps&255;
++    if(!maxMode && lo && lo<=hi && hi<=85) {
++     static XeHostRPSGovernor::State governor;
++     uint64_t t,now=0;clock_get_uptime(&t);absolutetime_to_nanoseconds(t,&now);
++     const uint32_t rc6=*reinterpret_cast<volatile uint32_t *>(base+0x138108);
++     requested=boost=XeHostRPSGovernor::decide(governor,now,rc6,lo,hi);
++    }
++    const uint32_t encoded=tglHostRPSEncode(requested,boost,caps);
+     if(encoded) {
+      *frequency=encoded;
+      __atomic_store_n(&tglHostRPSCap,caps,__ATOMIC_RELAXED);
+diff --git a/tests/fixtures/boot_argument_names.json b/tests/fixtures/boot_argument_names.json
+index 0c42ce9..643f42c 100644
+--- a/tests/fixtures/boot_argument_names.json
++++ b/tests/fixtures/boot_argument_names.json
+@@ -150,5 +150,6 @@
+   "-wex-dsi-hdmi-test": [],
+   "-wex-dsi-power-test": [],
+   "-wex-objpreempt": [],
+-  "-wex-noccs": []
++  "-wex-noccs": [],
++  "-wex-hostrps-max": []
+ }
+diff --git a/tests/host_rps_governor.cpp b/tests/host_rps_governor.cpp
+new file mode 100644
+index 0000000..4bb4e23
+--- /dev/null
++++ b/tests/host_rps_governor.cpp
+@@ -0,0 +1,62 @@
++// Contract (#176): with -disablegfxfirmware the host pmNotify answer must follow
++// GT busyness instead of Apple's RP0-pinned request fields. Busyness is the
++// complement of RC6 residency (1.28 us ticks, 32-bit wrapping). Retained:
++// answers stay inside [RPn,RP0]; the caller still encodes and clamps them.
++// Not covered here: Lilu routing, MMIO reads, hardware frequency response.
++#include "kern_host_rps_governor.hpp"
++#include <cassert>
++#include <cstdio>
++using namespace XeHostRPSGovernor;
++static constexpr uint32_t lo=2, hi=24; // ADL-P 0x46A8 caps: RPn 100 MHz, RP0 1200 MHz
++static constexpr uint64_t ms=1000000ULL;
++static uint32_t idleTicks(uint64_t ns) { return uint32_t(ns/rc6TickNs); }
++// Advance one window with the given busy percent and return the answer.
++static uint32_t run(State &s,uint64_t &now,uint32_t &rc6,uint32_t busy,uint64_t window=20*ms) {
++ now+=window;rc6+=idleTicks(window*(100-busy)/100);
++ return decide(s,now,rc6,lo,hi);
++}
++int main() {
++ // Busy percent from RC6 ticks, including counter wrap and over-full idle.
++ assert(busyPercent(0,0,0)==0);
++ assert(busyPercent(10*ms,0,idleTicks(10*ms))==0);
++ assert(busyPercent(10*ms,0,0)==100);
++ assert(busyPercent(10*ms,0xFFFFFFF0U,0xFFFFFFF0U+idleTicks(5*ms))==50);
++ assert(busyPercent(10*ms,0,idleTicks(20*ms))==0);
++
++ // First call starts at RPn, never at Apple's RP0 request.
++ State s;uint64_t now=1000*ms;uint32_t rc6=0;
++ assert(decide(s,now,rc6,lo,hi)==lo);
++ // Inside the minimum window the answer does not change.
++ assert(decide(s,now+5*ms,rc6,lo,hi)==lo);
++ now+=5*ms;
++ // Idle desktop (RC6 ~90% as measured on 0x46A8): stays at RPn.
++ for(int i=0;i<50;++i)assert(run(s,now,rc6,10)==lo);
++ // Saturated GT: jumps directly to RP0.
++ assert(run(s,now,rc6,100)==hi);
++ // Moderate load holds; light load steps down gradually to RPn, never below.
++ assert(run(s,now,rc6,50)==hi);
++ uint32_t previous=hi;
++ for(int i=0;i<10;++i) {
++  const uint32_t f=run(s,now,rc6,5);
++  assert(f<=previous && f>=lo);previous=f;
++ }
++ assert(previous==lo);
++ // Sustained 75% busy steps up without overshooting RP0.
++ previous=lo;
++ for(int i=0;i<10;++i) {
++  const uint32_t f=run(s,now,rc6,75);
++  assert(f>=previous && f<=hi);previous=f;
++ }
++ assert(previous==hi);
++ // A long callback gap means idle: restart at RPn.
++ assert(run(s,now,rc6,100,200*ms)==lo);
++ // A clock going backwards is treated as a restart, not as a huge window.
++ assert(decide(s,now-ms,rc6,lo,hi)==lo);
++ // Degenerate single-frequency caps stay valid.
++ State one;assert(decide(one,ms,0,7,7)==7);
++ now=ms;rc6=0;
++ for(int i=0;i<5;++i) { now+=20*ms; assert(decide(one,now,rc6,7,7)==7); }
++ // Out-of-range state is repaired to RPn.
++ State bad;bad.current=200;assert(decide(bad,ms,0,lo,hi)==lo);
++ puts("PASS: RC6 busyness, RPn start, up/down hysteresis, bounds, idle gap, clock reset");
++}
+-- 
+2.39.5 (Apple Git-154)
+
