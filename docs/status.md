@@ -29,8 +29,8 @@
   (`tools/hybrid/gpu-top.sh`). Off: 0.1 %. Keep `/wallpaper default off`. Typing in Ghostty was smooth.
 - XE-15c: GT pinned at RP0, **RC6 never entered** [measured]; likely AGPM `RCxControl` (#87) [inferred].
 - **wxe study** ([research/wxe-study-2026-11-22.md](research/wxe-study-2026-11-22.md)): macOS uses ~55 % (45-65) of
-  what Windows gets; CPU ST peaks 3.55 GHz vs 4.6. No fork. Next: `sudo bash tools/cpu/cpu-study.sh base`, then an
-  AGPM injector without `RCxControl`, then CPUFriend/CpuTopologyRebuild, then the #130 fence poll.
+  what Windows gets. No fork. CPU-1: idle package 11.7 W, never below C0; 12 threads stay at ~2.2 GHz / 19 W (no
+  turbo). **Next: AGPM-1** (`sudo bash tools/cpu/agpm.sh arm`), then CPUFriend, then the #130 fence poll.
 
 ## Other open problems
 

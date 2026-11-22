@@ -146,3 +146,4 @@ changes), then [../status.md](../status.md).
 | XE-15c | 11-22 | WhateverXe `8516faf3` | XE-15b + #176 host-RPS governor (upstream RC6 variant), `-wex-hostrps-max` knob | built, 222 tests pass; baseline: answer pinned at RP0 1400 MHz, **RC6 never entered** (counter frozen) | [wex-1](wex-1.md) |
 | XE-15 | 11-22 | WhateverXe `8516faf3`, `-wex-hostrps-max` | 0.8.3, governor off; Claude hidden, wallpaper off | boots, no hang; **kernel->gpu max 0.2-2 ms** (was 28-40); not yet attributed (wallpaper also off) | [wex-1](wex-1.md) |
 | XE-15 | 11-22 | same boot | Claude visible, wallpaper off | **kernel->gpu max 0.2-2 ms**, same as hidden | [wex-1](wex-1.md) |
+| CPU-1 | 11-22 | XE-15 daily | `cpu-study.sh base`: idle, 1 and 12 threads, powermetrics | **package 0 % in every PC state at idle, 11.7 W**; 12 threads at **2.18 GHz / 19 W** (no turbo); 1 thread peaks 3.6 GHz in bursts | [wxe study](../research/wxe-study-2026-11-22.md) |
