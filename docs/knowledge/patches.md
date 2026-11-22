@@ -152,3 +152,6 @@ source-fixes/00NN-<slug>.patch`, add an `apply` line to `build/apply-fixes.sh` (
 - `source-fixes/wex/0.8.3/0001..0002` (XE-15) — 0006 and 0008 re-applied on WhateverXe 0.8.3 `f26a368`. 0003 and
   0004 are dropped: upstream accepts mode 0 or 1 on the combo port, and `f49ff77` adds `adlnSetColdClock` for the cold
   CDCLK set. WhateverXe `94731d44`, staged in `kexts/wex-xe15/`.
+- `source-fixes/wex/0.8.2/0009-xe14b-noccs-lookup-window.patch` (XE-14b, on top of 0008) — the lookup window is one
+  byte longer than the key, so the patch applies (XE-14 recorded {1,0}). WhateverXe `b2bb8e95`, `kexts/wex-xe14b/`.
+  The same fix on 0.8.3: `0.8.3/0003`, WhateverXe `1c70dbd2`, `kexts/wex-xe15b/`.

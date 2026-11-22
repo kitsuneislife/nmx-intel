@@ -951,3 +951,18 @@ build, not LAT-8's `8dfa6775`** [measured]. LAT-5's one-boot mode restored the c
 11-22 pitfall says. With no `wexdev` property that kext behaves like LAT-8 [inferred from 0007: no property, no
 change], so XE-14 is still one variable. The rollback copy is renamed `kexts/wex-daily/` (read `wex-daily` for
 `wex-lat8` in the steps above); the script bug is fixed.
+
+### XE-14 result (2026-11-22 13:37 boot): knob ran, patch not applied → XE-14b
+
+- `~/xe14-a.txt` [measured]: boot-args end in `-wex-objpreempt -wex-noccs`; WhateverXe 0.8.2 UUID
+  `C37AD465-…` loaded; `WhateverXeNoCCS = <01000000 00000000>` = key found once, **not patched**. No
+  `Multi-Context` line in the log (the driver's `[IGPU] HWCAPS` lines are there, 73 `[IGPU]` lines this boot), so
+  the driver still runs with multi-context on. No `.gpuRestart` this boot. `lat-busy` did not run (stopped).
+  `check`'s "up since" read 1970 (the `kern.boottime` sed caught `usec`); fixed.
+- Cause: our 0008 passes a lookup window equal to the key, and Lilu searches nothing (pitfalls). skmaiti's
+  `bd5940e` was meant to be in the port and was not.
+- **XE-14b**: `0009-xe14b-noccs-lookup-window.patch` (`sizeof(f)+1`), WhateverXe `b2bb8e95`, staged in
+  `kexts/wex-xe14b/`; the same change on 0.8.3 is `0.8.3/0003`, WhateverXe `1c70dbd2` (`kexts/wex-xe15b/`, for
+  XE-15). Both build (rc 0), Info.plist OK, strings present. Same steps as XE-14: `sudo bash tools/hybrid/xe14.sh`,
+  reboot, `bash tools/hybrid/xe14.sh check b` with the CPU idle. The ESP keeps the XE-14 kext `29a78c34` until then;
+  without the boot-arg it behaves like the daily one.

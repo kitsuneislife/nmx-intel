@@ -2,7 +2,7 @@
 
 > **Summary.** Last updated 2026-11-22. Daily setup is the **WhateverXe hybrid** (XE-8): the Iris Xe drives the
 > desktop with Metal, the RTX runs nullmoth 3.0 headless and only apps listed by `ondemand.sh` open it. Staying on
-> Sequoia 15.8.1 (Tahoe trial in [tests/tahoe-1.md](tests/tahoe-1.md)). Next: **XE-14** `-wex-noccs`, one boot.
+> Sequoia 15.8.1 (Tahoe trial in [tests/tahoe-1.md](tests/tahoe-1.md)). Next: **XE-14b** `-wex-noccs`, one boot.
 
 ## Daily setup (how the machine boots now)
 
@@ -27,9 +27,9 @@
 - Radar 11-22 ([research/radar-2026-11-22.md](research/radar-2026-11-22.md)): 20 iGPU hangs on 11-20/21, 19 on the CCS
   ring (`mediaanalysisd`, WhateverXe #163). Hangs may leave compositing slow until reboot [inferred for us]. Without
   GuC the CPU drives submission, so CPU load raises iGPU latency (#182) [inferred]; take runs with the CPU idle.
-- **XE-14** prepared: `29a78c34`, LAT-8 + `-wex-noccs`, `sudo bash tools/hybrid/xe14.sh` then `xe14.sh check a`.
-  The 11-22 baseline is invalid (taken during a build); redo it idle.
-- **XE-15** built: `94731d44`, same changes on WhateverXe 0.8.3 (recovery fix; upstream covers our 0003/0004). After
+- **XE-14** (13:37 boot) had no effect: `WhateverXeNoCCS` 1,0, the lookup window was one byte short. **XE-14b**
+  `b2bb8e95` fixes it: `sudo bash tools/hybrid/xe14.sh`, reboot, `xe14.sh check b` with the CPU idle.
+- **XE-15** built: `1c70dbd2` (with the XE-14b fix), same changes on WhateverXe 0.8.3 (recovery fix; upstream covers our 0003/0004). After
   XE-14's verdict, with a kext rollback. **XE-16** (#182 144 Hz fixes) dropped: not our failure.
 
 ## Other open problems

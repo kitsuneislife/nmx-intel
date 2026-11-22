@@ -134,3 +134,5 @@ changes), then [../status.md](../status.md).
 | XE-14 | 11-22 | WhateverXe `29a78c34` | LAT-8 + `-wex-noccs` (Apple's `EnableMultiContext` read as 0: compute off the CCS, #163), one boot | prepared; baseline 11-22 invalid (CPU busy) | [wex-1](wex-1.md) |
 | XE-15 | 11-22 | WhateverXe `94731d44` | LAT-8 + XE-14 rebased on WhateverXe 0.8.3 (upstream covers our 0003/0004) | built, 221 tests pass; after XE-14 | [wex-1](wex-1.md) |
 | XE-16 | 11-22 | — | #182 A7A8 144 Hz fixes | dropped: our native FB already does 144 Hz, CDCLK has room | [wex-1](wex-1.md) |
+| XE-14 | 11-22 | WhateverXe `29a78c34` | result of the 13:37 boot | **no effect**: `WhateverXeNoCCS` 1,0 (key found, lookup window too short); no hang this boot | [wex-1](wex-1.md) |
+| XE-14b | 11-22 | WhateverXe `b2bb8e95` | XE-14 with the lookup window +1 (skmaiti `bd5940e`), one boot | prepared | [wex-1](wex-1.md) |

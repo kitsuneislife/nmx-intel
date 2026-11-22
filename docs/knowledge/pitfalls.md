@@ -438,3 +438,13 @@ copies with the new kernel range (`sudo tahoe.sh patch`); never just widen MaxKe
 - clang fails on `kern_donor.cpp` with the RELEASE `Lilu.kext`. Use the 1.7.2 DEBUG zip, which carries
   `Contents/Resources/Headers` and `Library`. WhateverXe's `_native` tests assert the Tahoe accelerator's SHA; on
   Sequoia run `tools/test.py` without `--accelerator`.
+
+## Lilu applyLookupPatch needs a window one byte longer than the pattern (XE-14, 11-22)
+
+- **Symptom:** XE-14 booted with `-wex-noccs` and `WhateverXeNoCCS = <01000000 00000000>`: key found once, not
+  patched; no `Multi-Context` line in the log [measured].
+- **Cause:** Lilu 1.7.2 `applyLookupPatch(patch, start, maxSize)` sets `end = start + maxSize - patch->size` and
+  searches while `current < end`, so `maxSize == size` searches nothing [measured, `kern_patcher.cpp:321-343`]. Our
+  port took skmaiti's `f2d016b` but not the one-line fix `bd5940e`.
+- **Lesson:** pass `sizeof(find)+1` (every other WhateverXe patch does). When porting a series, diff the result
+  against the source branch's tip, not against its first commit.
