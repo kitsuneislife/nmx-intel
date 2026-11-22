@@ -966,3 +966,14 @@ change], so XE-14 is still one variable. The rollback copy is renamed `kexts/wex
   XE-15). Both build (rc 0), Info.plist OK, strings present. Same steps as XE-14: `sudo bash tools/hybrid/xe14.sh`,
   reboot, `bash tools/hybrid/xe14.sh check b` with the CPU idle. The ESP keeps the XE-14 kext `29a78c34` until then;
   without the boot-arg it behaves like the daily one.
+
+### XE-14b result, part 1 (2026-11-22 13:51 boot)
+
+- `~/xe14-b.txt` [measured]: `WhateverXeNoCCS = <01000000 01000000>` (found once, patched); the driver logs
+  `[IGPU] Multi-Context (Compute Command Streamer) Disabled!` at 13:51:49; no `.gpuRestart` this boot (20 in total,
+  the newest still 11-21 16:54). **The knob works.**
+- `~/lat-xe14-b.txt`, taken 1-2 min after boot: kernel->gpu p50 0.11-0.68 ms, p90 0.9-8 ms, max 34-59 ms; gpu exec
+  p99 26-45 ms. Load average 16.62 at 13:53, with trustd, syspolicyd, WhatsApp and Claude's renderer (120%) busy
+  after login [measured]. **Not comparable** to LAT-8 (pitfall: CPU idle). The low p50 against LAT-8's 1.0-1.5 ms is a
+  hint only [unverified].
+- Next: the same check after ~15 min with load below 2 (`check` now prints `uptime`), then the day-long hang watch.

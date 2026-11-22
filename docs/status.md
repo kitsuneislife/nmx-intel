@@ -27,8 +27,8 @@
 - Radar 11-22 ([research/radar-2026-11-22.md](research/radar-2026-11-22.md)): 20 iGPU hangs on 11-20/21, 19 on the CCS
   ring (`mediaanalysisd`, WhateverXe #163). Hangs may leave compositing slow until reboot [inferred for us]. Without
   GuC the CPU drives submission, so CPU load raises iGPU latency (#182) [inferred]; take runs with the CPU idle.
-- **XE-14** (13:37 boot) had no effect: `WhateverXeNoCCS` 1,0, the lookup window was one byte short. **XE-14b**
-  `b2bb8e95` fixes it: `sudo bash tools/hybrid/xe14.sh`, reboot, `xe14.sh check b` with the CPU idle.
+- **XE-14b** `b2bb8e95` works (13:51 boot): `WhateverXeNoCCS` 1,1 and `Multi-Context ... Disabled!`, no hang so far.
+  Latency not yet comparable (run at load 16.6, 2 min after boot); redo `xe14.sh check c` with load below 2.
 - **XE-15** built: `1c70dbd2` (with the XE-14b fix), same changes on WhateverXe 0.8.3 (recovery fix; upstream covers our 0003/0004). After
   XE-14's verdict, with a kext rollback. **XE-16** (#182 144 Hz fixes) dropped: not our failure.
 
