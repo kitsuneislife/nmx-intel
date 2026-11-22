@@ -2,11 +2,12 @@
 
 > **Summary.** Last updated 2026-11-22. Daily setup is the **WhateverXe hybrid** (XE-8): the Iris Xe drives the
 > desktop with Metal, the RTX runs nullmoth 3.0 headless and only apps listed by `ondemand.sh` open it. Staying on
-> Sequoia 15.8.1 (Tahoe trial in [tests/tahoe-1.md](tests/tahoe-1.md)). XE-15 (0.8.3) booted 11-22: kernel->gpu max 0.2-2 ms. Next: visible-Claude run, XE-14b control, then XE-15g.
+> Sequoia 15.8.1 (Tahoe trial in [tests/tahoe-1.md](tests/tahoe-1.md)). Daily is XE-15 (0.8.3), kernel->gpu max 0.2-2 ms. Optional next: XE-15g (governor on).
 
 ## Daily setup (how the machine boots now)
 
-- OpenCore config from `xe14.sh keep` (11-22): WhateverXe 0.8.2 `b2bb8e95` (XE-14b) with `-wex-objpreempt -wex-noccs`
+- OpenCore config from `xe15.sh keep` (11-22): WhateverXe 0.8.3 `8516faf3` (XE-15c) with `-wex-objpreempt -wex-noccs
+  -wex-hostrps-max`; rollback `WEXDIR=wex-xe14b WEX_EXTRA="-wex-objpreempt -wex-noccs" efi.sh wexrtx-keep`.
   + Graphics 0.4.3, nullmoth NVRM/NVAccel 3.0 headless, `no-wsreset`, NMIntelFB
   gated off (`-nmintelfboff`), `SSDT-PNLF.aml`.
 - RTX for apps: `sudo bash tools/hybrid/ondemand.sh add NAME` (then reopen the app). List: Roblox, Chrome (+ its

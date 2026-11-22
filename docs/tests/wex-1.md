@@ -1106,3 +1106,7 @@ typing here". Evidence from that boot [measured]:
   `~/lat-xe15-av.txt` [measured]: GT answer 1400 MHz 20/20, actual 1100 MHz, RC6 0.0 %; pmNotify calls rose to
   ~300-1000/s for two samples, then ~20/s. Probe: kernel->gpu p50 0.04-0.10 ms, p99 0.10-0.18 ms, **max 0.18-1.97 ms**.
   A visible Claude window no longer costs latency with the wallpaper off. Next: XE-14b control (next reboot).
+- **Kept, 15:1x** (Lukas: keep this boot, the gain is most likely the wallpaper; XE-14b control skipped):
+  `xe15.sh keep` wrote `wexrtx-keep` with WhateverXe `8516faf3`, AMFIPassMod `2d36aeca`, args
+  `-wex-objpreempt -wex-noccs -wex-hostrps-max` [measured]. The 0.8.2 vs 0.8.3 share of the latency drop stays
+  unattributed [inferred: mostly the wallpaper]. Governor boot (`xe15.sh arm gov`) left for later.
