@@ -944,3 +944,10 @@ Staged in `kexts/wex-xe15/`. It changes the base, so it runs as its own test aft
 a native framebuffer that does not come up at 144 Hz. Here it comes up: the VBT gives no Conflict, 144 Hz already works
 through `refresh.sh` (XE-13), and `N97FBClockChange` requests 1305.6 MHz nativeHz (CDCLK 652.8 MHz) while 1080p144
 needs about 342 MHz, inside even the old `pixelHz <= nativeHz/2` rule [measured values, conclusion inferred].
+
+XE-14 note (2026-11-22 13:35): the first `xe14.sh` run stopped at `$1: unbound variable` (no argument under
+`set -u`) before `efi.sh` ran, so the ESP was not changed. It had already saved the ESP's kext: **`fa17909c`, the LAT-5
+build, not LAT-8's `8dfa6775`** [measured]. LAT-5's one-boot mode restored the config but left its kext, as the
+11-22 pitfall says. With no `wexdev` property that kext behaves like LAT-8 [inferred from 0007: no property, no
+change], so XE-14 is still one variable. The rollback copy is renamed `kexts/wex-daily/` (read `wex-daily` for
+`wex-lat8` in the steps above); the script bug is fixed.

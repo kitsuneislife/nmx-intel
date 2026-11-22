@@ -431,7 +431,7 @@ copies with the new kernel range (`sudo tahoe.sh patch`); never just widen MaxKe
 
 - `wexrtx` restores `config-back.plist` next boot but leaves the new `WhateverXe.kext` on the ESP. Safe only when
   the new code is behind an opt-in boot-arg (XE-14). A test that changes the base (XE-15) needs a kext rollback
-  (`WEXDIR=wex-lat8 ... wexrtx-keep`).
+  (`WEXDIR=wex-daily ... wexrtx-keep`).
 
 ## Building WhateverXe: Lilu's RELEASE zip has no headers (11-22)
 

@@ -6,8 +6,9 @@
 
 ## Daily setup (how the machine boots now)
 
-- OpenCore config from `sudo WEXDIR=wex-lat8 WEX_EXTRA=-wex-objpreempt bash tools/hybrid/efi.sh wexrtx-keep`:
-  WhateverXe 0.8.2 `8dfa6775` (LAT-8) + Graphics 0.4.3, nullmoth NVRM/NVAccel 3.0 headless, `no-wsreset`, NMIntelFB
+- OpenCore config from `sudo WEXDIR=wex-daily WEX_EXTRA=-wex-objpreempt bash tools/hybrid/efi.sh wexrtx-keep`:
+  WhateverXe 0.8.2 `fa17909c` on the ESP [measured 11-22] (the LAT-5 build; with no `wexdev` property it runs LAT-8's
+  code) + Graphics 0.4.3, nullmoth NVRM/NVAccel 3.0 headless, `no-wsreset`, NMIntelFB
   gated off (`-nmintelfboff`), `SSDT-PNLF.aml`.
 - RTX for apps: `sudo bash tools/hybrid/ondemand.sh add NAME` (then reopen the app). List: Roblox, Chrome (+ its
   Aperitif helper), `Claude`, `Claude Helper` (all three Claude apps, LAT-13), Horizon. After any nullmoth install:
