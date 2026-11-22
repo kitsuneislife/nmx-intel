@@ -900,3 +900,47 @@ composites their windows. Every app stays on a GPU.
   Julio's build); same load as LAT-5 part 3; `lat-busy.sh lat13` vs LAT-8 08:24 (max 20-24 ms) and LAT-5 (42-72).
   Unknown: whether Chromium picks the RTX or still the default Iris Xe device when both are visible [unverified].
 - Undo: `sudo bash tools/hybrid/ondemand.sh remove "Claude" "Claude Helper"` and reopen the apps.
+
+### XE-14 prepared, XE-15 built, XE-16 dropped (2026-11-22)
+
+Follows the [11-22 radar](../research/radar-2026-11-22.md). The tree had to be rebuilt first.
+
+- **`~/nmx-build` was gone** on 11-22 (no `whateverxe/`, no staged kexts) [measured]. Rebuilt: a clone of
+  b00t0x/WhateverXe, branch `nmx-082` from `4512191` with `source-fixes/wex/0.8.2/0001..0006` applied by `git am`,
+  MacKernelSDK `3f75008`, Lilu 1.7.2 **DEBUG** zip (the RELEASE zip has no `Contents/Resources/Headers`, see
+  pitfalls). Build: `python3 tools/build.py --release --sdk ../MacKernelSDK --lilu ../dl/liludbg/Lilu.kext`.
+- The LAT-8 source rebuilt gives `b53e4b13`, not the running `8dfa6775` (different UUID too) [measured]. Same source,
+  other toolchain [inferred]. So `xe14.sh` saves the ESP's running `WhateverXe.kext` as `kexts/wex-lat8/` (the true
+  rollback) and the ESP's `AMFIPassMod.kext`, both of which `efi.sh` needs.
+- **Baseline 11-22 13:24 (24 min up, no gpuRestart this boot), not valid:** `~/lat-base-1122.txt` kernel->gpu p50
+  4.7-7.2 ms / max 43-47 ms (gap 0), ~18 / 41-44 (gap 8), 27 / 34-35 (gap 16), against LAT-8's 1.0-1.5 / 7.3-7.5.
+  It ran while two clang processes (the WhateverXe test build) and XProtectRemediatorAdload were near 100% CPU, load
+  average 5.85, charging [measured]. Without GuC the iGPU's submission and completion run on the CPU (#182, below), so
+  CPU load alone can raise these numbers [inferred]. Redo both baseline and XE-14 with the CPU idle.
+
+**XE-14** (`tools/hybrid/xe14.sh`, one boot): LAT-8's daily config plus `-wex-noccs`. WhateverXe `29a78c34` =
+0.8.2 + 0001..0006 + `0008-xe14-wex-noccs.patch` (port of skmaiti2050 `f2d016b` + `bd5940e`). In
+`processTGLAccelerator`, when the boot-arg is set it counts `EnableMultiContext` in the TGL accelerator image and,
+only if there is exactly one, renames it to `EnableMultiContexX` with a Lilu lookup patch (window = key + 1 byte), so
+Apple's driver reads the default 0 and keeps compute off the CCS. It writes `WhateverXeNoCCS = {count, patched}` to the
+registry root. Tests: 218 pass; 16 `_native` tests fail because they assert the Tahoe accelerator's SHA
+`bd1a21f5…` and we passed the Sequoia one [measured]; they are environment, not code.
+- Steps: `sudo bash tools/hybrid/xe14.sh`, reboot, then `bash tools/hybrid/xe14.sh check a` with nothing heavy
+  running → `~/xe14-a.txt`. The next boot is the daily config again, but the XE-14 kext stays on the ESP: without
+  `-wex-noccs` it is LAT-8's code (the knob is opt-in).
+- Checks: `WhateverXeNoCCS` = 1,1; the log line `Multi-Context (Compute Command Streamer) Disabled!`; no CCS
+  `.gpuRestart` over a day with Photos analysis; `lat-busy` against a baseline taken the same way.
+- Keep: `sudo bash tools/hybrid/xe14.sh keep`. Undo: `sudo WEXDIR=wex-lat8 WEX_EXTRA="-wex-objpreempt" bash
+  tools/hybrid/efi.sh wexrtx-keep`.
+
+**XE-15 built, not armed**: our changes on WhateverXe 0.8.3 (`f26a368`), branch `nmx-083`. Upstream 0.8.3 already
+covers our 0003 (combo-port mode check accepts mode 0 or 1) and 0004 (`f49ff77` `adlnSetColdClock`, cold CDCLK set
+without the workloop gate) [measured, rebase conflicts read]; 0001, 0002 and 0005 come in with them. Only LAT-8 and
+XE-14 were carried: `source-fixes/wex/0.8.3/0001..0002`. WhateverXe `94731d44`, `CFBundleVersion` 0.8.3, strings
+`-wex-noccs` `WhateverXeNoCCS` `-wex-objpreempt` present; 221 tests pass with no accelerator given [measured].
+Staged in `kexts/wex-xe15/`. It changes the base, so it runs as its own test after XE-14's verdict.
+
+**XE-16 dropped**: #182's A7A8 fixes (DDI A VBT duplicate not a `Conflict`; watermark allows 2 pixels per CDCLK) fix
+a native framebuffer that does not come up at 144 Hz. Here it comes up: the VBT gives no Conflict, 144 Hz already works
+through `refresh.sh` (XE-13), and `N97FBClockChange` requests 1305.6 MHz nativeHz (CDCLK 652.8 MHz) while 1080p144
+needs about 342 MHz, inside even the old `pixelHz <= nativeHz/2` rule [measured values, conclusion inferred].

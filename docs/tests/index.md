@@ -131,3 +131,6 @@ changes), then [../status.md](../status.md).
 | LAT-12 | 11-14 | LAT-5 boot | Claude 2 and 3 restarted with `--disable-gpu --disable-gpu-compositing` (`claude-gpu.sh off`) | **dropped** by Lukas before running: no CPU drawing | [wex-1](wex-1.md) |
 | NMH-1 | 11-14 | LAT-8 daily + nullmoth 3.0 (NVRM `ba6184e9`, NVAccel `d4ced924`, NMIntelFB `4b8afbcf`) | RTX-only for one boot through nullmoth's own hybrid path, `nmhybrid=1` (copy) | **fail**: boot hung after the kexts were allowed, no NVRM/NVAccel/NMIntelFB line, no panic; daily config came back by itself | [wex-1](wex-1.md) |
 | LAT-13 | 11-14 | current boot | `Claude` and `Claude Helper` added to `nvmtl-allow.txt` (`ondemand.sh add`): all three Claude apps render on the RTX | prepared | [wex-1](wex-1.md) |
+| XE-14 | 11-22 | WhateverXe `29a78c34` | LAT-8 + `-wex-noccs` (Apple's `EnableMultiContext` read as 0: compute off the CCS, #163), one boot | prepared; baseline 11-22 invalid (CPU busy) | [wex-1](wex-1.md) |
+| XE-15 | 11-22 | WhateverXe `94731d44` | LAT-8 + XE-14 rebased on WhateverXe 0.8.3 (upstream covers our 0003/0004) | built, 221 tests pass; after XE-14 | [wex-1](wex-1.md) |
+| XE-16 | 11-22 | — | #182 A7A8 144 Hz fixes | dropped: our native FB already does 144 Hz, CDCLK has room | [wex-1](wex-1.md) |

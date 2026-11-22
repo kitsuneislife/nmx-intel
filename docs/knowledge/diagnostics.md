@@ -109,3 +109,7 @@ with the same registers after. Remove the boot-arg from `tools/hybrid/hybrid-con
   `config-wex.plist`). WhateverXe boot-args: `-allow3d -disablegfxfirmware` (required), `-wex-noaccel` (framebuffer
   only), `-wex-adlp-load-only` (blocks the framebuffer and accelerator probes), `-igfxdvmt` (60 MiB stolen only).
 - Same evidence as the hybrid route: `efi.sh boot-once` dmesg buffers, `sudo bash tools/hybrid/log.sh` → `~/hybrid.txt`.
+- Our knobs (boot-args, via `WEX_EXTRA` in `efi.sh`/`wex-config.py`): `-wex-objpreempt` (LAT-8, daily) and
+  `-wex-noccs` (XE-14). `-wex-noccs` writes `WhateverXeNoCCS = {count, patched}` on the registry root (want 1,1;
+  `ioreg -l -w0 -d1`) and Apple's driver logs `[IGPU] Multi-Context (Compute Command Streamer) Disabled!`.
+  `bash tools/hybrid/xe14.sh check TAG` gathers both, this boot's `.gpuRestart` files and `lat-busy.sh`.

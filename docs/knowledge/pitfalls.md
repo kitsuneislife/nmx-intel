@@ -418,3 +418,23 @@ copies with the new kernel range (`sudo tahoe.sh patch`); never just widen MaxKe
 - **Cause:** the counter is not fed on this path (no GuC) [inferred].
 - **Lesson:** do not use it to judge GPU load; use `xe-lattest` (wait) and the per-process Intel user client count
   (`claude-gpu.sh status`). Scheduler knobs only reshuffle a saturated 48 EU engine; removing work is the bigger lever.
+
+## iGPU latency runs must be taken with the CPU idle (XE-14 prep, 11-22)
+
+- **Symptom:** a baseline taken during a build gave max 43-47 ms, six times LAT-8's [measured].
+- **Cause:** without GuC (`-disablegfxfirmware`) Apple's host scheduler submits and completes iGPU work on the CPU;
+  #182 saw the GPU idle in RC6 while Metal was CPU-bound [inferred for us].
+- **Lesson:** no builds, test suites or Spotlight/XProtect bursts during `lat-busy.sh`; record the load average and
+  the top CPU processes with each run, and compare only runs taken the same way.
+
+## efi.sh one-boot modes roll back config.plist, not the kext (XE-14 prep, 11-22)
+
+- `wexrtx` restores `config-back.plist` next boot but leaves the new `WhateverXe.kext` on the ESP. Safe only when
+  the new code is behind an opt-in boot-arg (XE-14). A test that changes the base (XE-15) needs a kext rollback
+  (`WEXDIR=wex-lat8 ... wexrtx-keep`).
+
+## Building WhateverXe: Lilu's RELEASE zip has no headers (11-22)
+
+- clang fails on `kern_donor.cpp` with the RELEASE `Lilu.kext`. Use the 1.7.2 DEBUG zip, which carries
+  `Contents/Resources/Headers` and `Library`. WhateverXe's `_native` tests assert the Tahoe accelerator's SHA; on
+  Sequoia run `tools/test.py` without `--accelerator`.

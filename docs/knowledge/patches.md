@@ -145,3 +145,10 @@ source-fixes/00NN-<slug>.patch`, add an `apply` line to `build/apply-fixes.sh` (
 - `source-fixes/wex/0.8.2/0007-lat5-wexdev-development-keys.patch` (LAT-5, on top of 0006) — iGPU properties
   `wexdev-<Key>` (5 allowed scheduler keys) override Apple's `Development` dict before the TGL accelerator starts;
   set with `WEX_DEV` in `wex-config.py`. No property, no change. WhateverXe `fa17909c`, staged in `kexts/wex-lat5/`.
+- `source-fixes/wex/0.8.2/0008-xe14-wex-noccs.patch` (XE-14, on top of 0006) — knob `-wex-noccs`: renames the single
+  `EnableMultiContext` in the TGL accelerator image to `EnableMultiContexX` so compute stays off the CCS (#163); port
+  of skmaiti2050 `f2d016b` + `bd5940e`; registry record `WhateverXeNoCCS = {count, patched}`. Default off.
+  WhateverXe `29a78c34`, staged in `kexts/wex-xe14/`. 0007 (LAT-5) is not in this build.
+- `source-fixes/wex/0.8.3/0001..0002` (XE-15) — 0006 and 0008 re-applied on WhateverXe 0.8.3 `f26a368`. 0003 and
+  0004 are dropped: upstream accepts mode 0 or 1 on the combo port, and `f49ff77` adds `adlnSetColdClock` for the cold
+  CDCLK set. WhateverXe `94731d44`, staged in `kexts/wex-xe15/`.
