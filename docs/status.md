@@ -14,9 +14,7 @@
   Aperitif helper), Horizon (Claude moved back to the Iris Xe, LAT-14). After any nullmoth install:
   `on` + `add` again (pitfall).
 - Wi-Fi: AirportMtkWlan `dd967442` (WIFI-9); WIFI-10 `274f4c6a` built, install pending.
-- Recovery: OpenCore Space → "Start once without NVIDIA driver". Tests: [tests/wex-1.md](tests/wex-1.md); route
-  background: [knowledge/hybrid-route.md](knowledge/hybrid-route.md).
-- `~/nmx-build` was lost on 11-22 and rebuilt for WhateverXe only (clone, SDK, Lilu); nullmoth/drm-kmod trees not yet.
+- Recovery: OpenCore Space → "Start once without NVIDIA driver". Tests: [tests/wex-1.md](tests/wex-1.md).
 - Disk: 65.7 GB free [measured 11-22] after removing cargo `target/`s, magic-rush `tools/` + `private/`, a NixOS ISO.
 
 ## Lag work (main open problem)
@@ -29,8 +27,10 @@
   GuC the CPU drives submission, so CPU load raises iGPU latency (#182) [inferred]; take runs with the CPU idle.
 - **Lag cause (LAT-15, 11-22)**: Claude Desktop's chat **wallpaper** kept its gpu-process at 90-93 % of the Iris Xe
   (`tools/hybrid/gpu-top.sh`). Off: 0.1 %. Keep `/wallpaper default off`. Typing in Ghostty was smooth.
-- **XE-15c** `8516faf3` built: 0.8.3 + our 3 patches + #176 governor (`-wex-hostrps-max` = off). GT answer is pinned at
-  RP0 1400 MHz and **RC6 is never entered** [measured], so the RC6 governor is likely a no-op here. **XE-16** dropped.
+- XE-15c: GT pinned at RP0, **RC6 never entered** [measured]; likely AGPM `RCxControl` (#87) [inferred].
+- **wxe study** ([research/wxe-study-2026-11-22.md](research/wxe-study-2026-11-22.md)): macOS uses ~55 % (45-65) of
+  what Windows gets; CPU ST peaks 3.55 GHz vs 4.6. No fork. Next: `sudo bash tools/cpu/cpu-study.sh base`, then an
+  AGPM injector without `RCxControl`, then CPUFriend/CpuTopologyRebuild, then the #130 fence poll.
 
 ## Other open problems
 
@@ -38,8 +38,6 @@
 2. Panic 2026-11-12 19:39, WindowServer spinlock timeout, driver unknown. Watch for a repeat.
 3. Refresh: 144 Hz works through `refresh.sh` (XE-13); WindowServer still defaults to 60 Hz after boot.
 4. Sleep: off; untested with WhateverXe. `ASSERT(linkBW)` warning in the XE-7 log, harmless so far.
-5. RTX-only route: NMH-1 (nullmoth 3.0 `nmhybrid=1`) hung the boot; parked.
-6. Wi-Fi MT7921 at the line's ceiling (WIFI-8), [knowledge/wifi.md](knowledge/wifi.md).
+5. Wi-Fi MT7921 at the line's ceiling (WIFI-8), [knowledge/wifi.md](knowledge/wifi.md).
 
-Previous status text (verbatim): [archive/status-2026-10-29.md](archive/status-2026-10-29.md); the 11-14..11-22
-version is in git history (`git show 1c7768c:docs/status.md`).
+Older status: [archive/status-2026-10-29.md](archive/status-2026-10-29.md), `git log docs/status.md`.

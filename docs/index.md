@@ -18,6 +18,7 @@ summary block on top, linked to each other). The original Portuguese diary is pr
 | Iris Xe submit latency (research, test plan) | [research/xe-latency.md](research/xe-latency.md) |
 | Iris Xe alternatives, community patches (11-14) | [research/xe-alternatives.md](research/xe-alternatives.md) |
 | Radar 11-22: CCS hangs, WEX 0.8.3, 144 Hz fix, next tests | [research/radar-2026-11-22.md](research/radar-2026-11-22.md) |
+| How much of the CPU/iGPU macOS uses (%), gaps, fork verdict | [research/wxe-study-2026-11-22.md](research/wxe-study-2026-11-22.md) |
 | Panel brightness (nullmoth switch vs our Intel panel) | [knowledge/brightness.md](knowledge/brightness.md) |
 | Moving to a new nullmoth release | [knowledge/nullmoth-upgrade.md](knowledge/nullmoth-upgrade.md) |
 | Wi-Fi (MT7921): build, install, knobs, undo | [knowledge/wifi.md](knowledge/wifi.md) |

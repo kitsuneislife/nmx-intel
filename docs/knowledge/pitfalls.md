@@ -462,3 +462,12 @@ copies with the new kernel range (`sudo tahoe.sh patch`); never just widen MaxKe
 - `N97GTPowerSample` q[4] (RC6 residency, `0x138108`) stays at `0x18cd86a` across samples on the 0.8.2 boot
   [measured]. Any governor or power estimate built on RC6 residency reads 100 % busy here (e.g. #176's RC6 variant).
   Why RC6 is off (no GuC, or the TGL driver on RPL-P) is not known [unverified].
+- Note 2026-11-22 (wxe study): our AGPM profile (SMBIOS MacBookPro16,1) carries `IGPU > Heuristic > RCxControl`
+  (`RC6_Wake_Limit 40, RC6_Threshold 520, RC_Eval_Interval 40000, RP_Idle_Hysteresis 25`) and `CPGControl`
+  [measured, `ioreg`]. On a MacBookPro16,1 RPL-HX these exact values switch GT RC6 off 50-80 s after boot, and an
+  AGPM personality without them brings RC6 back to 96 % (rodgod-rr, WhateverXe #87). Likely our cause [inferred].
+
+## Clock probes: an add-immediate chain is not one add per cycle (2026-11-22)
+
+- A dependent `add $1, %reg` chain read ~15 GHz on the P-cores: Golden Cove folds add-immediate chains at rename.
+  Use `add %reg, %reg` with the increment in a register (`tools/cpu/clockprobe.c`) [measured].
