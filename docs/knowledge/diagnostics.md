@@ -119,3 +119,7 @@ with the same registers after. Remove the boot-arg from `tools/hybrid/hybrid-con
   requested/boost (50 MHz units), q[12]/q[13] pmNotify calls/answered, q[14] last answer ((MHz/50*3)<<23), q[15] caps
   (RPn bits 23:16, RP0 bits 7:0, 50 MHz units). `xe15.sh check TAG` decodes 20 samples.
 - Per-process Iris Xe time: `bash tools/hybrid/gpu-top.sh [SECONDS [DELAY]]` (`accumulatedGPUTime` per user client).
+- RTX D3cold (nullmoth 3.0 `nvrtd3=1 nvrtd3res=\_SB.PC00.PEG0.PXP_`, RTD3-1): `sudo bash tools/hybrid/rtd3.sh check
+  TAG` greps `log show --last boot` for `NVRM-xnu: RTD3` (armed / powered off after N s idle / power-off failed,
+  GPU resumed / powered on for a client / power-on FAILED) and averages the battery draw (AppleSmartBattery
+  `Voltage` × `InstantAmperage`, 30 samples in 60 s, unplugged only). powermetrics does not see the dGPU.
