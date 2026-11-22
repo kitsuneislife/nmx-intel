@@ -70,6 +70,9 @@ def make(c: dict, rtx: bool = False) -> dict:
         if not k or not v.isdigit():
             sys.exit(f"WEX_DEV entry {kv!r} is not Key=number")
         c["DeviceProperties"]["Add"][IGPU]["wexdev-" + k] = int(v).to_bytes(4, "little")
+    # RTD3-0 knob: SYSREPORT=1 makes the DEBUG OpenCore dump ACPI tables (and more) to the ESP's /SysReport at boot
+    if os.environ.get("SYSREPORT") == "1":
+        c["Misc"]["Debug"]["SysReport"] = True
     boot = c["NVRAM"]["Add"][APPLE_BOOT]
     drop, extra = (DROP_ARGS - {"nvaccel=1"}, WEX_ARGS[:-1] + ["-nmintelfboff"]) if rtx else (DROP_ARGS, WEX_ARGS)
     args = [SWAP_ARGS.get(a, a) for a in boot["boot-args"].split() if a not in drop]
