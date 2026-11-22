@@ -105,6 +105,9 @@ hybrid|hybrid-keep|wex|wex-keep|wexrtx|wexrtx-keep)
     if [ "$NAME" != hybrid ]; then
         /usr/bin/python3 -I "$HERE/pnlf-aml.py" "$OC/ACPI/SSDT-PNLF.aml" || { echo "could not write SSDT-PNLF.aml; nothing changed"; exit 1; }
     fi
+    if [ "${RTD3_AML:-}" = 1 ]; then   # RTD3-2 test knob (rtd3.sh): the PXP_ wrapper wex-config.py adds to ACPI/Add
+        /usr/bin/python3 -I "$HERE/rtd3-aml.py" "$OC/ACPI/SSDT-NXRTD3.aml" || { echo "could not write SSDT-NXRTD3.aml; nothing changed"; exit 1; }
+    fi
     if [ "$1" = "$NAME" ]; then
         # the daily config is a route config itself (wexrtx-keep): one boot comes back to it, not to GPU-only
         # (the RTX-only bridge in config-gpu-only.plist does not work on nullmoth 2.9+). A second run before the

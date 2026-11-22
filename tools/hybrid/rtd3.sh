@@ -8,10 +8,14 @@
 # RTD3-1, the daily config (HWP=off) plus nullmoth's D3cold with that resource:
 #   sudo bash tools/hybrid/rtd3.sh arm            ONE boot (keep: same, as the daily config)
 #   sudo bash tools/hybrid/rtd3.sh check TAG      on battery, apps closed: RTD3 log lines + battery watts over 60 s
+# RTD3-1 result: PXP_._OFF -> 0xe00002c2 (kIOReturnBadArgument) at once, GPU resumed. PXP_'s methods return no value;
+# RTD3-2 (the default now) loads SSDT-NXRTD3.aml (rtd3-aml.py): PowerResource \_SB.PC00.PEG0.NXPR whose _ON_/_OFF
+# call PXP_'s and Return (One), and points nvrtd3res at it. DIRECT=1 arms RTD3-1 again (PXP_ itself, no SSDT).
 # Rollback from keep: sudo HWP=off bash tools/cpu/cpufriend.sh keep
 set -uo pipefail
 HERE=$(cd "$(dirname "$0")" && pwd)
-RES='\_SB.PC00.PEG0.PXP_'
+RES='\_SB.PC00.PEG0.NXPR'; AML=1
+[ "${DIRECT:-}" = 1 ] && { RES='\_SB.PC00.PEG0.PXP_'; AML=; }
 HOMEU=$(eval echo "~${SUDO_USER:-$USER}")
 DST=$HOMEU/nmx-build/acpi
 die() { echo "STOP: $*"; exit 1; }
@@ -60,8 +64,8 @@ EOF
     echo "saved $OUT and the dump in $DST"
     ;;
 arm|keep)
-    HWP=off WEX_ADD="nvrtd3=1 nvrtd3res=$RES" bash "$HERE/../cpu/cpufriend.sh" "$1" || die "cpufriend.sh $1 failed"
-    echo "RTD3-1 ($1, nvrtd3res=$RES) installed. Reboot now."
+    HWP=off RTD3_AML=$AML WEX_ADD="nvrtd3=1 nvrtd3res=$RES" bash "$HERE/../cpu/cpufriend.sh" "$1" || die "cpufriend.sh $1 failed"
+    echo "RTD3 ($1, nvrtd3res=$RES, wrapper SSDT ${AML:-no}) installed. Reboot now."
     ;;
 check)
     TAG=${2:?usage: $0 check TAG}
