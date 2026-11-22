@@ -2,7 +2,7 @@
 
 > **Summary.** Last updated 2026-11-22. Daily setup is the **WhateverXe hybrid** (XE-8): the Iris Xe drives the
 > desktop with Metal, the RTX runs nullmoth 3.0 headless and only apps listed by `ondemand.sh` open it. Staying on
-> Sequoia 15.8.1 (Tahoe trial in [tests/tahoe-1.md](tests/tahoe-1.md)). Next: daily control run against XE-14b.
+> Sequoia 15.8.1 (Tahoe trial in [tests/tahoe-1.md](tests/tahoe-1.md)). Next: make XE-14b permanent (`xe14.sh keep`), then XE-15.
 
 ## Daily setup (how the machine boots now)
 
@@ -27,9 +27,8 @@
 - Radar 11-22 ([research/radar-2026-11-22.md](research/radar-2026-11-22.md)): 20 iGPU hangs on 11-20/21, 19 on the CCS
   ring (`mediaanalysisd`, WhateverXe #163). Hangs may leave compositing slow until reboot [inferred for us]. Without
   GuC the CPU drives submission, so CPU load raises iGPU latency (#182) [inferred]; take runs with the CPU idle.
-- **XE-14b** `b2bb8e95` works (13:51 boot): `WhateverXeNoCCS` 1,1 and `Multi-Context ... Disabled!`, no hang so far.
-  At load 2.3: kernel->gpu p50 ~0.5 ms, max 28-40 ms (tail in gpu exec) vs LAT-8a max 7.3-7.5 ms. Next: control run
-  in the daily boot under the same conditions (`lat-busy.sh daily-c`), then decide keep or drop.
+- **XE-14b** `b2bb8e95`: knob works, no hang. Against the daily boot under the same load: kernel->gpu p50 ~0.5 ms
+  against 6-20 ms, max about equal (28-40 against 23-35 ms). Verdict keep: `sudo bash tools/hybrid/xe14.sh keep`.
 - **XE-15** built: `1c70dbd2` (with the XE-14b fix), same changes on WhateverXe 0.8.3 (recovery fix; upstream covers our 0003/0004). After
   XE-14's verdict, with a kext rollback. **XE-16** (#182 144 Hz fixes) dropped: not our failure.
 

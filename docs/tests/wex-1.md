@@ -991,3 +991,20 @@ change], so XE-14 is still one variable. The rollback copy is renamed `kexts/wex
   now queued on the render ring next to the compositor [inferred]. Not conclusive: LAT-8a was a different boot, with
   a different Claude load. Next is a same-conditions control in the daily boot (no `-wex-noccs`), one variable:
   ~8 min up, load near 2, the same Claude apps, `bash tools/hybrid/lat-busy.sh daily-c`.
+
+### XE-14b control: daily boot, same conditions (2026-11-22 14:04 boot)
+
+- Boot verified [measured]: boot-args end in `-wex-objpreempt` (no `-wex-noccs`), no `WhateverXeNoCCS` record, 7 min
+  up, load 3.04 / 4.23 / 2.87; Claude's gpu-process at 47-51 % and its renderer at about 36 %, close to XE-14b part 2.
+- `~/lat-daily-c.txt` [measured], three runs, gap 0 / 8 / 16 ms:
+  - kernel->gpu p50 6.2-8.2 / 11.2-11.7 / 19.5-19.7 ms, max 33.5-35.0 / 31.0-33.2 / 23.2-26.0 ms.
+  - gpu exec max 0.01-0.03 ms.
+- Comparison, one variable (`-wex-noccs`): p50 goes from 6-20 ms down to about 0.5 ms, and max stays about the same
+  (23-35 against 28-40 ms). Without the knob, the probe's compute work runs on the CCS and executes at once, but
+  it waits to be submitted. With the knob it is submitted at once, and the tail moves into execution on the render
+  ring [measured for the probe; what the compositor sees is inferred]. Caveat: `xe-lattest` is a compute probe, so
+  this measures the compute path. The lag Lukas feels comes from compositing, which needs his own judgement over a
+  day.
+- No `.gpuRestart` from 13:51 to 14:11 (two boots).
+- **Verdict: keep XE-14b** (`xe14.sh keep`). It cuts the typical wait more than tenfold, does not change the worst
+  case, and removes the CCS ring that caused 19 of the 20 hangs.
