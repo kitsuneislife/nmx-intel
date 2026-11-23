@@ -72,7 +72,7 @@ arm|keep)
     bash "$HERE/../nvrm/rtd3-patch.sh" || die "could not build the patched NVRM; nothing installed"
     bash "$HERE/../nvrm/install.sh" || die "NVRM install failed (sudo bash $0 restore puts the original back)"
     HWP=off RTD3_AML=1 WEX_ADD="nvrtd3=1 nvrtd3res=$RES" bash "$HERE/../cpu/cpufriend.sh" "$1" || die "cpufriend.sh $1 failed"
-    echo "RTD3-3 ($1: patched NVRM, SSDT-NXRTD3, nvrtd3res=$RES) installed. Reboot now."
+    echo "RTD3-4 ($1: patched NVRM, SSDT-NXRTD3, nvrtd3res=$RES) installed. Reboot now."
     ;;
 check)
     TAG=${2:?usage: $0 check TAG}
