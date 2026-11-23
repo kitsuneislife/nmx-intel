@@ -500,3 +500,11 @@ copies with the new kernel range (`sudo tahoe.sh patch`); never just widen MaxKe
   returns 0xe00002c2 when the name is longer than 4 characters: only one NameSeg, relative to the device the call
   is made on. Absolute paths never work through `IOACPIPlatformDevice::evaluateObject`; put a 4-character method
   on that device instead (RTD3-3).
+
+## The RTX's `PXP_._ON_` can return without powering the GPU up (RTD3-3, 2026-11-22)
+
+- After `PXP_._OFF` through nullmoth's RTD3, `PXP_._ON_` returned at once and the RTX stayed off the bus (vendor
+  `0xffff`, GPU LOST until reboot) [measured]. `_ON_` returns 0 before `PON_` when `PEG0.GSTA` (power-good GPIO
+  `PEGP.PWGD`) is not 0, and `POFF` cuts the rail only when `GPPR` returns 1. So the GPU can be left in reset with
+  power-good high [inferred, branch unverified]. Do not trust `_ON_` alone: check `PEGP.NVID` afterwards and run
+  `PEG0.PON_` / `L23D` yourself (RTD3-4, `tools/hybrid/rtd3-aml.py`).
