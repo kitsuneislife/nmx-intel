@@ -1110,3 +1110,20 @@ typing here". Evidence from that boot [measured]:
   `xe15.sh keep` wrote `wexrtx-keep` with WhateverXe `8516faf3`, AMFIPassMod `2d36aeca`, args
   `-wex-objpreempt -wex-noccs -wex-hostrps-max` [measured]. The 0.8.2 vs 0.8.3 share of the latency drop stays
   unattributed [inferred: mostly the wallpaper]. Governor boot (`xe15.sh arm gov`) left for later.
+
+### FENCE-0: WhateverXe #130 (100 ms fence quantum) checked before building (2026-11-22 21:3x)
+
+- **Question:** does the `IOAccelFenceMachine` 100 ms fallback timer (#130: a flush-notify that arrives before the
+  stamp is visible leaves the completion to the next 100 ms step) stall completions here? If yes, build the issue's
+  `wexfencepoll=N` patch (verified on Sequoia 15.8.1 by gianguyen14, TGL-U: ~1 stall of 90-150 ms per ~330
+  completions without it, 0 in 6752 with it).
+- **Probe:** `xe-lattest event` (new mode): the render pass signals an `MTLSharedEvent`, the CPU waits on it
+  (`waitUntilSignaledValue`), `wall` = commit -> event seen; the run counts jobs over 50 ms. Same boot as RTD3-4 keep,
+  18 min uptime, load 1.6-2.0, daily XE-15c kext.
+- **Result** [measured]: `event` x2 and `render` x1, 2700 completions, **0 over 50 ms**, wall max 2.3-3.3 ms (p99
+  0.7-2.4 ms). The earlier `wall` maxima since XE-15 (six `lat-xe15-*` files, ~16,000 completions) also stay at
+  2.1-3.4 ms [measured]. At the issue's rate about 8 stalls were expected in 2700 [inferred].
+- **Verdict:** the stall does not show on this machine and load, so `wexfencepoll` is not built [inferred: it would
+  only shorten a timer that does not fire]. Not covered: the issue's trigger is a Chrome Graphite canvas, and Chrome
+  runs on the RTX here (`ondemand.sh`); Electron apps on the Iris Xe (Claude) were not run as a load. Rerun
+  `xe-lattest event` if a 100 ms-step stutter shows up in an Iris Xe app.
