@@ -10,6 +10,9 @@
   -wex-hostrps-max`; rollback `WEXDIR=wex-xe14b WEX_EXTRA="-wex-objpreempt -wex-noccs" efi.sh wexrtx-keep`.
   + Graphics 0.4.3, nullmoth NVRM/NVAccel 3.0 headless, `no-wsreset`, NMIntelFB
   gated off (`-nmintelfboff`), `SSDT-PNLF.aml`.
+- **RTD3 daily since 11-22** (`rtd3.sh keep`, after AGPM + CPUFriend hwp off): patched NVRM `986b14bc`,
+  `SSDT-NXRTD3.aml`, `nvrtd3=1 nvrtd3res=\_SB.PC00`: RTX off after 60 s idle, on for ondemand apps. First keep boot
+  not yet checked. Rollback `sudo HWP=off bash tools/cpu/cpufriend.sh keep`, then `rtd3.sh restore`.
 - RTX for apps: `sudo bash tools/hybrid/ondemand.sh add NAME` (then reopen the app). List: Roblox, Chrome (+ its
   Aperitif helper), Horizon (Claude moved back to the Iris Xe, LAT-14). After any nullmoth install:
   `on` + `add` again (pitfall).
@@ -31,7 +34,7 @@
   11.7 → 6.6 W, PC2 ~51 %. wxe study ([research/wxe-study-2026-11-22.md](research/wxe-study-2026-11-22.md)): macOS
   now ~55-60 % of Windows; no fork. Still no all-core turbo (12 threads ~2.4 GHz / 16 W).
   AGPM kept as daily (11-22). **CPUFRIEND-2 (11-22): `hwp` off in the vector → P-cores 4.5 GHz**:
-  12 threads 23.6 → 45.4 GHz-equiv, 1 thread 2.4 → 4.45 GHz; idle 7.2 → 10.8 W. Kept (11-22). **RTD3-4 (11-22): RTX off after 60 s idle and back on for Chrome** (RESUME 0x0, 844 ms). Second cycle OK; same boot RTX idle-on 30.9 W → off 25.3 W (~-5.5 W). Lukas OK'd `rtd3.sh keep` (11-22); confirm after its boot.
+  12 threads 23.6 → 45.4 GHz-equiv, 1 thread 2.4 → 4.45 GHz; idle 7.2 → 10.8 W. Kept (11-22). **RTD3-4 (11-22): RTX off after 60 s idle and back on for Chrome** (RESUME 0x0, 844 ms). Second cycle OK; same boot RTX idle-on 30.9 W → off 25.3 W (~-5.5 W). Kept as daily (11-22).
 
 ## Other open problems
 
