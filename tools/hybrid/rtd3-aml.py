@@ -10,7 +10,7 @@ for power resources; nothing else calls NXOF/NXO_. RTD3-2's PowerResource wrappe
 length check and is gone.
 
 Hand-assembled AML (iasl is not installed): Scope (\\_SB.PC00) { Method (NXOF) { \\_SB.PC00.PEG0.PXP_._OFF ()
-Return (One) }  Method (NXO_) { \\_SB.PC00.PEG0.PXP_._ON_ () Return (One) } }. The calls take no arguments, so they
+Return (One) }  Method (NXO_) { \\_SB.PC00.PEG0.PXP_._ON_ () If (NVID != 0x10DE) { ...see FALLBACK } Return (One) } }. The calls take no arguments, so they
 need no External: a bare NameString in a method body is resolved when the method runs.
 
 Usage: rtd3-aml.py OUT.aml
@@ -48,10 +48,40 @@ def method(name: str, body: bytes) -> bytes:
 
 RET_ONE = b"\xa4\x01"   # Return (One)
 PC00 = ("_SB_", "PC00")
-PXP = (*PC00, "PEG0", "PXP_")
+PEG0 = (*PC00, "PEG0")
+PXP = (*PEG0, "PXP_")
+NVID = path(*PEG0, "PEGP", "NVID")
+NOT_NV = b"\x92\x93" + NVID + b"\x0b\xde\x10"   # LNotEqual (PEGP.NVID, 0x10DE)
+
+
+def store(src: bytes, dst: bytes) -> bytes:
+    return b"\x70" + src + dst
+
+
+def sleep(arg: bytes) -> bytes:
+    return b"\x5b\x22" + arg
+
+
+# RTD3-4: PXP_._ON_ returned at once in RTD3-3 and the RTX stayed off the bus. _ON_ does Return (0) before PON_ when
+# \_SB.PC00.PEG0.GSTA (the PEGP.PWGD power-good GPIO) is not 0, and POFF only cuts the rail when GPPR returns 1, so
+# the GPU can sit in reset with power-good still high [inferred]. If NVID is not NVIDIA's after _ON_, NXO_ runs the
+# rest of _ON_'s normal branch itself (SSDT-12 0x4b6e): PON_ (power, release reset), L23D (retrain the link),
+# CMDR = 7, D0ST = 0, wait for NVID (bounded here to 1000 x 1 ms), LREN = PEGP.LTRE, CEDR = 1, PEGP.SSSV = DSSV,
+# Sleep (100), then EC0_.VGAF = 1 as _ON_ does at its end. Returns 2 when it took that path.
+FALLBACK = (path(*PEG0, "PON_") + path(*PEG0, "L23D")
+            + store(b"\x0a\x07", path(*PEG0, "CMDR"))
+            + store(b"\x00", path(*PEG0, "D0ST"))
+            + store(b"\x00", b"\x60")
+            + b"\xa2" + pkg(b"\x90" + NOT_NV + b"\x95\x60\x0b\xe8\x03" + sleep(b"\x01") + b"\x75\x60")
+            + store(path(*PEG0, "PEGP", "LTRE"), path(*PEG0, "LREN"))
+            + store(b"\x01", path(*PEG0, "CEDR"))
+            + store(path(*PC00, "DSSV"), path(*PEG0, "PEGP", "SSSV"))
+            + sleep(b"\x0a\x64")
+            + store(b"\x01", path(*PC00, "LPCB", "EC0_", "VGAF"))
+            + b"\xa4\x0a\x02")
 BODY = b"\x10" + pkg(path(*PC00)
                      + method("NXOF", path(*PXP, "_OFF") + RET_ONE)
-                     + method("NXO_", path(*PXP, "_ON_") + RET_ONE))
+                     + method("NXO_", path(*PXP, "_ON_") + b"\xa0" + pkg(NOT_NV + FALLBACK) + RET_ONE))
 
 
 def table() -> bytes:

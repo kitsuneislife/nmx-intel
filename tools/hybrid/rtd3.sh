@@ -13,6 +13,9 @@
 # RTD3-3 (now): arm installs nullmoth's NVRM with three byte patches (tools/nvrm/rtd3-patch.sh) so it evaluates
 # NXOF / NXO_ on \_SB.PC00, and loads SSDT-NXRTD3.aml (rtd3-aml.py), whose NXOF / NXO_ call PXP_._OFF / _ON_.
 # nvrtd3res only has to start with a backslash now (nullmoth logs it). The patched NVRM is inert without nvrtd3=1.
+# RTD3-3 result: NXOF cut the RTX, but NXO_'s PXP_._ON_ returned at once and the GPU stayed off the bus (vendor
+# 0xffff, LOST until reboot). RTD3-4 (now): NXO_ finishes _ON_'s power-up itself (PON_, L23D, wait for NVID) when the
+# GPU is still missing after _ON_. Same arm/check; nothing else changed.
 #   sudo bash tools/hybrid/rtd3.sh restore        nullmoth's original NVRM back (~/NVRM.kext.original), then reboot
 # Rollback from keep: sudo HWP=off bash tools/cpu/cpufriend.sh keep
 set -uo pipefail
