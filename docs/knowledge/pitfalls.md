@@ -508,3 +508,14 @@ copies with the new kernel range (`sudo tahoe.sh patch`); never just widen MaxKe
   `PEGP.PWGD`) is not 0, and `POFF` cuts the rail only when `GPPR` returns 1. So the GPU can be left in reset with
   power-good high [inferred, branch unverified]. Do not trust `_ON_` alone: check `PEGP.NVID` afterwards and run
   `PEG0.PON_` / `L23D` yourself (RTD3-4, `tools/hybrid/rtd3-aml.py`).
+
+## The HDMI port is on the RTX; a hotplugged display stays dark in the hybrid (2026-11-24)
+
+- [measured, ioreg 11-24] With an EPSON projector on HDMI, the EDID (`4ca3 1aa1`, ELD "EPSON PJ") and
+  `connector-type 0x800` (HDMI) appear on `NVRMNVDAFramebuffer`, not on any `AppleIntelFramebuffer`; Intel FB@1/@2
+  stay empty. `debug.nvaccel_heads_published 1`, `heads_registered 0`, `heads_piped 0`, `NVAccelHeadless = Yes`,
+  `NVRMFirstPrimaryFlipMs 0`, and the framebuffer has no `IODisplayConnect`, so WindowServer never lists it.
+- So the Intel VBT's "HDMI on DDI B" (XE-5) is not the physical port [inferred from the above].
+- Cause [inferred from hybrid-route.md]: the headless check runs once, 60 s after NVAccel starts; with no head by then
+  WindowServer gets no NVIDIA Metal device for the rest of the boot. A display plugged later is detected but never used.
+- Untested: plugging the display in before power-on, so the head publishes inside the 60 s window.
