@@ -22,6 +22,7 @@ summary block on top, linked to each other). The original Portuguese diary is pr
 | Panel brightness (nullmoth switch vs our Intel panel) | [knowledge/brightness.md](knowledge/brightness.md) |
 | Moving to a new nullmoth release | [knowledge/nullmoth-upgrade.md](knowledge/nullmoth-upgrade.md) |
 | Wi-Fi (MT7921): build, install, knobs, undo | [knowledge/wifi.md](knowledge/wifi.md) |
+| Wi-Fi slow after line upgrade: 2.4 GHz legacy, DMA cache fix upstream | [research/wifi-study-2026-11-27.md](research/wifi-study-2026-11-27.md) |
 | Hybrid route (Iris Xe composites, RTX renders chosen apps) | [knowledge/hybrid-route.md](knowledge/hybrid-route.md) |
 
 ## Map
