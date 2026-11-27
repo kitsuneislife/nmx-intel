@@ -1,0 +1,116 @@
+From 5fdf2949a654c6ef4273b4c72e4d4358f3721d72 Mon Sep 17 00:00:00 2001
+From: tinywifi <65711396+tinywifi@users.noreply.github.com>
+Date: Tue, 20 Oct 2026 12:39:05 +0700
+Subject: [PATCH] fix(dma): cache packet bounce buffers
+
+Use normal cached RAM for packet bounce allocations instead of inheriting
+kIOMapInhibitCache. Keep descriptor allocations uncached and retain the
+physical contiguity and 32-bit DMA mask.
+
+Add an extracted allocator test for the two cache policies, physical mask,
+preparation and allocation failure.
+---
+ mtk80211/compat.cpp     |  4 ++-
+ tests/dma/test-cache.py | 74 +++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 77 insertions(+), 1 deletion(-)
+ create mode 100644 tests/dma/test-cache.py
+
+diff --git a/mtk80211/compat.cpp b/mtk80211/compat.cpp
+index e0b9ac7..78f6917 100644
+--- a/mtk80211/compat.cpp
++++ b/mtk80211/compat.cpp
+@@ -414,8 +414,10 @@ int bus_dmamap_load(bus_dmamap_t map, mbuf_t mb) {
+ 				map->dm_bounce_mem = 0;
+ 				map->dm_bounce_size = 0;
+ 			}
++			/* x86 packet DMA is coherent; keep payload copies in cached RAM. */
+ 			IOBufferMemoryDescriptor *mem =
+-			    alloc_dma_memory(bounce_size, PAGE_SIZE);
++			    alloc_dma_memory(bounce_size, PAGE_SIZE,
++			    kIOMemoryPhysicallyContiguous | kIOMapDefaultCache);
+ 			if (mem == 0)
+ 				return 1;
+ 			map->dm_bounce_mem = mem;
+diff --git a/tests/dma/test-cache.py b/tests/dma/test-cache.py
+new file mode 100644
+index 0000000..5b78bc2
+--- /dev/null
++++ b/tests/dma/test-cache.py
+@@ -0,0 +1,74 @@
++from pathlib import Path
++import re
++import subprocess
++import sys
++import tempfile
++
++src = Path(sys.argv[1]) if len(sys.argv) > 1 else Path(__file__).resolve().parents[2] / 'mtk80211/compat.cpp'
++s = src.read_text()
++start = s.index('IOBufferMemoryDescriptor* alloc_dma_memory(', s.index('IOBufferMemoryDescriptor* alloc_dma_memory(') + 1)
++allocator = s[start:s.index('\nint bus_dmamem_alloc(', start)]
++bounce_call = re.search(r'alloc_dma_memory\(bounce_size, PAGE_SIZE,?.*?\);', s, re.S).group(0)
++ring_call = re.search(r'alloc_dma_memory\(size, alignment\);', s).group(0)
++stub = r'''
++#include <cassert>
++#include <cstddef>
++#include <cstdint>
++#include <initializer_list>
++using mach_vm_address_t = uint64_t;
++using IOOptionBits = unsigned;
++constexpr unsigned kIOMemoryPhysicallyContiguous = 0x10;
++constexpr unsigned kIOMapInhibitCache = 0x100;
++constexpr unsigned kIOMapDefaultCache = 0;
++constexpr unsigned PAGE_SIZE = 4096;
++constexpr int kernel_task = 1;
++struct IOBufferMemoryDescriptor {
++    static unsigned seen_options;
++    static uint64_t seen_mask;
++    static size_t seen_size;
++    static int preparations;
++    static bool fail;
++    static IOBufferMemoryDescriptor* inTaskWithPhysicalMask(int task, unsigned opts, size_t size, uint64_t mask) {
++        assert(task == kernel_task);
++        seen_options = opts; seen_size = size; seen_mask = mask;
++        static IOBufferMemoryDescriptor allocation;
++        return fail ? nullptr : &allocation;
++    }
++    void prepare() { ++preparations; }
++};
++unsigned IOBufferMemoryDescriptor::seen_options;
++uint64_t IOBufferMemoryDescriptor::seen_mask;
++size_t IOBufferMemoryDescriptor::seen_size;
++int IOBufferMemoryDescriptor::preparations;
++bool IOBufferMemoryDescriptor::fail;
++'''
++main = r'''
++int main() {
++    for (size_t bounce_size : {size_t(2048), size_t(4096), size_t(8192)}) {
++        auto* packet = BOUNCE_CALL
++        assert(packet);
++        assert(IOBufferMemoryDescriptor::seen_options == (kIOMemoryPhysicallyContiguous | kIOMapDefaultCache));
++        assert(IOBufferMemoryDescriptor::seen_size == bounce_size);
++        assert(IOBufferMemoryDescriptor::seen_mask == 0xfffff000ULL);
++        size_t size = bounce_size;
++        mach_vm_address_t alignment = PAGE_SIZE;
++        auto* ring = RING_CALL
++        assert(ring);
++        assert(IOBufferMemoryDescriptor::seen_options == (kIOMemoryPhysicallyContiguous | kIOMapInhibitCache));
++        assert(IOBufferMemoryDescriptor::seen_size == size);
++        assert(IOBufferMemoryDescriptor::seen_mask == 0xfffff000ULL);
++    }
++    assert(IOBufferMemoryDescriptor::preparations == 6);
++    IOBufferMemoryDescriptor::fail = true;
++    size_t bounce_size = 4096;
++    assert((BOUNCE_EXPR) == nullptr);
++    assert(IOBufferMemoryDescriptor::preparations == 6);
++}
++'''.replace('BOUNCE_CALL', bounce_call).replace('RING_CALL', ring_call).replace('BOUNCE_EXPR', bounce_call[:-1])
++with tempfile.TemporaryDirectory(prefix='mtk-dma-test-') as tmp:
++    cpp = Path(tmp) / 'cache.cpp'
++    exe = Path(tmp) / 'cache-test'
++    cpp.write_text(stub + allocator + main)
++    subprocess.run(['clang++', '-std=c++14', '-fsanitize=address,undefined', str(cpp), '-o', str(exe)], check=True)
++    subprocess.run([str(exe)], check=True)
++print('PASS: cached packet bounce allocation, uncached descriptor allocation, physical mask, preparation and null allocation.')
+-- 
+2.39.5 (Apple Git-154)
+

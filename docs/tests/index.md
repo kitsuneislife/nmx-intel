@@ -76,6 +76,8 @@ phase file; open only the row you need.
 | WIFI-8 | 10-18 | AirportMtkWlan `a7bfaa40` (+wifi5-0005) | data frames through firmware rate adaptation (was fixed 1/6 Mbit/s, BA off) | **works**: 37.1 down / 36.9 up (phone's ceiling); curl 38 up / 45 down | [wifi-1](wifi-1-mt7921.md) |
 | WIFI-9 | 10-30 | AirportMtkWlan `dd967442` (+wifi5-0006) | lock around TX ring cleanup (boot panic: interrupt and firmware download freed the same mbuf) | pending: no recurrence over the next boots | [wifi-1](wifi-1-mt7921.md) |
 | WIFI-10 | 11-13 | AirportMtkWlan `274f4c6a` (+wifi5-0007) | clear F_BGSCAN when a background scan ends outside RUN (Disconnect mid-scan left every scan/join busy) | pending: Disconnect + reconnect test | [wifi-1](wifi-1-mt7921.md) |
+| WIFI-11 | 11-27 | knob `nullmoth-wifi-band=5` on `274f4c6a` | Mac on 2.4 GHz ch 7 legacy OFDM (~4 Mbit/s), no 5 GHz heard | pending | [wifi-1](wifi-1-mt7921.md) |
+| WIFI-12 | 11-27 | AirportMtkWlan `69536f72` (+wifi5-0008) | cached DMA bounce buffers (upstream `dc88cdf`; was uncached) | pending: speedtest on 5 GHz | [wifi-1](wifi-1-mt7921.md) |
 | SLEEP-1 | 10-19 | OpenCore HibernateMode=Auto, `hibernatemode 25` | hibernate instead of S3, so the GOP relights the panel | **fails**: sleep policy chose deep idle (S3), never hibernated | [sleep-1](sleep-1-hibernate.md) |
 | SLEEP-2 | 10-19 | + HibernationFixup 1.5.4, `hbfx-ahbm=1` | force hibernation over the platform sleep policy | **fails**: still type 7 (S3), panel off at wake; sleep parked | [sleep-1](sleep-1-hibernate.md) |
 | GUARD-1 | 10-19 | NMIntelFB `241aff3d` (intelfb-0021) | stand down when nullmoth's boot guard has NVRM off | pending | [sleep-1](sleep-1-hibernate.md) |

@@ -342,3 +342,22 @@ a background scan. The HAL flag `MWX_FLAG_BGSCAN` is already cleared on scan don
 
 Expected: connect, start a scan (open the Wi-Fi menu), press Disconnect, then join again: the network list refreshes
 and the join succeeds. Workaround on `dd967442`: Wi-Fi off/on in Control Center [unverified] or reboot.
+
+## WIFI-11 and WIFI-12 (2026-11-27): slow download after the line upgrade
+
+Lukas's line went up to ~400 Mbit/s (phone). The Mac got ~4 down / 24 up on Wi-Fi and ~80 on cable. Findings
+[measured 11-27, `274f4c6a` installed]: joined "Nardino" on **2.4 GHz channel 7**, every `rxrate` window legacy OFDM
+(`ht=0 vht=0`, 20 MHz, 1 stream), RSSI −54, TX rate 6; the scan heard no 5 GHz BSS at all; country code 0; `en0` at
+`100baseTX` (cable or port, not the driver). Study and sources: [../research/wifi-study-2026-11-27.md](../research/wifi-study-2026-11-27.md).
+
+**WIFI-11 (knob, no rebuild):** `sudo nvram nullmoth-wifi-band=5`, reboot. Success = Nardino on 5 GHz (`chan=` > 14,
+`vht=` in `rxrate`). If no 5 GHz network shows, read the router's 5 GHz channel, width and security from the phone
+before changing code. Undo: `sudo nvram -d nullmoth-wifi-band`.
+
+**WIFI-12 (wifi5-0008, DMA cache):** cherry-pick of tinywifi's upstream commit `dc88cdf` (e5u v1.6.0, flx PR #2).
+Mbufs above 4 GB go through a 32-bit DMA bounce buffer; it was allocated `kIOMapInhibitCache`, so every packet copy
+ran on uncached memory. Now `kIOMapDefaultCache` (x86 packet DMA is coherent); descriptor rings stay uncached.
+Upstream: MT7922 26 → 197 Mbit/s, OverlordDev's MT7921 ~40 → ~148 down [measured by them]. Tree `nmx-wifi5`
+`5ca24bd`, build `AirportMtkWlan 69536f72` (Debug, same as before), host tests 12/12 PASS (adds `tests/dma`).
+Expected: download well above ~40 Mbit/s on 5 GHz. Without the fix even a good 5 GHz link should stop near the old
+~40 Mbit/s [inferred].

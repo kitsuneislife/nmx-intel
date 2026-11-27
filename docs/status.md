@@ -1,6 +1,6 @@
 # Status
 
-> **Summary.** Last updated 2026-11-22. Daily setup is the **WhateverXe hybrid** (XE-8): the Iris Xe drives the
+> **Summary.** Last updated 2026-11-27. Daily setup is the **WhateverXe hybrid** (XE-8): the Iris Xe drives the
 > desktop with Metal, the RTX runs nullmoth 3.0 headless and only apps listed by `ondemand.sh` open it. Staying on
 > Sequoia 15.8.1 (Tahoe trial in [tests/tahoe-1.md](tests/tahoe-1.md)). Daily is XE-15 (0.8.3), kernel->gpu max 0.2-2 ms. Next: AGPM-1 kept as daily.
 
@@ -16,7 +16,7 @@
 - RTX for apps: `sudo bash tools/hybrid/ondemand.sh add NAME` (then reopen the app). List: Roblox, Chrome (+ its
   Aperitif helper), Horizon (Claude moved back to the Iris Xe, LAT-14). After any nullmoth install:
   `on` + `add` again (pitfall).
-- Wi-Fi: AirportMtkWlan `dd967442` (WIFI-9); WIFI-10 `274f4c6a` built, install pending.
+- Wi-Fi: AirportMtkWlan `274f4c6a` (WIFI-10) installed; WIFI-11 knob + WIFI-12 `69536f72` (DMA cache) pending.
 - Recovery: OpenCore Space → "Start once without NVIDIA driver". Tests: [tests/wex-1.md](tests/wex-1.md).
 - Disk: 65.7 GB free [measured 11-22] after removing cargo `target/`s, magic-rush `tools/` + `private/`, a NixOS ISO.
 
@@ -43,6 +43,7 @@
 2. Panic 2026-11-12 19:39, WindowServer spinlock timeout, driver unknown. Watch for a repeat.
 3. Refresh: 144 Hz works through `refresh.sh` (XE-13); WindowServer still defaults to 60 Hz after boot.
 4. Sleep: off; untested with WhateverXe. `ASSERT(linkBW)` warning in the XE-7 log, harmless so far.
-5. Wi-Fi MT7921 at the line's ceiling (WIFI-8), [knowledge/wifi.md](knowledge/wifi.md).
+5. Wi-Fi ~4 Mbit/s on a ~400 line (2.4 GHz legacy, no 5 GHz heard; cable at 100baseTX): WIFI-11/12,
+   [research/wifi-study-2026-11-27.md](research/wifi-study-2026-11-27.md).
 
 Older status: [archive/status-2026-10-29.md](archive/status-2026-10-29.md), `git log docs/status.md`.

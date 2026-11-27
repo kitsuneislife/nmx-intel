@@ -2,7 +2,7 @@
 
 > **Summary.** Since WIFI-8 (2026-10-18) the internal MediaTek MT7921 (`14c3:7961`) works as a normal Mac Wi-Fi card:
 > native Wi-Fi menu, Keychain joins, 5 GHz VHT80, 37 down / 37 up on Lukas's line (the same as his phone). The driver is
-> flxxxxddd's **AirportMtkWlan** (SimpleMtkWlan fork v1.5.0, IO80211 Sequoia ABI) built from source with our six
+> flxxxxddd's **AirportMtkWlan** (SimpleMtkWlan fork v1.5.0, IO80211 Sequoia ABI) built from source with our eight
 > patches, installed in `/Library/Extensions` (auxiliary kernel collection), not in the EFI. History and measurements:
 > [../tests/wifi-1-mt7921.md](../tests/wifi-1-mt7921.md).
 
@@ -10,7 +10,7 @@
 
 | Piece | Where | Notes |
 | --- | --- | --- |
-| `AirportMtkWlan.kext` `274f4c6a` (WIFI-10, pending install; was `dd967442` WIFI-9) | `/Library/Extensions` | bundle `com.flxxxxddd.AirportMtkWlan` 1.5.0; MediaTek firmware inside (not versioned) |
+| `AirportMtkWlan.kext` `69536f72` (WIFI-12, pending install; installed `274f4c6a` WIFI-10) | `/Library/Extensions` | bundle `com.flxxxxddd.AirportMtkWlan` 1.5.0; MediaTek firmware inside (not versioned) |
 | Source | `~/nmx-build/wifi5/src`, branch `nmx-wifi5` | flxxxxddd/SimpleMtkWlan `9a9c2ea` (v1.5.0) + `source-fixes/wifi/flx-v1.5.0/*` |
 | MacKernelSDK | `~/nmx-build/wifi/mks` `3f75008` | the fork's submodule commit |
 | EFI requirement | `DisableIoMapper=true` (already in our config) | the driver does its own DMA without VT-d |
@@ -29,6 +29,7 @@ is separate and lives in the EFI.
 | wifi5-0005 | WIFI-8 | data frames through firmware rate adaptation; was fixed 1/6 Mbit/s with block ack off (the upload cap) |
 | wifi5-0006 | WIFI-9 | lock around TX ring cleanup: a boot panic (`m_free: freeing an already freed mbuf`) came from the interrupt and the firmware download freeing the same mbuf |
 | wifi5-0007 | WIFI-10 | clear `F_BGSCAN` when a background scan ends outside RUN: Disconnect during a scan left every scan and join `kIOReturnBusy` until reboot |
+| wifi5-0008 | WIFI-12 | DMA bounce buffers cached (`kIOMapDefaultCache`), upstream tinywifi `dc88cdf`: uncached copies capped download near ~40 Mbit/s |
 
 ## Build, install, undo
 
@@ -62,6 +63,9 @@ tag in `~/nmx-build/wifi5/src`, drop patches upstream already has (check wifi5-0
 fork's host tests, install, record a `WIFI-N` test.
 
 ## Open
+
+- 11-27: line now ~400 Mbit/s; Mac on 2.4 GHz legacy, no 5 GHz heard. WIFI-11 (band knob), WIFI-12 (DMA cache),
+  later a rebase on e5u v1.6.0 (HE, low-4G RX pool): [../research/wifi-study-2026-11-27.md](../research/wifi-study-2026-11-27.md).
 
 - University network: may be WPA2-Enterprise (802.1X) [unverified]; only WPA2-PSK is known to work with this driver.
 - wifi5-0002 and wifi5-0005 offered upstream in one PR (2026-10-18, Lukas's OK): https://github.com/flxxxxddd/SimpleMtkWlan/pull/1

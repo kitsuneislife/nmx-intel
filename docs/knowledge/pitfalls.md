@@ -354,6 +354,13 @@ names them. Internal eDP on ADL-P/RPL-P is experimental in WEX 0.6.1 (no hardwar
 > `Apple80211Scan Failed err[-536870187]`, join `-528342014`). Any flag set for one state must be cleared on every
 > exit path, not only the happy one (wifi5-0007).
 
+## AirportMtkWlan: uncached DMA bounce buffers cap the download; host tests need UTF-8
+
+> WIFI-12 [measured upstream, inferred here]: `alloc_dma_memory` defaults to `kIOMapInhibitCache`, right for descriptor
+> rings, wrong for the 32-bit bounce buffers that copy every packet above 4 GB (~40 Mbit/s ceiling on MT7921).
+> Packet bounce buffers use `kIOMapDefaultCache` (wifi5-0008). The fork's `tests/run-all.sh` fails `tests/scan`
+> with `invalid byte sequence in US-ASCII` unless run with `LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8`.
+
 ## A nullmoth update resets the RTX app list and drops `BOOST=` (UPG-6)
 
 > nullmoth's `install.sh` copies its own `nvmtl-allow.txt` (`*`, `!WindowServer`: every app on the RTX) and a fresh

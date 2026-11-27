@@ -119,6 +119,8 @@ source-fixes/00NN-<slug>.patch`, add an `apply` line to `build/apply-fixes.sh` (
   rate adaptation instead of the fixed basic rate with BA disabled (luzility `110c92c`); EAPOL keeps the basic rate.
 - `source-fixes/wifi/flx-v1.5.0/wifi5-0006` (WIFI-9) — an `IOLock` around the TX ring walk in `mwx_dma_tx_cleanup`:
   the interrupt and the firmware download reclaimed `sc_txfwdlq` together and double-freed an mbuf (boot panic).
+- `source-fixes/wifi/flx-v1.5.0/wifi5-0008` (WIFI-12) — upstream tinywifi `dc88cdf`: 32-bit DMA bounce buffers
+  allocated cached instead of `kIOMapInhibitCache`; descriptor rings unchanged. Adds the host test `tests/dma`.
 - `source-fixes/wifi/dropped-wifi-0005` (WIFI-4, **dropped**: hung the boot) — the 1 s watchdog runs the interrupt handler when `HOST_INT_STA` has
   pending bits (lost MSI) and dumps the RX DMA state after 3 s without frames.
 - `source-fixes/wex/0001-adopt-dp-boot-aux-diag.patch` (XE-3) — WhateverXe 0.6.1 (`68a2427`): diagnostics only.
