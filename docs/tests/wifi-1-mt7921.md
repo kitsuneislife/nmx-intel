@@ -361,3 +361,10 @@ Upstream: MT7922 26 → 197 Mbit/s, OverlordDev's MT7921 ~40 → ~148 down [meas
 `5ca24bd`, build `AirportMtkWlan 69536f72` (Debug, same as before), host tests 12/12 PASS (adds `tests/dma`).
 Expected: download well above ~40 Mbit/s on 5 GHz. Without the fix even a good 5 GHz link should stop near the old
 ~40 Mbit/s [inferred].
+
+Result WIFI-11 + WIFI-12 (2026-11-27 10:19, one boot with both; knob set, `69536f72` installed) [measured]:
+Speedtest **81.0 down / 40.0 up**, ping 7 ms (was ~4 / 24 on 2.4 GHz). Driver log: `chan=100`, every `rxrate`
+window VHT, 80 MHz, 2 streams, SGI, LDPC, but **always MCS 4** (~390 Mbit/s PHY). `en0` still `100baseTX`.
+The knob brought back 5 GHz; the download is now about twice the old ~40 Mbit/s ceiling that upstream ties to the
+uncached bounce buffers, so the DMA fix probably helped [inferred: the two changes were not isolated]. Still below
+the phone's ~400. Next candidates: why RX never leaves MCS 4, and e5u v1.6.0's low-4G RX pool (no bounce at all).

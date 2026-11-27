@@ -16,7 +16,7 @@
 - RTX for apps: `sudo bash tools/hybrid/ondemand.sh add NAME` (then reopen the app). List: Roblox, Chrome (+ its
   Aperitif helper), Horizon (Claude moved back to the Iris Xe, LAT-14). After any nullmoth install:
   `on` + `add` again (pitfall).
-- Wi-Fi: AirportMtkWlan `274f4c6a` (WIFI-10) installed; WIFI-11 knob + WIFI-12 `69536f72` (DMA cache) pending.
+- Wi-Fi: AirportMtkWlan `69536f72` (WIFI-12) + `nullmoth-wifi-band=5`: 81 down / 40 up (11-27).
 - Recovery: OpenCore Space → "Start once without NVIDIA driver". Tests: [tests/wex-1.md](tests/wex-1.md).
 - Disk: 65.7 GB free [measured 11-22] after removing cargo `target/`s, magic-rush `tools/` + `private/`, a NixOS ISO.
 
@@ -43,7 +43,7 @@
 2. Panic 2026-11-12 19:39, WindowServer spinlock timeout, driver unknown. Watch for a repeat.
 3. Refresh: 144 Hz works through `refresh.sh` (XE-13); WindowServer still defaults to 60 Hz after boot.
 4. Sleep: off; untested with WhateverXe. `ASSERT(linkBW)` warning in the XE-7 log, harmless so far.
-5. Wi-Fi ~4 Mbit/s on a ~400 line (2.4 GHz legacy, no 5 GHz heard; cable at 100baseTX): WIFI-11/12,
+5. Wi-Fi 81/40 on a ~400 line (WIFI-12; RX stuck at MCS 4; cable at 100baseTX),
    [research/wifi-study-2026-11-27.md](research/wifi-study-2026-11-27.md).
 
 Older status: [archive/status-2026-10-29.md](archive/status-2026-10-29.md), `git log docs/status.md`.
